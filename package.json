@@ -9,9 +9,20 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@sendgrid/mail": "^8.1.6",
+    "@stripe/react-stripe-js": "^5.4.1",
+    "@stripe/stripe-js": "^8.6.1",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.90.1",
+    "@types/stripe": "^8.0.416",
+    "dotenv": "^17.2.3",
     "next": "16.1.1",
+    "octokit": "^5.0.5",
+    "postmark": "^4.0.5",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "resend": "^6.7.0",
+    "stripe": "^20.1.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

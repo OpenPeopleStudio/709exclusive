@@ -1,36 +1,113 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 709exclusive
+> Production-Grade Resale Commerce Platform
 
-## Getting Started
+A complete e-commerce solution built with Next.js, Supabase, Stripe, and SendGrid. Features enterprise-grade inventory management, SKU intelligence, order lifecycle management, and Google image import.
 
-First, run the development server:
+## 🚀 Features
+
+- **Complete E-commerce Stack**: User auth, products, cart, checkout, orders
+- **Inventory Intelligence**: Real-time stock tracking with oversell protection
+- **SKU System**: Deterministic product codes for resale operations
+- **Admin Dashboard**: Product management, order fulfillment, analytics
+- **Email System**: Professional transactional emails via SendGrid
+- **Image Import**: Automated product photography via Google Search
+- **Analytics**: Sell-through rates, time-to-sell, inventory insights
+
+## 🛠️ Tech Stack
+
+- **Frontend**: Next.js 16, TypeScript, Tailwind CSS
+- **Backend**: Supabase (Auth, Database, Storage, Edge Functions)
+- **Payments**: Stripe (with webhook handling)
+- **Email**: SendGrid (transactional emails)
+- **Images**: Google Programmable Search API
+- **Database**: PostgreSQL with advanced functions and views
+
+## 📋 Quick Start
+
+1. **Clone & Install**
+   ```bash
+   git clone https://github.com/yourusername/709exclusive.git
+   cd 709exclusive
+   npm install
+   ```
+
+2. **Environment Setup**
+   ```bash
+   cp .env.local.example .env.local
+   # Edit with your API keys
+   ```
+
+3. **Database Setup**
+   ```bash
+   # Run the setup helper
+   ./setup-db.sh
+   
+   # Or manually run SQL migrations in Supabase
+   # Files: sql/001_init.sql through sql/015_model_images.sql
+   ```
+
+4. **Development**
+   ```bash
+   npm run dev
+   ```
+
+## 📚 Documentation
+
+- **[Setup Guide](SETUP_GUIDE.md)** - Complete deployment instructions
+- **[Database Schema](sql/)** - All SQL migrations with explanations
+- **[API Reference](api/)** - Backend endpoint documentation
+- **[Email Setup](EMAIL_SETUP.md)** - SendGrid configuration
+
+## 🎯 Key Features
+
+### Inventory Management
+- Atomic inventory locking prevents overselling
+- Reserved stock system for pending orders
+- Complete audit trails for all changes
+- Real-time availability calculations
+
+### SKU Intelligence
+- Deterministic SKU generation (BRAND-MODEL-SIZE-CONDITION-HASH)
+- Professional resale categorization
+- Automated variant management
+
+### Order Lifecycle
+- Complete fulfillment workflow
+- Shipping integration with tracking
+- Customer communication automation
+- Admin controls with proper authorization
+
+### Admin Analytics
+- Sell-through rate calculations
+- Time-to-sell metrics
+- Inventory aging reports
+- Performance dashboards
+
+## 🔒 Enterprise Security
+
+- Row-level security (RLS) on all database tables
+- Server-authoritative validation (no client trust)
+- TypeScript for type safety
+- Comprehensive error handling
+- Production-ready logging
+
+## 🚀 Deployment
+
+Ready for deployment on Vercel, Netlify, or Railway:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Vercel (recommended)
+npm install -g vercel
+vercel --prod
+
+# Set production environment variables
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 📞 Support
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Built for production resale operations. Includes comprehensive setup guides, testing scripts, and production monitoring.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**This is a complete, enterprise-grade commerce platform ready for real business operations.**
+# 709exclusive
