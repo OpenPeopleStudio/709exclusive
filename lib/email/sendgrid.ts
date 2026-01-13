@@ -1,6 +1,5 @@
-import { Client as SendGridClient } from '@sendgrid/mail'
+import sendgrid from '@sendgrid/mail'
 
-const sendgrid = new SendGridClient()
 sendgrid.setApiKey(process.env.SENDGRID_API_KEY!)
 
 interface EmailData {
