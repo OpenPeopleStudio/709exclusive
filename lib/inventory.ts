@@ -7,6 +7,18 @@ export interface VariantAvailability {
   available: number
 }
 
+export interface InventoryAuditLog {
+  id: string
+  variant_id: string
+  delta: number
+  reason: string
+  actor_id: string
+  created_at: string
+  product_variants: {
+    sku: string
+  }
+}
+
 // Get availability for multiple variants
 export async function getVariantAvailability(variantIds: string[]): Promise<VariantAvailability[]> {
   const supabase = await createSupabaseServer()
@@ -66,7 +78,7 @@ export async function adjustInventory(
 }
 
 // Get inventory audit history
-export async function getInventoryAuditHistory(variantId?: string): Promise<any[]> {
+export async function getInventoryAuditHistory(variantId?: string): Promise<InventoryAuditLog[]> {
   const supabase = await createSupabaseServer()
 
   let query = supabase

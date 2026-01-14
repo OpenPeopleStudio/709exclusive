@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { isAdmin } from '@/lib/roles'
+import { SupabaseClient } from '@supabase/supabase-js'
 
 export async function GET() {
   const supabase = await createSupabaseServer()
@@ -29,7 +30,7 @@ export async function GET() {
   }
 }
 
-async function getUserRole(supabase: any, userId: string): Promise<string | undefined> {
+async function getUserRole(supabase: SupabaseClient, userId: string): Promise<string | undefined> {
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')

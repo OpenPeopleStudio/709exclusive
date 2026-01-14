@@ -64,6 +64,7 @@ async function getOrderEmailData(orderId: string): Promise<OrderEmailData | null
 
   if (!items) return null
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const emailItems = items?.map((item: any) => ({
     sku: item.product_variants.sku,
     name: `${item.product_variants.brand} ${item.product_variants.model}`,

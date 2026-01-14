@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { supabase } from '@/lib/supabaseClient'
 import { useCart } from '@/context/CartContext'
 import { getDropStatus, formatTimeRemaining } from '@/lib/drops'
@@ -107,21 +108,29 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
           {/* Product Images */}
           <div className="space-y-4">
             {primaryImage && (
-              <img
-                src={primaryImage.url}
-                alt={product.name}
-                className="w-full h-96 object-cover rounded-lg"
-              />
+              <div className="relative w-full h-96">
+                <Image
+                  src={primaryImage.url}
+                  alt={product.name}
+                  fill
+                  className="object-cover rounded-lg"
+                  priority
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                />
+              </div>
             )}
             {images.length > 1 && (
               <div className="grid grid-cols-4 gap-2">
                 {images.slice(1).map((image) => (
-                  <img
-                    key={image.id}
-                    src={image.url}
-                    alt={product.name}
-                    className="w-full h-20 object-cover rounded cursor-pointer"
-                  />
+                  <div key={image.id} className="relative w-full h-20">
+                    <Image
+                      src={image.url}
+                      alt={product.name}
+                      fill
+                      className="object-cover rounded cursor-pointer"
+                      sizes="(max-width: 768px) 25vw, 10vw"
+                    />
+                  </div>
                 ))}
               </div>
             )}

@@ -70,9 +70,9 @@ export function formatTimeRemaining(milliseconds: number): string {
 
 // Check if user can purchase based on per-user limits (future feature)
 export async function checkUserPurchaseLimit(
-  _userId: string,
-  _productId: string,
-  _requestedQty: number
+  _userId: string, // eslint-disable-line @typescript-eslint/no-unused-vars
+  _productId: string, // eslint-disable-line @typescript-eslint/no-unused-vars
+  _requestedQty: number // eslint-disable-line @typescript-eslint/no-unused-vars
 ): Promise<{
   canPurchase: boolean
   maxAllowed?: number

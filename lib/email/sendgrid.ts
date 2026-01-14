@@ -159,7 +159,7 @@ export async function sendOrderRefunded(data: EmailData): Promise<void> {
   await sendgrid.send(msg)
 }
 
-export async function sendAdminOrderNotification(orderId: string, customerEmail: string, total: number, items: any[]): Promise<void> {
+export async function sendAdminOrderNotification(orderId: string, customerEmail: string, total: number, items: Array<{ sku: string; name: string; quantity: number }>): Promise<void> {
   const msg = {
     to: 'admin@709exclusive.com', // Configure your admin email
     from: 'system@709exclusive.com',
