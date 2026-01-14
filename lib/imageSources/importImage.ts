@@ -35,7 +35,7 @@ export async function importImageToStorage({
   // Upload to Supabase storage
   const supabase = await createSupabaseServer()
 
-  const { data, error } = await supabase.storage
+  const { error } = await supabase.storage
     .from('model-images')
     .upload(filePath, buffer, {
       contentType: 'image/jpeg', // Normalize to JPEG

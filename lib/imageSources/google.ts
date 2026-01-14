@@ -35,7 +35,15 @@ export async function searchGoogleImages({
 
   const json = await res.json()
 
-  return (json.items || []).map((item: any) => ({
+  return (json.items || []).map((item: {
+    link: string
+    image: {
+      thumbnailLink: string
+      width: number
+      height: number
+      contextLink: string
+    }
+  }) => ({
     imageUrl: item.link,
     thumbnail: item.image.thumbnailLink,
     width: item.image.width,

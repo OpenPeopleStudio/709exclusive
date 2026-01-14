@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Image from 'next/image'
 
 interface ModelImage {
   id: string
@@ -34,11 +35,7 @@ export default function ModelImagesPage() {
   const [importing, setImporting] = useState(false)
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
-    fetchData()
-  }, [modelId])
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const response = await fetch(`/api/admin/models/${modelId}`)
       if (response.ok) {
@@ -56,7 +53,11 @@ export default function ModelImagesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [modelId, router])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   const searchGoogleImages = async () => {
     if (!model) return
@@ -197,11 +198,15 @@ export default function ModelImagesPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {images.map((image) => (
                 <div key={image.id} className="relative group">
-                  <img
-                    src={image.url}
-                    alt={`${model.brand} ${model.model}`}
-                    className="w-full h-32 object-cover rounded-lg"
-                  />
+                  <div className="relative w-full h-32">
+                    <Image
+                      src={image.url}
+                      alt={`${model.brand} ${model.model}`}
+                      fill
+                      className="object-cover rounded-lg"
+                      sizes="(max-width: 768px) 50vw, 25vw"
+                    />
+                  </div>
                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all rounded-lg flex items-center justify-center">
                     <div className="opacity-0 group-hover:opacity-100 flex space-x-2">
                       {image.is_primary && (
@@ -250,24 +255,28 @@ export default function ModelImagesPage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {googleImages.map((image, index) => (
                     <div key={index} className="relative">
-                      <img
-                        src={image.thumbnail}
-                        alt={`Search result ${index + 1}`}
-                        className={`w-full h-32 object-cover rounded-lg cursor-pointer border-2 ${
-                          selectedImages.has(image.imageUrl)
-                            ? 'border-blue-500'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                        onClick={() => {
-                          const newSelected = new Set(selectedImages)
-                          if (newSelected.has(image.imageUrl)) {
-                            newSelected.delete(image.imageUrl)
-                          } else {
-                            newSelected.add(image.imageUrl)
-                          }
-                          setSelectedImages(newSelected)
-                        }}
-                      />
+                      <div className="relative w-full h-32">
+                        <Image
+                          src={image.thumbnail}
+                          alt={`Search result ${index + 1}`}
+                          fill
+                          className={`object-cover rounded-lg cursor-pointer border-2 ${
+                            selectedImages.has(image.imageUrl)
+                              ? 'border-blue-500'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                          sizes="(max-width: 768px) 50vw, 25vw"
+                          onClick={() => {
+                            const newSelected = new Set(selectedImages)
+                            if (newSelected.has(image.imageUrl)) {
+                              newSelected.delete(image.imageUrl)
+                            } else {
+                              newSelected.add(image.imageUrl)
+                            }
+                            setSelectedImages(newSelected)
+                          }}
+                        />
+                      </div>
                       {selectedImages.has(image.imageUrl) && (
                         <div className="absolute top-2 right-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
                           <span className="text-white text-sm">✓</span>

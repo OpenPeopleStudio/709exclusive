@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 
 interface ProductModel {
@@ -17,11 +17,7 @@ export default function AdminModelsPage() {
   const [brands, setBrands] = useState<string[]>([])
   const [selectedBrand, setSelectedBrand] = useState<string>('')
 
-  useEffect(() => {
-    fetchModels()
-  }, [selectedBrand])
-
-  const fetchModels = async () => {
+  const fetchModels = useCallback(async () => {
     try {
       const url = selectedBrand
         ? `/api/admin/models?brand=${encodeURIComponent(selectedBrand)}`
@@ -40,7 +36,11 @@ export default function AdminModelsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [selectedBrand])
+
+  useEffect(() => {
+    fetchModels()
+  }, [fetchModels])
 
   if (loading) {
     return (

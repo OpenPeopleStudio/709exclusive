@@ -144,7 +144,7 @@ export default function CheckoutPage() {
     }
 
     initiateCheckout()
-  }, [cart, router])
+  }, [cart, router]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePaymentSuccess = () => {
     clearCart()
