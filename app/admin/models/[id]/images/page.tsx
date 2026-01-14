@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
 
 interface ModelImage {
   id: string
@@ -109,7 +110,7 @@ export default function ModelImagesPage() {
         alert(`Imported ${data.imported} of ${data.total} images`)
         setShowGoogleImport(false)
         setSelectedImages(new Set())
-        await fetchData() // Refresh images
+        await fetchData()
       } else {
         alert('Import failed')
       }
@@ -143,8 +144,15 @@ export default function ModelImagesPage() {
   if (loading) {
     return (
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-8">Model Images</h1>
-        <p className="text-gray-600">Loading...</p>
+        <div className="mb-8">
+          <Link href="/admin/models" className="text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
+            ← Back to Models
+          </Link>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] mt-4">Model Images</h1>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin"></div>
+        </div>
       </div>
     )
   }
@@ -152,88 +160,90 @@ export default function ModelImagesPage() {
   if (!model) {
     return (
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-8">Model Images</h1>
-        <p className="text-red-600">Model not found</p>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-4">Model Images</h1>
+        <p className="text-[var(--error)]">Model not found</p>
       </div>
     )
   }
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Model Images</h1>
-          <p className="text-gray-600 mt-1">
-            {model.brand} {model.model}
-          </p>
-        </div>
-        <div className="flex items-center space-x-4">
-          <input
-            type="text"
-            placeholder="Color (e.g., Red, Black)"
-            value={colorSearch}
-            onChange={(e) => setColorSearch(e.target.value)}
-            className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            onClick={searchGoogleImages}
-            disabled={searching}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md font-medium hover:bg-blue-700 disabled:opacity-50"
-          >
-            {searching ? 'Searching...' : 'Search Images'}
-          </button>
-          <button
-            onClick={() => router.back()}
-            className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md font-medium hover:bg-gray-400"
-          >
-            Back
-          </button>
+      <div className="mb-8">
+        <Link href="/admin/models" className="text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
+          ← Back to Models
+        </Link>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mt-4 gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-[var(--text-primary)]">Model Images</h1>
+            <p className="text-[var(--text-secondary)]">{model.brand} {model.model}</p>
+          </div>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <input
+              type="text"
+              placeholder="Color (e.g., Red, Black)"
+              value={colorSearch}
+              onChange={(e) => setColorSearch(e.target.value)}
+              className="min-w-[180px]"
+            />
+            <button
+              onClick={searchGoogleImages}
+              disabled={searching}
+              className="btn-primary whitespace-nowrap"
+            >
+              {searching ? 'Searching...' : 'Search Images'}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Existing Images */}
-      <div className="bg-white shadow rounded-lg overflow-hidden mb-8">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">
+      <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-[var(--border-primary)]">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">
             Images ({images.length})
           </h2>
         </div>
         {images.length === 0 ? (
-          <div className="p-6 text-center text-gray-500">
-            No images yet. Import from Google or upload manually.
+          <div className="p-12 text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center">
+              <svg className="w-8 h-8 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <p className="text-[var(--text-muted)]">No images yet. Search and import from Google.</p>
           </div>
         ) : (
           <div className="p-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {images.map((image) => (
                 <div key={image.id} className="relative group">
-                  <div className="relative w-full h-32">
+                  <div className="relative aspect-square rounded-lg overflow-hidden bg-[var(--bg-tertiary)]">
                     <Image
                       src={image.url}
                       alt={`${model.brand} ${model.model}`}
                       fill
-                      className="object-cover rounded-lg"
+                      className="object-cover"
                       sizes="(max-width: 768px) 50vw, 25vw"
                     />
-                  </div>
-                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all rounded-lg flex items-center justify-center">
-                    <div className="opacity-0 group-hover:opacity-100 flex space-x-2">
-                      {image.is_primary && (
-                        <span className="bg-green-500 text-white px-2 py-1 rounded text-xs">
-                          Primary
-                        </span>
-                      )}
-                      <button
-                        onClick={() => deleteImage(image.id)}
-                        className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600"
-                      >
-                        Delete
-                      </button>
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-all flex items-center justify-center">
+                      <div className="opacity-0 group-hover:opacity-100 flex items-center gap-2">
+                        {image.is_primary && (
+                          <span className="bg-[var(--success)] text-white px-2 py-1 rounded text-xs font-medium">
+                            Primary
+                          </span>
+                        )}
+                        <button
+                          onClick={() => deleteImage(image.id)}
+                          className="bg-[var(--error)] text-white px-3 py-1 rounded text-sm font-medium hover:bg-[var(--error)]/90 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <div className="mt-2 text-xs text-gray-500">
+                  <p className="mt-2 text-xs text-[var(--text-muted)]">
                     {image.source} • {new Date(image.created_at).toLocaleDateString()}
-                  </div>
+                  </p>
                 </div>
               ))}
             </div>
@@ -243,79 +253,83 @@ export default function ModelImagesPage() {
 
       {/* Google Import Modal */}
       {showGoogleImport && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Import from Google - {model.brand} {model.model}
-                {colorSearch && <span className="text-blue-600"> ({colorSearch})</span>}
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg max-w-4xl w-full max-h-[85vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-[var(--border-primary)] flex justify-between items-center">
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                Import from Google — {model.brand} {model.model}
+                {colorSearch && <span className="text-[var(--accent)]"> ({colorSearch})</span>}
               </h2>
               <button
                 onClick={() => setShowGoogleImport(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="p-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
               >
-                ✕
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto max-h-96">
+            <div className="p-6 overflow-y-auto max-h-[calc(85vh-140px)]">
               {googleImages.length === 0 ? (
-                <p className="text-gray-500">No images found. Try different search terms.</p>
+                <p className="text-center text-[var(--text-muted)] py-8">No images found. Try a different color or search term.</p>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {googleImages.map((image, index) => (
-                    <div key={index} className="relative">
-                      <div className="relative w-full h-32">
+                    <button
+                      key={index}
+                      onClick={() => {
+                        const newSelected = new Set(selectedImages)
+                        if (newSelected.has(image.imageUrl)) {
+                          newSelected.delete(image.imageUrl)
+                        } else {
+                          newSelected.add(image.imageUrl)
+                        }
+                        setSelectedImages(newSelected)
+                      }}
+                      className="relative text-left"
+                    >
+                      <div className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-colors ${
+                        selectedImages.has(image.imageUrl)
+                          ? 'border-[var(--accent)]'
+                          : 'border-transparent hover:border-[var(--border-secondary)]'
+                      }`}>
                         <Image
                           src={image.thumbnail}
                           alt={`Search result ${index + 1}`}
                           fill
-                          className={`object-cover rounded-lg cursor-pointer border-2 ${
-                            selectedImages.has(image.imageUrl)
-                              ? 'border-blue-500'
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
+                          className="object-cover"
                           sizes="(max-width: 768px) 50vw, 25vw"
-                          onClick={() => {
-                            const newSelected = new Set(selectedImages)
-                            if (newSelected.has(image.imageUrl)) {
-                              newSelected.delete(image.imageUrl)
-                            } else {
-                              newSelected.add(image.imageUrl)
-                            }
-                            setSelectedImages(newSelected)
-                          }}
                         />
+                        {selectedImages.has(image.imageUrl) && (
+                          <div className="absolute top-2 right-2 w-6 h-6 bg-[var(--accent)] rounded-full flex items-center justify-center">
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                        )}
                       </div>
-                      {selectedImages.has(image.imageUrl) && (
-                        <div className="absolute top-2 right-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                          <span className="text-white text-sm">✓</span>
-                        </div>
-                      )}
-                      <div className="mt-1 text-xs text-gray-500">
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
                         {image.width}×{image.height}
-                      </div>
-                    </div>
+                      </p>
+                    </button>
                   ))}
                 </div>
               )}
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
-              <div className="text-sm text-gray-600">
+            <div className="px-6 py-4 border-t border-[var(--border-primary)] flex justify-between items-center">
+              <p className="text-sm text-[var(--text-secondary)]">
                 {selectedImages.size} images selected
-              </div>
-              <div className="space-x-4">
-                <button
-                  onClick={() => setShowGoogleImport(false)}
-                  className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md font-medium hover:bg-gray-400"
-                >
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setShowGoogleImport(false)} className="btn-secondary">
                   Cancel
                 </button>
                 <button
                   onClick={importSelectedImages}
                   disabled={selectedImages.size === 0 || importing}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-md font-medium hover:bg-blue-700 disabled:opacity-50"
+                  className="btn-primary"
                 >
                   {importing ? 'Importing...' : `Import ${selectedImages.size} Images`}
                 </button>

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 export default function NewModelPage() {
   const router = useRouter()
@@ -19,9 +20,7 @@ export default function NewModelPage() {
     try {
       const response = await fetch('/api/admin/models', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brand, model })
       })
 
@@ -41,55 +40,48 @@ export default function NewModelPage() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Add New Model</h1>
-        <p className="mt-2 text-gray-600">Create a new product model to manage images for.</p>
+        <Link href="/admin/models" className="text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
+          ← Back to Models
+        </Link>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)] mt-4">Add New Model</h1>
+        <p className="text-[var(--text-secondary)] mt-1">Create a new product model to manage images for</p>
       </div>
 
       <form onSubmit={handleSubmit} className="max-w-lg">
-        <div className="bg-white shadow rounded-lg p-6 space-y-6">
+        <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6 space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Brand</label>
+            <label>Brand *</label>
             <input
               type="text"
               required
               value={brand}
               onChange={(e) => setBrand(e.target.value)}
               placeholder="e.g., Nike, Jordan, Yeezy"
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">Model</label>
+            <label>Model *</label>
             <input
               type="text"
               required
               value={model}
               onChange={(e) => setModel(e.target.value)}
               placeholder="e.g., Air Force 1, Retro 4, 350 V2"
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-4">
-              <div className="text-red-800">{error}</div>
+            <div className="p-4 bg-[var(--error)]/10 border border-[var(--error)]/20 rounded-md">
+              <p className="text-sm text-[var(--error)]">{error}</p>
             </div>
           )}
 
-          <div className="flex justify-end space-x-4">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md font-medium hover:bg-gray-400"
-            >
+          <div className="flex justify-end gap-4 pt-4">
+            <button type="button" onClick={() => router.back()} className="btn-secondary">
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-md font-medium hover:bg-indigo-700 disabled:opacity-50"
-            >
+            <button type="submit" disabled={loading} className="btn-primary">
               {loading ? 'Creating...' : 'Create Model'}
             </button>
           </div>

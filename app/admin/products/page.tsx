@@ -34,20 +34,17 @@ export default function AdminProductsPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch products
         const productsResponse = await fetch('/api/admin/products')
         if (productsResponse.ok) {
           const productsData = await productsResponse.json()
           setProducts(productsData.products || [])
         }
 
-        // Fetch analytics
         const analyticsResponse = await fetch('/api/admin/analytics')
         if (analyticsResponse.ok) {
           const analyticsData = await analyticsResponse.json()
           setAnalytics(analyticsData.analytics || [])
         }
-
       } catch (error) {
         console.error('Error fetching admin data:', error)
       } finally {
@@ -61,180 +58,193 @@ export default function AdminProductsPage() {
   if (loading) {
     return (
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-8">Product Management</h1>
-        <div className="bg-white shadow rounded-lg p-6">
-          <p className="text-gray-600">Loading...</p>
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Products</h1>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6">
+              <div className="skeleton h-8 w-16 mb-2"></div>
+              <div className="skeleton h-4 w-24"></div>
+            </div>
+          ))}
         </div>
       </div>
     )
   }
 
+  const totalSold = analytics.reduce((sum, a) => sum + a.sold_units, 0)
+  const totalStock = analytics.reduce((sum, a) => sum + a.stock, 0)
+  const slowMovers = analytics.filter(a => a.sell_through_rate < 0.1).length
+  const variantsSold = analytics.filter(a => a.days_to_first_sale !== null).length
+
   return (
     <div>
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Product Management</h1>
-        <Link
-          href="/admin/products/new"
-          className="bg-indigo-600 text-white px-4 py-2 rounded-md font-medium hover:bg-indigo-700"
-        >
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Products</h1>
+        <Link href="/admin/products/new" className="btn-primary">
           Add Product
         </Link>
       </div>
 
-      {/* Analytics Summary */}
-      <div className="bg-white shadow rounded-lg p-6 mb-8">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Analytics Summary</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-indigo-600">
-              {analytics.reduce((sum, a) => sum + a.sold_units, 0)}
-            </div>
-            <div className="text-sm text-gray-600">Total Units Sold</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">
-              {analytics.reduce((sum, a) => sum + a.stock, 0)}
-            </div>
-            <div className="text-sm text-gray-600">Total Stock Remaining</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-yellow-600">
-              {analytics.filter(a => a.sell_through_rate < 0.1).length}
-            </div>
-            <div className="text-sm text-gray-600">Slow Movers (&lt;10% sell-through)</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">
-              {analytics.filter(a => a.days_to_first_sale !== null).length}
-            </div>
-            <div className="text-sm text-gray-600">Variants Sold</div>
-          </div>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6">
+          <p className="text-3xl font-bold text-[var(--accent)]">{totalSold}</p>
+          <p className="text-sm text-[var(--text-muted)] mt-1">Units Sold</p>
+        </div>
+        <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6">
+          <p className="text-3xl font-bold text-[var(--success)]">{totalStock}</p>
+          <p className="text-sm text-[var(--text-muted)] mt-1">In Stock</p>
+        </div>
+        <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6">
+          <p className="text-3xl font-bold text-[var(--warning)]">{slowMovers}</p>
+          <p className="text-sm text-[var(--text-muted)] mt-1">Slow Movers</p>
+        </div>
+        <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6">
+          <p className="text-3xl font-bold text-[var(--text-primary)]">{variantsSold}</p>
+          <p className="text-sm text-[var(--text-muted)] mt-1">Variants Sold</p>
         </div>
       </div>
 
-      {/* Products List */}
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Products ({products.length})</h2>
+      {/* Products Table */}
+      <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-[var(--border-primary)]">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+            All Products ({products.length})
+          </h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-[var(--border-primary)]">
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                   Product
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                   Category
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Drop
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
+                  Type
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                   Created
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-[var(--border-primary)]">
               {products.map((product) => (
-                <tr key={product.id}>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                <tr key={product.id} className="hover:bg-[var(--bg-tertiary)] transition-colors">
+                  <td className="px-6 py-4">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                      <div className="text-sm text-gray-500">{product.brand}</div>
+                      <p className="font-medium text-[var(--text-primary)]">{product.name}</p>
+                      {product.brand && (
+                        <p className="text-sm text-[var(--text-muted)]">{product.brand}</p>
+                      )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {product.category}
+                  <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
+                    {product.category || '—'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4">
                     {product.is_drop ? (
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                      <span className="inline-flex px-2 py-1 text-xs font-medium rounded bg-[var(--accent)]/20 text-[var(--accent)]">
                         Drop
                       </span>
                     ) : (
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                      <span className="inline-flex px-2 py-1 text-xs font-medium rounded bg-[var(--bg-tertiary)] text-[var(--text-muted)]">
                         Regular
                       </span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 text-sm text-[var(--text-muted)]">
                     {new Date(product.created_at).toLocaleDateString()}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <td className="px-6 py-4 text-right">
                     <Link
-                      href={`/admin/products/${product.id}`}
-                      className="text-indigo-600 hover:text-indigo-900"
+                      href={`/product/${product.slug}`}
+                      className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                     >
-                      Edit
+                      View →
                     </Link>
                   </td>
                 </tr>
               ))}
+              {products.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-[var(--text-muted)]">
+                    No products yet. Create your first product to get started.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Top Analytics */}
-      <div className="mt-8 bg-white shadow rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Top Performing Variants</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  SKU
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Sold
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Remaining
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Sell-Through
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Days to First Sale
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {analytics.slice(0, 10).map((variant) => (
-                <tr key={variant.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
-                    {variant.sku}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {variant.sold_units}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {variant.stock}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      variant.sell_through_rate > 0.8 ? 'bg-green-100 text-green-800' :
-                      variant.sell_through_rate > 0.5 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {(variant.sell_through_rate * 100).toFixed(1)}%
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {variant.days_to_first_sale ? `${variant.days_to_first_sale.toFixed(1)} days` : 'Not sold'}
-                  </td>
+      {/* Top Performers */}
+      {analytics.length > 0 && (
+        <div className="mt-8 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg overflow-hidden">
+          <div className="px-6 py-4 border-b border-[var(--border-primary)]">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">Top Performers</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-[var(--border-primary)]">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
+                    SKU
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
+                    Sold
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
+                    Stock
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
+                    Sell-Through
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
+                    Days to First Sale
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-[var(--border-primary)]">
+                {analytics.slice(0, 10).map((variant) => (
+                  <tr key={variant.id} className="hover:bg-[var(--bg-tertiary)] transition-colors">
+                    <td className="px-6 py-4 font-mono text-sm text-[var(--text-primary)]">
+                      {variant.sku}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
+                      {variant.sold_units}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
+                      {variant.stock}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${
+                        variant.sell_through_rate > 0.8 
+                          ? 'bg-[var(--success)]/20 text-[var(--success)]' 
+                          : variant.sell_through_rate > 0.5 
+                            ? 'bg-[var(--warning)]/20 text-[var(--warning)]' 
+                            : 'bg-[var(--error)]/20 text-[var(--error)]'
+                      }`}>
+                        {(variant.sell_through_rate * 100).toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-[var(--text-muted)]">
+                      {variant.days_to_first_sale ? `${variant.days_to_first_sale.toFixed(1)} days` : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
