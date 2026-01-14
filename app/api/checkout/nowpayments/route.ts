@@ -2,6 +2,16 @@ import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { createNOWPaymentInvoice } from '@/lib/nowpayments'
 
+// Helper to safely extract product name from Supabase join result
+function getProductName(products: unknown): string {
+  if (!products) return 'Unknown'
+  if (Array.isArray(products) && products[0]?.name) return products[0].name
+  if (typeof products === 'object' && (products as { name?: string }).name) {
+    return (products as { name: string }).name
+  }
+  return 'Unknown'
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await createSupabaseServer()
@@ -44,7 +54,7 @@ export async function POST(request: Request) {
         variant_id: variant.id,
         quantity: item.quantity,
         price_cents: variant.price_cents,
-        product_name: (variant.products as { name: string })?.name || 'Unknown',
+        product_name: getProductName(variant.products),
         size: variant.size,
       })
     }

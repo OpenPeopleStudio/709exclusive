@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { useCart } from '@/context/CartContext'
 
-export default function CheckoutSuccessPage() {
+function SuccessContent() {
   const searchParams = useSearchParams()
   const orderId = searchParams.get('order_id')
   const { clearCart } = useCart()
@@ -78,5 +78,21 @@ export default function CheckoutSuccessPage() {
 
       <Footer />
     </div>
+  )
+}
+
+export default function CheckoutSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[var(--bg-primary)] flex flex-col">
+        <Header />
+        <main className="flex-1 flex items-center justify-center pt-20 pb-16">
+          <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin"></div>
+        </main>
+        <Footer />
+      </div>
+    }>
+      <SuccessContent />
+    </Suspense>
   )
 }

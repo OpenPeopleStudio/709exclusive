@@ -160,7 +160,7 @@ export default function CheckoutPage() {
           },
           body: JSON.stringify({
             items: cart.map(item => ({
-              variantId: item.variantId,
+              variantId: item.variant_id,
               quantity: item.qty
             })),
             shippingAddress: {

@@ -9,6 +9,7 @@ import Footer from '@/components/Footer'
 
 interface Message {
   id: string
+  customer_id: string
   content: string
   sender_type: 'customer' | 'admin'
   created_at: string
