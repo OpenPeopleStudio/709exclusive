@@ -21,6 +21,7 @@ interface OrderEmailData {
   }>
   subtotal: number
   shipping: number
+  tax: number
   total: number
   shippingAddress: {
     name: string
@@ -39,13 +40,10 @@ interface OrderEmailData {
 async function getOrderEmailData(orderId: string): Promise<OrderEmailData | null> {
   const supabase = await createSupabaseServer()
 
-  // Get order with customer email
+  // Get order with stored shipping address (includes customer email)
   const { data: order } = await supabase
     .from('orders')
-    .select(`
-      *,
-      709_profiles!customer_id(email)
-    `)
+    .select('*')
     .eq('id', orderId)
     .single()
 
@@ -79,11 +77,13 @@ async function getOrderEmailData(orderId: string): Promise<OrderEmailData | null
     price: item.price_cents
   })) || []
 
-  const subtotal = emailItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-  const shipping = order.shipping_cents
+  const computedSubtotal = emailItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+  const subtotal = (order.subtotal_cents ?? computedSubtotal) as number
+  const shipping = (order.shipping_cents ?? 0) as number
+  const tax = (order.tax_cents ?? 0) as number
+  const total = (order.total_cents ?? (subtotal + shipping + tax)) as number
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const customerEmail = (order as any)['709_profiles']?.email || ''
+  const customerEmail = (order.shipping_address as unknown as { email?: string } | null)?.email || ''
 
   return {
     orderId: order.id,
@@ -91,7 +91,8 @@ async function getOrderEmailData(orderId: string): Promise<OrderEmailData | null
     items: emailItems,
     subtotal,
     shipping,
-    total: subtotal + shipping,
+    tax,
+    total,
     shippingAddress: order.shipping_address,
     trackingNumber: order.tracking_number,
     carrier: order.carrier

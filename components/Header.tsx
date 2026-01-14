@@ -3,18 +3,34 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useCart } from '@/context/CartContext'
+import { supabase } from '@/lib/supabaseClient'
 
 export default function Header() {
   const { itemCount } = useCart()
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 50)
     }
     window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
+
+    // Check auth status
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setIsLoggedIn(!!user)
+    })
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setIsLoggedIn(!!session?.user)
+    })
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+      subscription.unsubscribe()
+    }
   }, [])
 
   return (
@@ -80,10 +96,10 @@ export default function Header() {
 
               {/* Account */}
               <Link 
-                href="/account/login" 
+                href={isLoggedIn ? "/account" : "/account/login"} 
                 className="hidden md:flex px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors rounded-full hover:bg-white/5"
               >
-                Account
+                {isLoggedIn ? 'Account' : 'Login'}
               </Link>
 
               {/* Mobile Menu Toggle */}
@@ -144,11 +160,11 @@ export default function Header() {
                 )}
               </Link>
               <Link 
-                href="/account/login" 
+                href={isLoggedIn ? "/account" : "/account/login"} 
                 className="text-2xl font-medium text-[var(--text-muted)] py-4"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                Account
+                {isLoggedIn ? 'Account' : 'Login'}
               </Link>
             </nav>
           </div>

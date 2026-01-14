@@ -1,95 +1,146 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { createNOWPaymentInvoice } from '@/lib/nowpayments'
-
-// Helper to safely extract product name from Supabase join result
-function getProductName(products: unknown): string {
-  if (!products) return 'Unknown'
-  if (Array.isArray(products) && products[0]?.name) return products[0].name
-  if (typeof products === 'object' && (products as { name?: string }).name) {
-    return (products as { name: string }).name
-  }
-  return 'Unknown'
-}
+import { getCheckoutQuote } from '@/lib/checkoutPricing'
+import type { CartItem } from '@/types/cart'
 
 export async function POST(request: Request) {
   try {
     const supabase = await createSupabaseServer()
     const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await request.json()
-    const { items, shippingAddress, email } = body
+    const { items, shippingAddress, shippingMethodCode } = body as {
+      items: CartItem[]
+      shippingAddress: {
+        name: string
+        line1: string
+        line2?: string
+        city: string
+        province: string
+        postal_code: string
+        country: string
+        phone?: string
+        email?: string
+      }
+      shippingMethodCode?: string
+    }
 
     if (!items || items.length === 0) {
       return NextResponse.json({ error: 'No items in cart' }, { status: 400 })
     }
 
-    if (!shippingAddress || !shippingAddress.name || !shippingAddress.address) {
+    if (!shippingAddress) {
       return NextResponse.json({ error: 'Shipping address required' }, { status: 400 })
     }
 
-    // Calculate total
-    let totalCents = 0
-    const orderItems: Array<{
-      variant_id: string
-      quantity: number
-      price_cents: number
-      product_name: string
-      size: string
-    }> = []
+    const required = ['name', 'line1', 'city', 'province', 'postal_code', 'country']
+    for (const field of required) {
+      if (!(shippingAddress as Record<string, unknown>)[field]) {
+        return NextResponse.json({ error: `Missing required field: ${field}` }, { status: 400 })
+      }
+    }
 
+    // Calculate totals (includes shipping + tax)
+    let quote
+    try {
+      quote = await getCheckoutQuote({
+        supabase,
+        items,
+        shippingAddress,
+        requestedShippingMethodCode: shippingMethodCode,
+      })
+    } catch (error) {
+      const anyError = error as Error & { variant_id?: string }
+      if (anyError.message === 'Insufficient stock') {
+        return NextResponse.json(
+          { error: anyError.message, variant_id: anyError.variant_id },
+          { status: 409 }
+        )
+      }
+      return NextResponse.json({ error: anyError.message || 'Checkout failed' }, { status: 400 })
+    }
+
+    const selectedShipping =
+      quote.shippingOptions.find(o => o.code === quote.selectedShippingMethodCode) ?? quote.shippingOptions[0]
+
+    if (selectedShipping.code.startsWith('local_delivery') && !shippingAddress.phone?.trim()) {
+      return NextResponse.json(
+        { error: 'Phone number is required for local delivery' },
+        { status: 400 }
+      )
+    }
+
+    // Reserve inventory (atomic updates) with cleanup on failure
+    const reserved: Array<{ variant_id: string; qty: number }> = []
     for (const item of items) {
-      const { data: variant } = await supabase
-        .from('variants')
-        .select('id, price_cents, size, products(name)')
-        .eq('id', item.variantId)
-        .single()
+      const { error } = await supabase.rpc('reserve_inventory', {
+        variant_id_input: item.variant_id,
+        qty_input: item.qty,
+      })
 
-      if (!variant) {
-        return NextResponse.json({ error: `Variant not found: ${item.variantId}` }, { status: 400 })
+      if (error) {
+        for (const r of reserved) {
+          await supabase.rpc('release_reserved_inventory', { variant_id: r.variant_id, qty: r.qty })
+        }
+        return NextResponse.json({ error: 'Reservation failed' }, { status: 409 })
       }
 
-      totalCents += variant.price_cents * item.quantity
-      orderItems.push({
-        variant_id: variant.id,
-        quantity: item.quantity,
-        price_cents: variant.price_cents,
-        product_name: getProductName(variant.products),
-        size: variant.size,
-      })
+      reserved.push({ variant_id: item.variant_id, qty: item.qty })
     }
 
     // Create order in pending state
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
-        customer_id: user?.id || null,
-        customer_email: email || user?.email,
         status: 'pending',
-        total_cents: totalCents,
-        payment_method: 'nowpayments',
-        shipping_name: shippingAddress.name,
-        shipping_address: shippingAddress.address,
-        shipping_city: shippingAddress.city,
-        shipping_state: shippingAddress.state,
-        shipping_zip: shippingAddress.zip,
-        shipping_country: shippingAddress.country || 'CA',
+        customer_id: user.id,
+        subtotal_cents: quote.subtotalCents,
+        shipping_address: shippingAddress,
+        shipping_cents: quote.shippingCents,
+        shipping_method: selectedShipping.label,
+        tax_cents: quote.taxCents,
+        tax_rate: quote.taxRate,
+        total_cents: quote.totalCents,
+        currency: quote.currency,
+        payment_method: 'crypto',
+        crypto_payment_status: 'waiting',
       })
       .select()
       .single()
 
     if (orderError || !order) {
       console.error('Order creation error:', orderError)
+      for (const r of reserved) {
+        await supabase.rpc('release_reserved_inventory', { variant_id: r.variant_id, qty: r.qty })
+      }
       return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
     }
 
     // Insert order items
-    const itemsToInsert = orderItems.map(item => ({
-      order_id: order.id,
-      variant_id: item.variant_id,
-      quantity: item.quantity,
-      price_cents: item.price_cents,
-    }))
+    const { data: variantsForItems, error: variantsError } = await supabase
+      .from('product_variants')
+      .select('id, sku, brand, model, size, price_cents')
+      .in('id', reserved.map(r => r.variant_id))
+
+    if (variantsError || !variantsForItems) {
+      await supabase.from('orders').delete().eq('id', order.id)
+      for (const r of reserved) {
+        await supabase.rpc('release_reserved_inventory', { variant_id: r.variant_id, qty: r.qty })
+      }
+      return NextResponse.json({ error: 'Failed to create order items' }, { status: 500 })
+    }
+
+    const itemsToInsert = reserved.map(r => {
+      const variant = variantsForItems.find(v => v.id === r.variant_id)
+      return {
+        order_id: order.id,
+        variant_id: r.variant_id,
+        qty: r.qty,
+        price_cents: variant?.price_cents ?? 0,
+      }
+    })
 
     const { error: itemsError } = await supabase
       .from('order_items')
@@ -98,27 +149,42 @@ export async function POST(request: Request) {
     if (itemsError) {
       // Rollback order
       await supabase.from('orders').delete().eq('id', order.id)
+      for (const r of reserved) {
+        await supabase.rpc('release_reserved_inventory', { variant_id: r.variant_id, qty: r.qty })
+      }
       console.error('Order items error:', itemsError)
       return NextResponse.json({ error: 'Failed to create order items' }, { status: 500 })
     }
 
     // Create product description
-    const itemDescriptions = orderItems.map(item => 
-      `${item.product_name} (${item.size}) x${item.quantity}`
-    ).join(', ')
+    const itemDescriptions = reserved.map(r => {
+      const variant = variantsForItems.find(v => v.id === r.variant_id)
+      const name = variant ? `${variant.brand} ${variant.model}` : 'Item'
+      const size = variant?.size ? ` (${variant.size})` : ''
+      return `${name}${size} x${r.qty}`
+    }).join(', ')
 
     // Create NOWPayments invoice
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://709exclusive.shop'
     
-    const invoice = await createNOWPaymentInvoice({
-      price_amount: totalCents / 100,
-      price_currency: 'cad',
-      order_id: order.id,
-      order_description: itemDescriptions.slice(0, 150), // Max 150 chars
-      ipn_callback_url: `${baseUrl}/api/nowpayments/webhook`,
-      success_url: `${baseUrl}/checkout/success?order_id=${order.id}`,
-      cancel_url: `${baseUrl}/checkout?cancelled=true`,
-    })
+    let invoice
+    try {
+      invoice = await createNOWPaymentInvoice({
+        price_amount: quote.totalCents / 100,
+        price_currency: quote.currency,
+        order_id: order.id,
+        order_description: itemDescriptions.slice(0, 150), // Max 150 chars
+        ipn_callback_url: `${baseUrl}/api/nowpayments/webhook`,
+        success_url: `${baseUrl}/checkout/success?order_id=${order.id}`,
+        cancel_url: `${baseUrl}/checkout?cancelled=true`,
+      })
+    } catch {
+      await supabase.from('orders').delete().eq('id', order.id)
+      for (const r of reserved) {
+        await supabase.rpc('release_reserved_inventory', { variant_id: r.variant_id, qty: r.qty })
+      }
+      return NextResponse.json({ error: 'Failed to create payment invoice' }, { status: 500 })
+    }
 
     // Store invoice ID on order
     await supabase
@@ -132,6 +198,11 @@ export async function POST(request: Request) {
       orderId: order.id,
       invoiceId: invoice.id,
       invoiceUrl: invoice.invoice_url,
+      subtotalCents: quote.subtotalCents,
+      shippingCents: quote.shippingCents,
+      taxCents: quote.taxCents,
+      totalCents: quote.totalCents,
+      shippingMethodLabel: selectedShipping.label,
     })
 
   } catch (error) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Header from '@/components/Header'
@@ -11,15 +11,15 @@ function SuccessContent() {
   const searchParams = useSearchParams()
   const orderId = searchParams.get('order_id')
   const { clearCart } = useCart()
-  const [cleared, setCleared] = useState(false)
+  const clearedRef = useRef(false)
 
   useEffect(() => {
-    // Clear cart on successful checkout
-    if (!cleared) {
+    // Clear cart on successful checkout (only once)
+    if (!clearedRef.current) {
+      clearedRef.current = true
       clearCart()
-      setCleared(true)
     }
-  }, [clearCart, cleared])
+  }, [clearCart])
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] flex flex-col">

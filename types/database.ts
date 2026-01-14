@@ -61,11 +61,15 @@ export interface Order {
   id: string
   customer_id: string
   status: OrderStatus
+  subtotal_cents: number
   total_cents: number | null
   stripe_payment_intent: string | null
   shipping_address: ShippingAddress
   shipping_cents: number
   shipping_method: string | null
+  tax_cents: number
+  tax_rate: number | null
+  currency: string
   tracking_number: string | null
   carrier: string | null
   paid_at: string | null

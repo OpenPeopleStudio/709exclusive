@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useCart } from '@/context/CartContext'
-import { CartItemWithVariant } from '@/lib/cart'
+import { getCartDisplayData } from '@/lib/cart'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import Header from '@/components/Header'
@@ -110,8 +110,42 @@ export default function CheckoutPage() {
   const [checkoutData, setCheckoutData] = useState<{
     clientSecret: string
     orderId: string
-    total: number
-    items: CartItemWithVariant[]
+    subtotalCents: number
+    shippingCents: number
+    taxCents: number
+    taxRate: number
+    totalCents: number
+    currency: string
+    shippingMethodLabel: string
+    shippingMethodCode: string
+  } | null>(null)
+  const [quote, setQuote] = useState<{
+    currency: string
+    subtotalCents: number
+    shippingCents: number
+    taxCents: number
+    taxRate: number
+    totalCents: number
+    shippingOptions: Array<{
+      code: string
+      label: string
+      description: string | null
+      amount_cents: number
+      currency: string
+      sort_order: number
+    }>
+    selectedShippingMethodCode: string
+  } | null>(null)
+  const [shippingMethodCode, setShippingMethodCode] = useState<string>('')
+  const [quoteLoading, setQuoteLoading] = useState(false)
+  const [quoteError, setQuoteError] = useState<string | null>(null)
+  const [cartDisplay, setCartDisplay] = useState<{
+    items: Array<{
+      variant_id: string
+      qty: number
+      variant?: { sku: string; price_cents: number; stock: number; reserved: number }
+    }>
+    subtotal: number
   } | null>(null)
   const [shippingAddress, setShippingAddress] = useState({
     name: '',
@@ -132,6 +166,88 @@ export default function CheckoutPage() {
     }
   }, [cart, router, checkoutData])
 
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const data = await getCartDisplayData(cart)
+      if (!cancelled) setCartDisplay(data)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [cart])
+
+  useEffect(() => {
+    if (checkoutData) return
+    if (cart.length === 0) {
+      setQuote(null)
+      setQuoteError(null)
+      return
+    }
+
+    const canQuote =
+      shippingAddress.country.trim() !== '' &&
+      shippingAddress.province.trim() !== '' &&
+      shippingAddress.postal_code.trim() !== ''
+
+    if (!canQuote) {
+      setQuote(null)
+      setQuoteError(null)
+      return
+    }
+
+    const controller = new AbortController()
+    const timeout = setTimeout(async () => {
+      setQuoteLoading(true)
+      setQuoteError(null)
+
+      try {
+        const response = await fetch('/api/checkout/quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            items: cart,
+            shippingAddress,
+            shippingMethodCode: shippingMethodCode || undefined,
+          }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null)
+          throw new Error(errorData?.error || 'Failed to calculate totals')
+        }
+
+        const data = await response.json()
+        if (controller.signal.aborted) return
+
+        setQuote(data)
+        if (data?.selectedShippingMethodCode && data.selectedShippingMethodCode !== shippingMethodCode) {
+          setShippingMethodCode(data.selectedShippingMethodCode)
+        }
+      } catch (err) {
+        if (controller.signal.aborted) return
+        setQuote(null)
+        setQuoteError(err instanceof Error ? err.message : 'Failed to calculate totals')
+      } finally {
+        if (!controller.signal.aborted) setQuoteLoading(false)
+      }
+    }, 350)
+
+    return () => {
+      clearTimeout(timeout)
+      controller.abort()
+    }
+  }, [
+    cart,
+    checkoutData,
+    shippingAddress.country,
+    shippingAddress.province,
+    shippingAddress.postal_code,
+    shippingAddress.city,
+    shippingMethodCode,
+  ])
+
   const isShippingValid = 
     shippingAddress.name.trim() !== '' &&
     shippingAddress.line1.trim() !== '' &&
@@ -141,9 +257,28 @@ export default function CheckoutPage() {
     shippingAddress.country.trim() !== '' &&
     shippingAddress.email.trim() !== ''
 
+  const isLocalDelivery = shippingMethodCode.startsWith('local_delivery')
+  const isReadyToProceed =
+    isShippingValid &&
+    !quoteLoading &&
+    !quoteError &&
+    !!quote &&
+    shippingMethodCode.trim() !== '' &&
+    (!isLocalDelivery || shippingAddress.phone.trim() !== '')
+
   const handleProceedToPayment = async () => {
     if (!isShippingValid) {
       setError('Please fill in all required shipping fields')
+      return
+    }
+
+    if (!quote || !shippingMethodCode.trim()) {
+      setError('Please complete your address to calculate shipping and tax')
+      return
+    }
+
+    if (isLocalDelivery && !shippingAddress.phone.trim()) {
+      setError('Phone number is required for local delivery')
       return
     }
 
@@ -159,19 +294,9 @@ export default function CheckoutPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            items: cart.map(item => ({
-              variantId: item.variant_id,
-              quantity: item.qty
-            })),
-            shippingAddress: {
-              name: shippingAddress.name,
-              address: `${shippingAddress.line1}${shippingAddress.line2 ? ', ' + shippingAddress.line2 : ''}`,
-              city: shippingAddress.city,
-              state: shippingAddress.province,
-              zip: shippingAddress.postal_code,
-              country: shippingAddress.country,
-            },
-            email: shippingAddress.email
+            items: cart,
+            shippingAddress,
+            shippingMethodCode
           }),
         })
 
@@ -192,7 +317,8 @@ export default function CheckoutPage() {
           },
           body: JSON.stringify({
             items: cart,
-            shippingAddress
+            shippingAddress,
+            shippingMethodCode
           }),
         })
 
@@ -219,6 +345,19 @@ export default function CheckoutPage() {
   if (cart.length === 0 && !checkoutData) {
     return null
   }
+
+  const formatMoney = (cents: number) => `$${(cents / 100).toFixed(2)}`
+  const activeTotals = checkoutData ?? quote
+  const subtotalCents = activeTotals?.subtotalCents ?? cartDisplay?.subtotal ?? 0
+  const shippingCents = activeTotals?.shippingCents ?? 0
+  const taxCents = activeTotals?.taxCents ?? 0
+  const totalCents = activeTotals?.totalCents ?? subtotalCents + shippingCents + taxCents
+  const taxRate = activeTotals?.taxRate ?? 0
+
+  const quoteShippingLabel = quote?.shippingOptions?.find(
+    o => o.code === quote.selectedShippingMethodCode
+  )?.label
+  const shippingLabel = checkoutData?.shippingMethodLabel ?? quoteShippingLabel
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] flex flex-col">
@@ -299,29 +438,61 @@ export default function CheckoutPage() {
                     />
                   </div>
                   
-                  <div>
-                    <label>Province *</label>
-                    <input
-                      type="text"
-                      required
-                      value={shippingAddress.province}
-                      onChange={(e) => setShippingAddress({...shippingAddress, province: e.target.value})}
-                      disabled={!!checkoutData}
-                      placeholder="NL"
-                    />
-                  </div>
+	                  <div>
+	                    <label>{shippingAddress.country === 'CA' ? 'Province *' : 'State *'}</label>
+	                    {shippingAddress.country === 'CA' ? (
+	                      <select
+	                        required
+	                        value={shippingAddress.province}
+	                        onChange={(e) => setShippingAddress({ ...shippingAddress, province: e.target.value })}
+	                        disabled={!!checkoutData}
+	                      >
+	                        <option value="">Select province</option>
+	                        <option value="AB">Alberta</option>
+	                        <option value="BC">British Columbia</option>
+	                        <option value="MB">Manitoba</option>
+	                        <option value="NB">New Brunswick</option>
+	                        <option value="NL">Newfoundland and Labrador</option>
+	                        <option value="NS">Nova Scotia</option>
+	                        <option value="NT">Northwest Territories</option>
+	                        <option value="NU">Nunavut</option>
+	                        <option value="ON">Ontario</option>
+	                        <option value="PE">Prince Edward Island</option>
+	                        <option value="QC">Quebec</option>
+	                        <option value="SK">Saskatchewan</option>
+	                        <option value="YT">Yukon</option>
+	                      </select>
+	                    ) : (
+	                      <input
+	                        type="text"
+	                        required
+	                        value={shippingAddress.province}
+	                        onChange={(e) => setShippingAddress({ ...shippingAddress, province: e.target.value })}
+	                        disabled={!!checkoutData}
+	                        placeholder="NY"
+	                      />
+	                    )}
+	                  </div>
                   
-                  <div>
-                    <label>Postal Code *</label>
-                    <input
-                      type="text"
-                      required
-                      value={shippingAddress.postal_code}
-                      onChange={(e) => setShippingAddress({...shippingAddress, postal_code: e.target.value})}
-                      disabled={!!checkoutData}
-                      placeholder="A1C 1A1"
-                    />
-                  </div>
+	                  <div>
+	                    <label>Postal Code *</label>
+	                    <input
+	                      type="text"
+	                      required
+	                      value={shippingAddress.postal_code}
+	                      onChange={(e) =>
+	                        setShippingAddress({
+	                          ...shippingAddress,
+	                          postal_code:
+	                            shippingAddress.country === 'CA'
+	                              ? e.target.value.toUpperCase()
+	                              : e.target.value
+	                        })
+	                      }
+	                      disabled={!!checkoutData}
+	                      placeholder={shippingAddress.country === 'CA' ? 'A1C 1A1' : '12345'}
+	                    />
+	                  </div>
                   
                   <div>
                     <label>Country *</label>
@@ -357,8 +528,73 @@ export default function CheckoutPage() {
                       placeholder="you@example.com"
                     />
                   </div>
+	                </div>
+	              </div>
+
+              {/* Delivery Method */}
+              {!checkoutData && (
+                <div className="mt-6 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6">
+                  <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">
+                    Delivery
+                  </h2>
+                  <p className="text-sm text-[var(--text-muted)] mb-4">
+                    Enter your province and postal code to see shipping and local delivery options.
+                  </p>
+
+                  {quoteLoading && (
+                    <div className="flex items-center gap-3 text-sm text-[var(--text-muted)]">
+                      <span className="w-4 h-4 border-2 border-[var(--text-muted)]/30 border-t-[var(--text-muted)] rounded-full animate-spin" />
+                      Calculating…
+                    </div>
+                  )}
+
+                  {quoteError && (
+                    <div className="p-3 bg-[var(--error)]/10 border border-[var(--error)]/20 rounded-md text-sm text-[var(--error)]">
+                      {quoteError}
+                    </div>
+                  )}
+
+                  {quote && quote.shippingOptions.length > 0 && (
+                    <div className="space-y-3">
+                      {quote.shippingOptions.map((option) => (
+                        <label
+                          key={option.code}
+                          className={`flex items-start justify-between gap-4 p-4 rounded-lg border transition-colors cursor-pointer ${
+                            shippingMethodCode === option.code
+                              ? 'border-[var(--accent)] bg-[var(--accent)]/10'
+                              : 'border-[var(--border-primary)] hover:border-[var(--border-secondary)]'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <input
+                              type="radio"
+                              name="shipping_method"
+                              value={option.code}
+                              checked={shippingMethodCode === option.code}
+                              onChange={() => setShippingMethodCode(option.code)}
+                              className="mt-1"
+                            />
+                            <div>
+                              <div className="font-medium text-[var(--text-primary)]">{option.label}</div>
+                              {option.description && (
+                                <div className="text-sm text-[var(--text-muted)] mt-1">{option.description}</div>
+                              )}
+                              {option.code.startsWith('local_delivery') && (
+                                <div className="text-xs text-[var(--text-muted)] mt-2">
+                                  Local delivery areas: St. John&apos;s, Mount Pearl, Paradise, CBS, Torbay, Portugal Cove (NL). Phone number required.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-sm font-medium text-[var(--text-primary)] whitespace-nowrap">
+                            ${((option.amount_cents ?? 0) / 100).toFixed(2)}
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
 
               {/* Payment Method Selector */}
               {!checkoutData && (
@@ -419,12 +655,12 @@ export default function CheckoutPage() {
                   )}
 
                   {/* Proceed Button */}
-                  <div className="mt-6">
-                    <button
-                      onClick={handleProceedToPayment}
-                      disabled={!isShippingValid || isLoading}
-                      className="btn-primary w-full justify-center py-4"
-                    >
+	                  <div className="mt-6">
+	                    <button
+	                      onClick={handleProceedToPayment}
+	                      disabled={!isReadyToProceed || isLoading}
+	                      className="btn-primary w-full justify-center py-4"
+	                    >
                       {isLoading ? (
                         <span className="flex items-center gap-2">
                           <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
@@ -435,13 +671,21 @@ export default function CheckoutPage() {
                       ) : (
                         'Continue to Card Payment'
                       )}
-                    </button>
-                    {!isShippingValid && (
-                      <p className="mt-3 text-sm text-[var(--text-muted)] text-center">
-                        Please fill in all required fields (*)
-                      </p>
-                    )}
-                  </div>
+	                    </button>
+	                    {!isReadyToProceed && (
+	                      <p className="mt-3 text-sm text-[var(--text-muted)] text-center">
+	                        {!isShippingValid
+	                          ? 'Please fill in all required fields (*)'
+	                          : quoteLoading
+	                            ? 'Calculating shipping and tax…'
+	                            : quoteError
+	                              ? quoteError
+	                              : isLocalDelivery && !shippingAddress.phone.trim()
+	                                ? 'Phone number is required for local delivery'
+	                                : 'Select a delivery option above'}
+	                      </p>
+	                    )}
+	                  </div>
                 </div>
               )}
 
@@ -473,48 +717,69 @@ export default function CheckoutPage() {
                   Order Summary
                 </h2>
 
-                {checkoutData ? (
-                  <div className="space-y-4">
-                    {checkoutData.items.map((item, index) => (
-                      <div key={index} className="flex justify-between items-start text-sm">
+                <div className="space-y-4">
+                  {cartDisplay?.items?.length ? (
+                    cartDisplay.items.map((item) => (
+                      <div key={item.variant_id} className="flex justify-between items-start text-sm">
                         <div className="flex-1 min-w-0">
-                          <p className="text-[var(--text-primary)] truncate">{item.variant.sku}</p>
+                          <p className="text-[var(--text-primary)] truncate">
+                            {item.variant?.sku || item.variant_id}
+                          </p>
                           <p className="text-[var(--text-muted)]">Qty: {item.qty}</p>
                         </div>
                         <span className="text-[var(--text-primary)] ml-4">
-                          ${((item.variant.price_cents * item.qty) / 100).toFixed(2)}
+                          {item.variant ? formatMoney(item.variant.price_cents * item.qty) : '—'}
                         </span>
                       </div>
-                    ))}
-                    
-                    <div className="pt-4 border-t border-[var(--border-primary)] space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-[var(--text-secondary)]">Subtotal</span>
-                        <span className="text-[var(--text-primary)]">${(checkoutData.total / 100).toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-[var(--text-secondary)]">Shipping</span>
-                        <span className="text-[var(--text-muted)]">Free</span>
-                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-4">
+                      <p className="text-[var(--text-secondary)]">{cart.length} item(s) in cart</p>
+                      <p className="text-sm text-[var(--text-muted)] mt-2">
+                        Loading items…
+                      </p>
                     </div>
-                    
-                    <div className="pt-4 border-t border-[var(--border-primary)]">
-                      <div className="flex justify-between">
-                        <span className="font-medium text-[var(--text-primary)]">Total</span>
-                        <span className="text-xl font-bold text-[var(--text-primary)]">
-                          ${(checkoutData.total / 100).toFixed(2)}
-                        </span>
-                      </div>
+                  )}
+
+                  <div className="pt-4 border-t border-[var(--border-primary)] space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-[var(--text-secondary)]">Subtotal</span>
+                      <span className="text-[var(--text-primary)]">{formatMoney(subtotalCents)}</span>
+                    </div>
+
+                    <div className="flex justify-between text-sm">
+                      <span className="text-[var(--text-secondary)]">
+                        {shippingLabel ? `Shipping (${shippingLabel})` : 'Shipping'}
+                      </span>
+                      <span className="text-[var(--text-primary)]">
+                        {activeTotals ? formatMoney(shippingCents) : '—'}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-sm">
+                      <span className="text-[var(--text-secondary)]">
+                        {activeTotals && taxRate > 0 ? `Tax (${Math.round(taxRate * 100)}%)` : 'Tax'}
+                      </span>
+                      <span className="text-[var(--text-primary)]">
+                        {activeTotals ? formatMoney(taxCents) : '—'}
+                      </span>
                     </div>
                   </div>
-                ) : (
-                  <div className="text-center py-4">
-                    <p className="text-[var(--text-secondary)]">{cart.length} item(s) in cart</p>
-                    <p className="text-sm text-[var(--text-muted)] mt-2">
-                      Complete shipping info to see total
-                    </p>
+
+                  <div className="pt-4 border-t border-[var(--border-primary)]">
+                    <div className="flex justify-between">
+                      <span className="font-medium text-[var(--text-primary)]">Total</span>
+                      <span className="text-xl font-bold text-[var(--text-primary)]">
+                        {activeTotals ? formatMoney(totalCents) : '—'}
+                      </span>
+                    </div>
+                    {!activeTotals && (
+                      <p className="text-sm text-[var(--text-muted)] mt-2 text-center">
+                        Enter your address above to calculate shipping and tax.
+                      </p>
+                    )}
                   </div>
-                )}
+                </div>
 
                 {/* Secure checkout badge */}
                 <div className="mt-6 pt-6 border-t border-[var(--border-primary)]">

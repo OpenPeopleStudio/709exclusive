@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -35,30 +35,34 @@ export default function Home() {
   const [images, setImages] = useState<Record<string, string>>({})
   const [prices, setPrices] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
+  const authCheckedRef = useRef(false)
 
   useEffect(() => {
     // Check for auth hash fragment (from Supabase redirect)
     const hash = window.location.hash
-    if (hash && hash.includes('access_token')) {
-      setIsProcessingAuth(true)
+    if (hash && hash.includes('access_token') && !authCheckedRef.current) {
+      authCheckedRef.current = true
       
-      const params = new URLSearchParams(hash.substring(1))
-      const accessToken = params.get('access_token')
-      const refreshToken = params.get('refresh_token')
+      const handleAuth = async () => {
+        setIsProcessingAuth(true)
+        const params = new URLSearchParams(hash.substring(1))
+        const accessToken = params.get('access_token')
+        const refreshToken = params.get('refresh_token')
 
-      if (accessToken && refreshToken) {
-        supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        }).then(({ error }) => {
+        if (accessToken && refreshToken) {
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          })
           if (!error) {
             window.history.replaceState(null, '', window.location.pathname)
             router.push('/admin/products')
           } else {
             setIsProcessingAuth(false)
           }
-        })
+        }
       }
+      handleAuth()
       return
     }
 

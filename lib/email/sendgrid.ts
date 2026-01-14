@@ -15,6 +15,7 @@ interface EmailData {
   }>
   subtotal: number
   shipping: number
+  tax: number
   total: number
   shippingAddress: {
     name: string
@@ -79,6 +80,7 @@ export async function sendOrderConfirmation(data: EmailData): Promise<void> {
       <h2>Order Summary</h2>
       <p>Subtotal: ${formatCurrency(data.subtotal)}</p>
       <p>Shipping: ${formatCurrency(data.shipping)}</p>
+      <p>Tax: ${formatCurrency(data.tax)}</p>
       <p><strong>Total: ${formatCurrency(data.total)}</strong></p>
 
       <h2>Shipping Address</h2>

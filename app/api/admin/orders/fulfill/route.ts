@@ -15,53 +15,68 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 
-  const { orderId }: { orderId: string } = await req.json()
+  const body = await req.json()
+  
+  // Support both single orderId and bulk orderIds array
+  const orderIds: string[] = body.orderIds || (body.orderId ? [body.orderId] : [])
 
-  if (!orderId) {
-    return NextResponse.json({ error: 'Order ID required' }, { status: 400 })
+  if (orderIds.length === 0) {
+    return NextResponse.json({ error: 'Order ID(s) required' }, { status: 400 })
   }
 
-  try {
-    // Get current order status
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .select('status')
-      .eq('id', orderId)
-      .single()
+  const results: { orderId: string; success: boolean; error?: string }[] = []
 
-    if (orderError || !order) {
-      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+  for (const orderId of orderIds) {
+    try {
+      // Get current order status
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .select('status')
+        .eq('id', orderId)
+        .single()
+
+      if (orderError || !order) {
+        results.push({ orderId, success: false, error: 'Order not found' })
+        continue
+      }
+
+      // Can only fulfill paid orders
+      if (order.status !== 'paid') {
+        results.push({ orderId, success: false, error: `Cannot fulfill order in ${order.status} status` })
+        continue
+      }
+
+      // Update order status
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({
+          status: 'fulfilled',
+          fulfilled_at: new Date().toISOString()
+        })
+        .eq('id', orderId)
+
+      if (updateError) {
+        results.push({ orderId, success: false, error: 'Failed to update order' })
+        continue
+      }
+
+      // TODO: Trigger fulfillment email to customer
+      results.push({ orderId, success: true })
+
+    } catch (error) {
+      console.error('Fulfill order error:', error)
+      results.push({ orderId, success: false, error: 'Internal error' })
     }
-
-    // Can only fulfill paid orders
-    if (order.status !== 'paid') {
-      return NextResponse.json({
-        error: 'Can only fulfill paid orders',
-        currentStatus: order.status
-      }, { status: 400 })
-    }
-
-    // Update order status
-    const { error: updateError } = await supabase
-      .from('orders')
-      .update({
-        status: 'fulfilled',
-        fulfilled_at: new Date().toISOString()
-      })
-      .eq('id', orderId)
-
-    if (updateError) {
-      return NextResponse.json({ error: 'Failed to update order' }, { status: 500 })
-    }
-
-    // TODO: Trigger fulfillment email to customer
-
-    return NextResponse.json({ success: true })
-
-  } catch (error) {
-    console.error('Fulfill order error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
+
+  const successCount = results.filter(r => r.success).length
+  const failCount = results.filter(r => !r.success).length
+
+  return NextResponse.json({
+    success: failCount === 0,
+    results,
+    summary: { processed: orderIds.length, succeeded: successCount, failed: failCount }
+  })
 }
 
 async function getUserRole(supabase: SupabaseClient, userId: string): Promise<string | undefined> {

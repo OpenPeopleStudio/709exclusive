@@ -82,7 +82,10 @@ export async function POST(req: Request) {
       // Update order status
       await supabase
         .from('orders')
-        .update({ status: 'failed' })
+        .update({
+          status: 'cancelled',
+          cancelled_at: new Date().toISOString()
+        })
         .eq('id', order.id)
     }
   }

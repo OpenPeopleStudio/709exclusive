@@ -1,6 +1,8 @@
 // NOWPayments Integration
 // Docs: https://documenter.getpostman.com/view/7907941/S1a32n38
 
+import crypto from 'crypto'
+
 const NOWPAYMENTS_API_KEY = process.env.NOWPAYMENTS_API_KEY!
 const NOWPAYMENTS_IPN_SECRET = process.env.NOWPAYMENTS_IPN_SECRET!
 
@@ -93,8 +95,6 @@ export function verifyNOWPaymentsIPN(
   payload: Record<string, unknown>,
   signature: string
 ): boolean {
-  const crypto = require('crypto')
-  
   // Sort payload keys and create string
   const sortedPayload = Object.keys(payload)
     .sort()

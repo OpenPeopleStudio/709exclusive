@@ -1,0 +1,143 @@
+import { NextResponse } from 'next/server'
+import { createSupabaseServer } from '@/lib/supabaseServer'
+
+interface CSVRow {
+  brand: string
+  model: string
+  size: string
+  condition: string
+  price: string
+  stock: string
+}
+
+export async function POST(request: Request) {
+  const supabase = await createSupabaseServer()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { data: profile } = await supabase
+    .from('709_profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile || !['admin', 'owner', 'staff'].includes(profile.role)) {
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+  }
+
+  try {
+    const { rows }: { rows: CSVRow[] } = await request.json()
+
+    let imported = 0
+    let errors = 0
+    const productCache: Record<string, string> = {}
+
+    for (const row of rows) {
+      try {
+        const cacheKey = `${row.brand}:${row.model}`
+        let productId = productCache[cacheKey]
+
+        if (!productId) {
+          // Check if product exists
+          const { data: existingProduct } = await supabase
+            .from('products')
+            .select('id')
+            .eq('brand', row.brand)
+            .eq('name', row.model)
+            .single()
+
+          if (existingProduct) {
+            productId = existingProduct.id
+          } else {
+            // Create product
+            const slug = `${row.brand}-${row.model}`
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-|-$/g, '')
+              + '-' + Date.now().toString(36)
+
+            const { data: newProduct, error: productError } = await supabase
+              .from('products')
+              .insert({
+                name: row.model,
+                brand: row.brand,
+                slug,
+                category: 'footwear',
+                description: `${row.brand} ${row.model}`
+              })
+              .select()
+              .single()
+
+            if (productError) throw productError
+            productId = newProduct.id
+
+            // Also create product_model if it doesn't exist
+            const modelSlug = `${row.brand}-${row.model}`
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+
+            await supabase
+              .from('product_models')
+              .upsert({
+                brand: row.brand,
+                model: row.model,
+                slug: modelSlug
+              }, { onConflict: 'slug' })
+          }
+
+          productCache[cacheKey] = productId
+        }
+
+        // Create variant
+        const priceCents = Math.round(parseFloat(row.price) * 100)
+        const stock = parseInt(row.stock) || 1
+        const sku = `${row.brand.substring(0, 3)}-${row.model.substring(0, 3)}-${row.size}-${row.condition}-${Date.now().toString(36)}`.toUpperCase()
+
+        const { error: variantError } = await supabase
+          .from('product_variants')
+          .insert({
+            product_id: productId,
+            sku,
+            brand: row.brand,
+            model: row.model,
+            size: row.size,
+            condition_code: row.condition.toUpperCase(),
+            price_cents: priceCents,
+            stock,
+            reserved: 0
+          })
+
+        if (variantError) throw variantError
+        imported++
+      } catch (err) {
+        console.error('Row import error:', err)
+        errors++
+      }
+    }
+
+    // Log the action
+    await supabase.from('activity_logs').insert({
+      user_id: user.id,
+      user_email: user.email,
+      action: 'csv_import',
+      entity_type: 'inventory',
+      entity_id: null,
+      details: { imported, errors, total: rows.length }
+    })
+
+    return NextResponse.json({ 
+      success: true, 
+      imported,
+      errors
+    })
+
+  } catch (error) {
+    console.error('CSV import error:', error)
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : 'Import failed'
+    }, { status: 500 })
+  }
+}

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { stripe } from '@/lib/stripe'
+import { getCheckoutQuote } from '@/lib/checkoutPricing'
 import type { CartItem } from '@/types/cart'
 
 export async function POST(req: Request) {
@@ -8,7 +9,7 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { items, shippingAddress }: {
+  const { items, shippingAddress, shippingMethodCode }: {
     items: CartItem[]
     shippingAddress: {
       name: string
@@ -20,6 +21,7 @@ export async function POST(req: Request) {
       country: string
       phone?: string
     }
+    shippingMethodCode?: string
   } = await req.json()
 
   if (!items?.length) return NextResponse.json({ error: 'Empty cart' }, { status: 400 })
@@ -33,97 +35,130 @@ export async function POST(req: Request) {
     }
   }
 
-  // 1. Fetch variants with FOR UPDATE semantics
-  const variantIds = items.map(i => i.variant_id)
-
-  const { data: variants, error } = await supabase
-    .from('product_variants')
-    .select('id, price_cents, stock, reserved')
-    .in('id', variantIds)
-
-  if (error || !variants) {
-    return NextResponse.json({ error: 'Inventory fetch failed' }, { status: 500 })
-  }
-
-  // 2. Validate availability and calculate subtotal
-  let subtotal = 0
-
-  for (const item of items) {
-    const variant = variants.find(v => v.id === item.variant_id)
-    if (!variant) return NextResponse.json({ error: 'Variant missing' }, { status: 400 })
-
-    const available = variant.stock - variant.reserved
-    if (available < item.qty) {
-      return NextResponse.json({
-        error: 'Insufficient stock',
-        variant_id: variant.id
-      }, { status: 409 })
+  let quote
+  try {
+    quote = await getCheckoutQuote({
+      supabase,
+      items,
+      shippingAddress,
+      requestedShippingMethodCode: shippingMethodCode,
+    })
+  } catch (error) {
+    const anyError = error as Error & { variant_id?: string }
+    if (anyError.message === 'Insufficient stock') {
+      return NextResponse.json(
+        { error: anyError.message, variant_id: anyError.variant_id },
+        { status: 409 }
+      )
     }
-
-    subtotal += variant.price_cents * item.qty
+    return NextResponse.json({ error: anyError.message || 'Checkout failed' }, { status: 400 })
   }
 
-  // 3. Calculate shipping (flat rate for Canada)
-  const shippingCents = shippingAddress.country === 'CA' ? 1500 : 2500 // $15 CAD or $25 USD
-  const total = subtotal + shippingCents
+  const selectedShipping =
+    quote.shippingOptions.find(o => o.code === quote.selectedShippingMethodCode) ?? quote.shippingOptions[0]
 
-  // 3. Reserve inventory (atomic update)
+  if (selectedShipping.code.startsWith('local_delivery') && !shippingAddress.phone?.trim()) {
+    return NextResponse.json(
+      { error: 'Phone number is required for local delivery' },
+      { status: 400 }
+    )
+  }
+
+  // Reserve inventory (atomic updates) with cleanup on failure
+  const reserved: Array<{ variant_id: string; qty: number }> = []
   for (const item of items) {
     const { error } = await supabase.rpc('reserve_inventory', {
       variant_id_input: item.variant_id,
-      qty_input: item.qty
+      qty_input: item.qty,
     })
 
     if (error) {
+      for (const r of reserved) {
+        await supabase.rpc('release_reserved_inventory', { variant_id: r.variant_id, qty: r.qty })
+      }
       return NextResponse.json({ error: 'Reservation failed' }, { status: 409 })
     }
+
+    reserved.push({ variant_id: item.variant_id, qty: item.qty })
   }
 
-  // 4. Create order
+  // Create order
   const { data: order, error: orderError } = await supabase
     .from('orders')
     .insert({
       customer_id: user.id,
       status: 'pending',
-      total_cents: total,
+      subtotal_cents: quote.subtotalCents,
       shipping_address: shippingAddress,
-      shipping_cents: shippingCents,
-      shipping_method: 'Standard'
+      shipping_cents: quote.shippingCents,
+      shipping_method: selectedShipping.label,
+      tax_cents: quote.taxCents,
+      tax_rate: quote.taxRate,
+      total_cents: quote.totalCents,
+      currency: quote.currency,
     })
     .select()
     .single()
 
   if (orderError || !order) {
+    for (const r of reserved) {
+      await supabase.rpc('release_reserved_inventory', { variant_id: r.variant_id, qty: r.qty })
+    }
     return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
   }
 
-  // 5. Create order items
-  const orderItems = items.map(item => {
-    const variant = variants.find(v => v.id === item.variant_id)!
-    return {
-      order_id: order.id,
-      variant_id: item.variant_id,
-      qty: item.qty,
-      price_cents: variant.price_cents
-    }
-  })
+  // Create order items
+  const { data: variantsForItems, error: variantsError } = await supabase
+    .from('product_variants')
+    .select('id, price_cents')
+    .in('id', reserved.map(r => r.variant_id))
 
-  const { error: itemsError } = await supabase
-    .from('order_items')
-    .insert(orderItems)
-
-  if (itemsError) {
-    // Cleanup: delete the order if items fail
+  if (variantsError || !variantsForItems) {
     await supabase.from('orders').delete().eq('id', order.id)
+    for (const r of reserved) {
+      await supabase.rpc('release_reserved_inventory', { variant_id: r.variant_id, qty: r.qty })
+    }
     return NextResponse.json({ error: 'Failed to create order items' }, { status: 500 })
   }
 
-  // 6. Create Stripe intent
-  const intent = await stripe.paymentIntents.create({
-    amount: total,
-    currency: 'cad',
-    metadata: { order_id: order.id }
+  const orderItems = reserved.map(r => {
+    const variant = variantsForItems.find(v => v.id === r.variant_id)
+    return {
+      order_id: order.id,
+      variant_id: r.variant_id,
+      qty: r.qty,
+      price_cents: variant?.price_cents ?? 0,
+    }
   })
+
+  const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
+
+  if (itemsError) {
+    await supabase.from('orders').delete().eq('id', order.id)
+    for (const r of reserved) {
+      await supabase.rpc('release_reserved_inventory', { variant_id: r.variant_id, qty: r.qty })
+    }
+    return NextResponse.json({ error: 'Failed to create order items' }, { status: 500 })
+  }
+
+  // Create Stripe intent
+  let intent
+  try {
+    intent = await stripe.paymentIntents.create({
+      amount: quote.totalCents,
+      currency: quote.currency,
+      metadata: {
+        order_id: order.id,
+        shipping_method_code: quote.selectedShippingMethodCode,
+      },
+    })
+  } catch {
+    await supabase.from('orders').delete().eq('id', order.id)
+    for (const r of reserved) {
+      await supabase.rpc('release_reserved_inventory', { variant_id: r.variant_id, qty: r.qty })
+    }
+    return NextResponse.json({ error: 'Payment initialization failed' }, { status: 500 })
+  }
 
   await supabase
     .from('orders')
@@ -132,6 +167,14 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     clientSecret: intent.client_secret,
-    orderId: order.id
+    orderId: order.id,
+    subtotalCents: quote.subtotalCents,
+    shippingCents: quote.shippingCents,
+    taxCents: quote.taxCents,
+    taxRate: quote.taxRate,
+    totalCents: quote.totalCents,
+    currency: quote.currency,
+    shippingMethodLabel: selectedShipping.label,
+    shippingMethodCode: quote.selectedShippingMethodCode,
   })
 }

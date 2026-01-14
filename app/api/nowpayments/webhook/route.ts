@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { verifyNOWPaymentsIPN, type NOWPaymentsIPNPayload } from '@/lib/nowpayments'
+import { sendOrderConfirmation } from '@/lib/email'
 
 // Use service role for webhook handling
 const supabase = createClient(
@@ -42,16 +43,34 @@ export async function POST(request: Request) {
       case 'finished':
       case 'confirmed':
         // Payment confirmed - update order status
-        await supabase
-          .from('orders')
-          .update({ 
-            status: 'paid',
-            paid_at: new Date().toISOString(),
-            crypto_payment_status: 'confirmed',
-            crypto_network: payload.pay_currency,
-            crypto_transaction_id: String(payload.payment_id),
-          })
-          .eq('id', order.id)
+        if (order.status === 'pending') {
+          const { data: orderItems } = await supabase
+            .from('order_items')
+            .select('variant_id, qty')
+            .eq('order_id', order.id)
+
+          if (orderItems) {
+            for (const item of orderItems) {
+              await supabase.rpc('finalize_inventory', {
+                variant_id_input: item.variant_id,
+                qty_input: item.qty
+              })
+            }
+          }
+
+          await supabase
+            .from('orders')
+            .update({ 
+              status: 'paid',
+              paid_at: new Date().toISOString(),
+              crypto_payment_status: 'confirmed',
+              crypto_network: payload.pay_currency,
+              crypto_transaction_id: String(payload.payment_id),
+            })
+            .eq('id', order.id)
+
+          await sendOrderConfirmation(order.id)
+        }
 
         console.log('Order paid via NOWPayments:', order.id)
         break
@@ -83,10 +102,25 @@ export async function POST(request: Request) {
       case 'refunded':
         // Payment failed
         if (order.status === 'pending') {
+          const { data: orderItems } = await supabase
+            .from('order_items')
+            .select('variant_id, qty')
+            .eq('order_id', order.id)
+
+          if (orderItems) {
+            for (const item of orderItems) {
+              await supabase.rpc('release_reserved_inventory', {
+                variant_id: item.variant_id,
+                qty: item.qty
+              })
+            }
+          }
+
           await supabase
             .from('orders')
             .update({ 
               status: 'cancelled',
+              cancelled_at: new Date().toISOString(),
               crypto_payment_status: payload.payment_status,
             })
             .eq('id', order.id)

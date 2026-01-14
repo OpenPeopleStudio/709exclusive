@@ -91,9 +91,11 @@ export default function AdminInventoryPage() {
   if (loading) {
     return (
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-8">Inventory Management</h1>
-        <div className="bg-white shadow rounded-lg p-6">
-          <p className="text-gray-600">Loading inventory...</p>
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Inventory Management</h1>
+        </div>
+        <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-8 text-center">
+          <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin mx-auto"></div>
         </div>
       </div>
     )
@@ -101,7 +103,12 @@ export default function AdminInventoryPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-8">Inventory Management</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Inventory Management</h1>
+        <a href="/admin/inventory/intake" className="btn-primary">
+          + Add Inventory
+        </a>
+      </div>
 
       {/* Current Inventory */}
       <div className="bg-white shadow rounded-lg overflow-hidden mb-8">
