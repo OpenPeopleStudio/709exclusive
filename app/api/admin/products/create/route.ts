@@ -39,11 +39,19 @@ export async function POST(req: Request) {
   } = await req.json()
 
   try {
+    // Generate slug from name
+    const slug = product.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      + '-' + Date.now().toString(36)
+
     // Create product
     const { data: createdProduct, error: productError } = await supabase
       .from('products')
       .insert({
         name: product.name,
+        slug: slug,
         brand: product.brand,
         category: product.category,
         description: product.description,

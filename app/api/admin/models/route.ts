@@ -1,15 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 
-export async function GET(request: Request) {
-  const supabase = await createSupabaseServer()
+async function checkAdminAuth(supabase: Awaited<ReturnType<typeof createSupabaseServer>>) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user || !user.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    return { error: 'Unauthorized', status: 403 }
   }
 
-  // Check if user is admin
   const { data: profile } = await supabase
     .from('709_profiles')
     .select('role')
@@ -17,7 +15,18 @@ export async function GET(request: Request) {
     .single()
 
   if (!profile || !['admin', 'owner'].includes(profile.role)) {
-    return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+    return { error: 'Admin access required', status: 403 }
+  }
+
+  return { user, profile }
+}
+
+export async function GET(request: Request) {
+  const supabase = await createSupabaseServer()
+  const auth = await checkAdminAuth(supabase)
+  
+  if ('error' in auth) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status })
   }
 
   try {
@@ -48,5 +57,46 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('Admin models fetch error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function POST(request: Request) {
+  const supabase = await createSupabaseServer()
+  const auth = await checkAdminAuth(supabase)
+  
+  if ('error' in auth) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status })
+  }
+
+  try {
+    const { brand, model }: { brand: string; model: string } = await request.json()
+
+    if (!brand?.trim() || !model?.trim()) {
+      return NextResponse.json({ error: 'Brand and model are required' }, { status: 400 })
+    }
+
+    // Generate slug
+    const slug = `${brand}-${model}`
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      + '-' + Date.now().toString(36)
+
+    const { data: newModel, error } = await supabase
+      .from('product_models')
+      .insert({
+        brand: brand.trim(),
+        model: model.trim(),
+        slug
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+
+    return NextResponse.json({ model: newModel })
+  } catch (error) {
+    console.error('Create model error:', error)
+    return NextResponse.json({ error: 'Failed to create model' }, { status: 500 })
   }
 }

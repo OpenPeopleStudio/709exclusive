@@ -9,13 +9,17 @@ export interface GoogleImageResult {
 export async function searchGoogleImages({
   brand,
   model,
+  color,
   limit = 10
 }: {
   brand: string
   model: string
+  color?: string
   limit?: number
 }): Promise<GoogleImageResult[]> {
-  const query = `"${brand} ${model}" product studio white background`
+  // Build search query with optional color
+  const colorPart = color ? ` "${color}"` : ''
+  const query = `"${brand} ${model}"${colorPart} product studio white background`
 
   const url = new URL('https://www.googleapis.com/customsearch/v1')
   url.searchParams.set('key', process.env.GOOGLE_IMAGE_API_KEY!)

@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { brand, model }: { brand: string; model: string } = await req.json()
+    const { brand, model, color }: { brand: string; model: string; color?: string } = await req.json()
 
     if (!brand?.trim() || !model?.trim()) {
       return NextResponse.json({ error: 'Brand and model required' }, { status: 400 })
@@ -31,6 +31,7 @@ export async function POST(req: Request) {
     const images = await searchGoogleImages({
       brand: brand.trim(),
       model: model.trim(),
+      color: color?.trim(),
       limit: 20
     })
 

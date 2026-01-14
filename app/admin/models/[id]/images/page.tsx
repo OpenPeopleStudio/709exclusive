@@ -34,6 +34,7 @@ export default function ModelImagesPage() {
   const [searching, setSearching] = useState(false)
   const [importing, setImporting] = useState(false)
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set())
+  const [colorSearch, setColorSearch] = useState('')
 
   const fetchData = useCallback(async () => {
     try {
@@ -69,7 +70,8 @@ export default function ModelImagesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           brand: model.brand,
-          model: model.model
+          model: model.model,
+          color: colorSearch || undefined
         })
       })
 
@@ -165,13 +167,20 @@ export default function ModelImagesPage() {
             {model.brand} {model.model}
           </p>
         </div>
-        <div className="space-x-4">
+        <div className="flex items-center space-x-4">
+          <input
+            type="text"
+            placeholder="Color (e.g., Red, Black)"
+            value={colorSearch}
+            onChange={(e) => setColorSearch(e.target.value)}
+            className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
           <button
             onClick={searchGoogleImages}
             disabled={searching}
             className="bg-blue-600 text-white px-4 py-2 rounded-md font-medium hover:bg-blue-700 disabled:opacity-50"
           >
-            {searching ? 'Searching...' : 'Import from Google'}
+            {searching ? 'Searching...' : 'Search Images'}
           </button>
           <button
             onClick={() => router.back()}
@@ -239,6 +248,7 @@ export default function ModelImagesPage() {
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
               <h2 className="text-lg font-semibold text-gray-900">
                 Import from Google - {model.brand} {model.model}
+                {colorSearch && <span className="text-blue-600"> ({colorSearch})</span>}
               </h2>
               <button
                 onClick={() => setShowGoogleImport(false)}
