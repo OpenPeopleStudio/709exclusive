@@ -40,6 +40,8 @@ export default function AdminMessagesPage() {
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [search, setSearch] = useState('')
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false)
   const [adminId, setAdminId] = useState<string | null>(null)
   const [showKeyVerification, setShowKeyVerification] = useState(false)
   const [showKeyBackup, setShowKeyBackup] = useState(false)
@@ -62,6 +64,7 @@ export default function AdminMessagesPage() {
     backupKeys,
     restoreKeys,
     verifyUserKey,
+    error: encryptionError,
   } = useE2EEncryption(adminId)
 
   // Get admin user ID
@@ -208,6 +211,28 @@ export default function AdminMessagesPage() {
     }
   }, [selectedCustomer, loadMessages])
 
+  // Realtime updates for usability: new messages appear without refresh.
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-messages')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        (payload) => {
+          const msg = payload.new as { customer_id?: string } | null
+          loadConversations()
+          if (selectedCustomer && msg?.customer_id === selectedCustomer) {
+            loadMessages(selectedCustomer)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [loadConversations, loadMessages, selectedCustomer])
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -294,6 +319,15 @@ export default function AdminMessagesPage() {
   }
 
   const selectedConvo = conversations.find(c => c.customer_id === selectedCustomer)
+  const filteredConversations = conversations.filter((c) => {
+    if (showUnreadOnly && c.unread_count === 0) return false
+    if (!search.trim()) return true
+    const q = search.trim().toLowerCase()
+    return (
+      c.customer_email.toLowerCase().includes(q) ||
+      (c.customer_name || '').toLowerCase().includes(q)
+    )
+  })
 
   return (
     <div>
@@ -307,7 +341,7 @@ export default function AdminMessagesPage() {
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
               </svg>
-              E2E Encrypted
+              Encrypted
             </span>
           ) : (
             <span className="text-sm text-[var(--text-muted)]">
@@ -319,32 +353,67 @@ export default function AdminMessagesPage() {
             onClick={() => setShowKeyVerification(true)}
             className="btn-secondary text-sm"
           >
-            🔑 Verify Keys
+            Verify keys
           </button>
           
           <button
             onClick={() => setShowKeyBackup(true)}
             className="btn-secondary text-sm"
           >
-            💾 Backup
+            Backup
           </button>
         </div>
       </div>
 
-      <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg overflow-hidden" style={{ height: 'calc(100vh - 200px)', minHeight: '500px' }}>
-        <div className="flex h-full">
+      {encryptionError && (
+        <div className="mb-4 p-3 bg-[var(--warning)]/10 border border-[var(--warning)]/20 rounded-lg text-sm text-[var(--text-secondary)]">
+          Encryption is unavailable on this device. Messages will send normally. {encryptionError}
+        </div>
+      )}
+
+      <div
+        className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg overflow-hidden"
+        style={{ height: 'calc(100vh - 200px)', minHeight: '560px' }}
+      >
+        <div className="flex h-full flex-col md:flex-row">
           {/* Conversations List */}
-          <div className="w-80 border-r border-[var(--border-primary)] flex flex-col">
-            <div className="p-4 border-b border-[var(--border-primary)]">
-              <h2 className="font-semibold text-[var(--text-primary)]">Conversations</h2>
+          <div
+            className={[
+              'w-full md:w-80 md:border-r border-[var(--border-primary)] flex flex-col',
+              selectedCustomer ? 'hidden md:flex' : 'flex',
+            ].join(' ')}
+          >
+            <div className="p-4 border-b border-[var(--border-primary)] space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="font-semibold text-[var(--text-primary)]">Inbox</h2>
+                <button
+                  type="button"
+                  onClick={() => setShowUnreadOnly((v) => !v)}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                    showUnreadOnly
+                      ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
+                      : 'border-[var(--border-primary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                  }`}
+                >
+                  Unread
+                </button>
+              </div>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search name or email…"
+                className="w-full"
+              />
             </div>
+
             <div className="flex-1 overflow-y-auto">
               {loading ? (
                 <div className="p-4 text-center text-[var(--text-muted)]">Loading...</div>
-              ) : conversations.length === 0 ? (
+              ) : filteredConversations.length === 0 ? (
                 <div className="p-4 text-center text-[var(--text-muted)]">No messages yet</div>
               ) : (
-                conversations.map(convo => (
+                filteredConversations.map(convo => (
                   <button
                     key={convo.customer_id}
                     onClick={() => setSelectedCustomer(convo.customer_id)}
@@ -384,18 +453,30 @@ export default function AdminMessagesPage() {
           </div>
 
           {/* Chat Area */}
-          <div className="flex-1 flex flex-col">
+          <div className={['flex-1 flex flex-col', selectedCustomer ? 'flex' : 'hidden md:flex'].join(' ')}>
             {selectedCustomer ? (
               <>
                 {/* Header */}
-                <div className="p-4 border-b border-[var(--border-primary)] flex justify-between items-center">
-                  <div>
+                <div className="p-4 border-b border-[var(--border-primary)] flex justify-between items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCustomer(null)}
+                      className="md:hidden p-2 -ml-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+                      aria-label="Back to inbox"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <div className="min-w-0">
                     <p className="font-medium text-[var(--text-primary)]">
                       {selectedConvo?.customer_name || selectedConvo?.customer_email}
                     </p>
                     {selectedConvo?.customer_name && (
                       <p className="text-sm text-[var(--text-muted)]">{selectedConvo.customer_email}</p>
                     )}
+                    </div>
                   </div>
                   {selectedConvo?.has_encryption && (
                     <button
@@ -403,9 +484,12 @@ export default function AdminMessagesPage() {
                         selectedCustomer,
                         selectedConvo?.customer_name || selectedConvo?.customer_email || 'Customer'
                       )}
-                      className="text-sm text-[var(--success)] hover:underline"
+                      className="text-sm text-[var(--success)] hover:underline flex items-center gap-2"
                     >
-                      🔐 Verify Key
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                      </svg>
+                      Verify key
                     </button>
                   )}
                 </div>
@@ -443,9 +527,8 @@ export default function AdminMessagesPage() {
 
                 {/* Input */}
                 <form onSubmit={handleSend} className="p-4 border-t border-[var(--border-primary)]">
-                  <div className="flex gap-3">
-                    <input
-                      type="text"
+                  <div className="flex gap-3 items-end">
+                    <textarea
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
                       placeholder={
@@ -453,8 +536,15 @@ export default function AdminMessagesPage() {
                           ? "Type an encrypted message..."
                           : "Type a message..."
                       }
-                      className="flex-1"
+                      className="flex-1 resize-none"
+                      rows={2}
                       disabled={sending}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          ;(e.currentTarget.form as HTMLFormElement | null)?.requestSubmit()
+                        }
+                      }}
                     />
                     <button
                       type="submit"
@@ -468,7 +558,7 @@ export default function AdminMessagesPage() {
               </>
             ) : (
               <div className="flex-1 flex items-center justify-center">
-                <p className="text-[var(--text-muted)]">Select a conversation to start chatting</p>
+                <p className="text-[var(--text-muted)]">Select a conversation</p>
               </div>
             )}
           </div>

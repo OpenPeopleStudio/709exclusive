@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
+import { useEncryption } from '@/components/EncryptionProvider'
 
 interface Order {
   id: string
@@ -24,6 +25,7 @@ export default function AccountPage() {
   const [user, setUser] = useState<UserProfile | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
+  const { hasKeys, isInitializing } = useEncryption()
 
   useEffect(() => {
     const loadAccount = async () => {
@@ -123,13 +125,27 @@ export default function AccountPage() {
               href="/account/messages"
               className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-4 md:p-6 hover:border-[var(--border-secondary)] transition-colors"
             >
-              <div className="w-10 h-10 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center mb-3">
+              <div className="w-10 h-10 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center mb-3 relative">
                 <svg className="w-5 h-5 text-[var(--text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
+                {hasKeys && (
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[var(--success)] flex items-center justify-center">
+                    <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                )}
+                {isInitializing && (
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[var(--bg-tertiary)] border border-[var(--border-primary)] flex items-center justify-center">
+                    <div className="w-2 h-2 border border-[var(--text-muted)] border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
               </div>
               <h3 className="font-medium text-[var(--text-primary)]">Messages</h3>
-              <p className="text-xs text-[var(--text-muted)] mt-1 hidden md:block">Chat with seller</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1 hidden md:block">
+                {hasKeys ? 'Encrypted chat' : 'Chat with seller'}
+              </p>
             </Link>
 
             <Link 
