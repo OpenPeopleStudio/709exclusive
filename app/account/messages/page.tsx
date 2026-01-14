@@ -9,6 +9,7 @@ import KeyVerification from '@/components/KeyVerification'
 import KeyBackup from '@/components/KeyBackup'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
+import PWAInstallButton from '@/components/account/PWAInstallButton'
 
 interface Message {
   id: string
@@ -61,7 +62,6 @@ export default function MessagesPage() {
         .from('709_profiles')
         .select('id, public_key')
         .in('role', ['admin', 'owner'])
-        .not('public_key', 'is', null)
         .limit(1)
         .single()
       
@@ -159,6 +159,13 @@ export default function MessagesPage() {
         if (newMsg.customer_id === userId) {
           const [decrypted] = await loadAndDecryptMessages([newMsg])
           setMessages(prev => [...prev, decrypted as DecryptedMessage])
+
+          if (newMsg.sender_type === 'admin' && !newMsg.read) {
+            await supabase
+              .from('messages')
+              .update({ read: true })
+              .eq('id', newMsg.id)
+          }
         }
       })
       .subscribe()
@@ -260,16 +267,17 @@ export default function MessagesPage() {
               </div>
               {/* E2EE Status & Actions */}
               <div className="flex items-center gap-2">
+                <PWAInstallButton />
                 {isInitialized ? (
                   <span className="flex items-center gap-1 px-2 py-1 bg-[var(--success)]/10 text-[var(--success)] text-xs rounded-full">
                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
                     </svg>
-                    E2E Encrypted
+                    Encrypted
                   </span>
                 ) : encryptionError ? (
                   <span className="flex items-center gap-1 px-2 py-1 bg-[var(--warning)]/10 text-[var(--warning)] text-xs rounded-full">
-                    ⚠️ Encryption unavailable
+                    Encryption unavailable
                   </span>
                 ) : (
                   <span className="flex items-center gap-1 px-2 py-1 bg-[var(--bg-tertiary)] text-[var(--text-muted)] text-xs rounded-full">
@@ -286,13 +294,13 @@ export default function MessagesPage() {
               onClick={() => setShowKeyVerification(true)}
               className="flex items-center gap-1 px-3 py-1.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
             >
-              🔑 Verify Keys
+              Verify keys
             </button>
             <button
               onClick={() => setShowKeyBackup(true)}
               className="flex items-center gap-1 px-3 py-1.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
             >
-              💾 Backup Keys
+              Backup
             </button>
           </div>
 
@@ -344,14 +352,20 @@ export default function MessagesPage() {
 
             {/* Input */}
             <form onSubmit={handleSend} className="p-4 border-t border-[var(--border-primary)]">
-              <div className="flex gap-3">
-                <input
-                  type="text"
+              <div className="flex gap-3 items-end">
+                <textarea
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   placeholder={isInitialized && adminId ? "Type an encrypted message..." : "Type a message..."}
-                  className="flex-1"
+                  className="flex-1 resize-none"
+                  rows={2}
                   disabled={sending}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      ;(e.currentTarget.form as HTMLFormElement | null)?.requestSubmit()
+                    }
+                  }}
                 />
                 <button
                   type="submit"
@@ -373,7 +387,7 @@ export default function MessagesPage() {
           {/* E2EE Info */}
           <div className="mt-4 p-3 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg">
             <p className="text-xs text-[var(--text-muted)]">
-              <strong className="text-[var(--text-secondary)]">🔐 End-to-End Encrypted:</strong> Your messages are encrypted on your device before being sent. Only you and our support team can read them.
+              <strong className="text-[var(--text-secondary)]">End-to-end encrypted:</strong> Messages are encrypted on your device before sending. Only you and support can read them.
             </p>
           </div>
         </div>

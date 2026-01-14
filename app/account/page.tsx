@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabaseClient'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { useEncryption } from '@/components/EncryptionProvider'
+import PWAInstallButton from '@/components/account/PWAInstallButton'
 
 interface Order {
   id: string
@@ -86,11 +87,20 @@ export default function AccountPage() {
       <main className="flex-1 pt-24 pb-16 md:pt-28 md:pb-24">
         <div className="container max-w-4xl">
           {/* Welcome */}
-          <div className="mb-8">
-            <h1 className="text-2xl md:text-3xl font-bold text-[var(--text-primary)]">
-              Welcome back{user?.full_name ? `, ${user.full_name}` : ''}
-            </h1>
-            <p className="text-[var(--text-muted)] mt-1">{user?.email}</p>
+          <div className="mb-8 flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-[var(--text-primary)]">
+                Welcome back{user?.full_name ? `, ${user.full_name}` : ''}
+              </h1>
+              <p className="text-[var(--text-muted)] mt-1">{user?.email}</p>
+            </div>
+            <div className="hidden sm:block">
+              <PWAInstallButton />
+            </div>
+          </div>
+
+          <div className="sm:hidden mb-6">
+            <PWAInstallButton />
           </div>
 
           {/* Quick Links */}

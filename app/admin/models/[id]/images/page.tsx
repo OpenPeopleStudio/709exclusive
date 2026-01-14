@@ -61,10 +61,13 @@ export default function ModelImagesPage() {
     fetchData()
   }, [fetchData])
 
+  const [searchError, setSearchError] = useState<string | null>(null)
+
   const searchGoogleImages = async () => {
     if (!model) return
 
     setSearching(true)
+    setSearchError(null)
     try {
       const response = await fetch('/api/admin/models/google-search', {
         method: 'POST',
@@ -76,16 +79,17 @@ export default function ModelImagesPage() {
         })
       })
 
+      const data = await response.json()
+
       if (response.ok) {
-        const data = await response.json()
         setGoogleImages(data.images || [])
         setShowGoogleImport(true)
       } else {
-        alert('Failed to search Google images')
+        setSearchError(data.error || 'Failed to search images')
       }
     } catch (error) {
       console.error('Google search error:', error)
-      alert('Search failed')
+      setSearchError('Network error. Please check your connection.')
     } finally {
       setSearching(false)
     }
@@ -194,6 +198,34 @@ export default function ModelImagesPage() {
             </button>
           </div>
         </div>
+        
+        {/* Search Error */}
+        {searchError && (
+          <div className="mt-4 p-4 bg-[var(--error)]/10 border border-[var(--error)]/20 rounded-lg">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-[var(--error)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-[var(--error)]">Image search failed</p>
+                <p className="text-sm text-[var(--text-secondary)] mt-1">{searchError}</p>
+                {searchError.includes('not configured') && (
+                  <p className="text-xs text-[var(--text-muted)] mt-2">
+                    To enable image search, add your Google Custom Search API credentials to the environment variables.
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => setSearchError(null)}
+                className="ml-auto text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Existing Images */}
