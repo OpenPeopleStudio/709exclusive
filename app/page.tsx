@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 export default function Home() {
   return (
     <div className="min-h-screen bg-white">
@@ -8,9 +10,9 @@ export default function Home() {
               <h1 className="text-2xl font-bold text-gray-900">709exclusive</h1>
             </div>
             <nav className="flex space-x-8">
-              <a href="/products" className="text-gray-600 hover:text-gray-900">Products</a>
-              <a href="/account" className="text-gray-600 hover:text-gray-900">Account</a>
-              <a href="/cart" className="text-gray-600 hover:text-gray-900">Cart</a>
+              <Link href="/admin/products" className="text-gray-600 hover:text-gray-900">Admin</Link>
+              <Link href="/account/orders" className="text-gray-600 hover:text-gray-900">Orders</Link>
+              <Link href="/cart" className="text-gray-600 hover:text-gray-900">Cart</Link>
             </nav>
           </div>
         </div>
@@ -25,12 +27,12 @@ export default function Home() {
             Your trusted destination for premium products. Discover our curated collection of high-quality items.
           </p>
           <div className="mt-8">
-            <a
-              href="/products"
+            <Link
+              href="/admin/products"
               className="bg-indigo-600 text-white px-8 py-3 rounded-md font-medium hover:bg-indigo-700 transition-colors"
             >
-              Shop Now
-            </a>
+              Browse Products
+            </Link>
           </div>
         </div>
       </main>

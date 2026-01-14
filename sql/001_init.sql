@@ -1,13 +1,18 @@
-create type user_role as enum ('customer', 'admin', 'owner');
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'user_role') then
+    create type user_role as enum ('customer', 'admin', 'owner');
+  end if;
+end $$;
 
-create table profiles (
+create table if not exists "709_profiles" (
   id uuid primary key references auth.users on delete cascade,
   role user_role default 'customer',
   full_name text,
   created_at timestamp default now()
 );
 
-create table products (
+create table if not exists products (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   slug text unique not null,
@@ -17,17 +22,16 @@ create table products (
   created_at timestamp default now()
 );
 
-create table product_variants (
+create table if not exists product_variants (
   id uuid primary key default gen_random_uuid(),
   product_id uuid references products on delete cascade,
-  sku text unique not null,
   size text,
   condition text,
   price_cents integer not null,
   stock integer not null default 0
 );
 
-create table orders (
+create table if not exists orders (
   id uuid primary key default gen_random_uuid(),
   customer_id uuid references auth.users,
   status text default 'pending',
@@ -36,7 +40,7 @@ create table orders (
   created_at timestamp default now()
 );
 
-create table order_items (
+create table if not exists order_items (
   id uuid primary key default gen_random_uuid(),
   order_id uuid references orders on delete cascade,
   variant_id uuid references product_variants,

@@ -16,6 +16,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "709exclusive - Premium Commerce Platform",
   description: "Your trusted destination for premium products",
+  icons: {
+    icon: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({

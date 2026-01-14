@@ -80,7 +80,7 @@ export async function POST(req: Request) {
   }
 
   // 4. Create order
-  const { data: order } = await supabase
+  const { data: order, error: orderError } = await supabase
     .from('orders')
     .insert({
       customer_id: user.id,
@@ -93,7 +93,32 @@ export async function POST(req: Request) {
     .select()
     .single()
 
-  // 5. Create Stripe intent
+  if (orderError || !order) {
+    return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
+  }
+
+  // 5. Create order items
+  const orderItems = items.map(item => {
+    const variant = variants.find(v => v.id === item.variant_id)!
+    return {
+      order_id: order.id,
+      variant_id: item.variant_id,
+      qty: item.qty,
+      price_cents: variant.price_cents
+    }
+  })
+
+  const { error: itemsError } = await supabase
+    .from('order_items')
+    .insert(orderItems)
+
+  if (itemsError) {
+    // Cleanup: delete the order if items fail
+    await supabase.from('orders').delete().eq('id', order.id)
+    return NextResponse.json({ error: 'Failed to create order items' }, { status: 500 })
+  }
+
+  // 6. Create Stripe intent
   const intent = await stripe.paymentIntents.create({
     amount: total,
     currency: 'cad',
