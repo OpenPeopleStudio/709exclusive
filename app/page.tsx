@@ -48,6 +48,13 @@ export default function Home() {
         const params = new URLSearchParams(hash.substring(1))
         const accessToken = params.get('access_token')
         const refreshToken = params.get('refresh_token')
+        const tokenType = params.get('type') // 'recovery', 'invite', 'signup', 'magiclink'
+
+        // If this is a password recovery link, redirect to reset-password page
+        if (tokenType === 'recovery') {
+          router.push(`/reset-password#${hash.substring(1)}`)
+          return
+        }
 
         if (accessToken && refreshToken) {
           const { error } = await supabase.auth.setSession({
