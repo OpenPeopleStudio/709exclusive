@@ -390,6 +390,8 @@ export default function MessagesPage() {
           theirFingerprint={adminFingerprint}
           theirShortFingerprint={adminShortFingerprint}
           theirName="709exclusive Support"
+          isInitialized={isInitialized}
+          error={encryptionError}
           onClose={() => setShowKeyVerification(false)}
         />
       )}

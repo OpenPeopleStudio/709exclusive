@@ -143,7 +143,6 @@ export default function NewProductPage() {
                 type="checkbox"
                 checked={isDrop}
                 onChange={(e) => setIsDrop(e.target.checked)}
-                className="w-4 h-4 rounded border-[var(--border-secondary)] bg-[var(--bg-tertiary)] text-[var(--accent)] focus:ring-[var(--accent)]"
               />
               <span className="text-[var(--text-primary)] font-medium">This is a drop product</span>
             </label>

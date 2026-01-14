@@ -206,7 +206,6 @@ export default function AdminOrdersPage() {
                     type="checkbox"
                     checked={selectedOrders.size === orders.length && orders.length > 0}
                     onChange={selectAll}
-                    className="rounded"
                   />
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Order</th>
@@ -226,7 +225,6 @@ export default function AdminOrdersPage() {
                       type="checkbox"
                       checked={selectedOrders.has(order.id)}
                       onChange={() => toggleSelectOrder(order.id)}
-                      className="rounded"
                     />
                   </td>
                   <td className="px-4 py-4">
@@ -407,10 +405,10 @@ function ShipModal({ order, onClose, onSuccess }: { order: Order; onClose: () =>
             </p>
           </div>
 
-          <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
-            <input type="checkbox" id="sendEmail" defaultChecked className="rounded" />
-            <label htmlFor="sendEmail">Send shipping confirmation email</label>
-          </div>
+          <label className="flex items-center gap-2 text-sm text-[var(--text-muted)] cursor-pointer mb-0">
+            <input type="checkbox" id="sendEmail" defaultChecked />
+            <span>Send shipping confirmation email</span>
+          </label>
 
           {error && (
             <div className="p-3 bg-[var(--error)]/10 border border-[var(--error)]/20 rounded-lg">
@@ -552,10 +550,10 @@ function RefundModal({ order, onClose, onSuccess }: { order: Order; onClose: () 
             />
           </div>
 
-          <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
-            <input type="checkbox" id="sendRefundEmail" defaultChecked className="rounded" />
-            <label htmlFor="sendRefundEmail">Send refund confirmation email</label>
-          </div>
+          <label className="flex items-center gap-2 text-sm text-[var(--text-muted)] cursor-pointer mb-0">
+            <input type="checkbox" id="sendRefundEmail" defaultChecked />
+            <span>Send refund confirmation email</span>
+          </label>
 
           {error && (
             <div className="p-3 bg-[var(--error)]/10 border border-[var(--error)]/20 rounded-lg">
@@ -678,7 +676,6 @@ function ReturnModal({ order, onClose, onSuccess }: { order: Order; onClose: () 
                     type="checkbox"
                     checked={selectedItems.has(item.id)}
                     onChange={() => toggleItem(item.id)}
-                    className="rounded"
                   />
                   <div className="flex-1">
                     <p className="text-sm font-medium text-[var(--text-primary)]">{item.variant?.sku}</p>

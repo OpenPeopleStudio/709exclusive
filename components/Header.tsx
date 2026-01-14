@@ -10,6 +10,7 @@ export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     const handleScroll = () => {
@@ -17,14 +18,38 @@ export default function Header() {
     }
     window.addEventListener('scroll', handleScroll, { passive: true })
 
-    // Check auth status
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    // Check auth status and role
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
       setIsLoggedIn(!!user)
-    })
+      
+      if (user) {
+        const { data: profile } = await supabase
+          .from('709_profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+        
+        setIsAdmin(['owner', 'admin', 'staff'].includes(profile?.role || ''))
+      }
+    }
+    checkAuth()
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setIsLoggedIn(!!session?.user)
+      
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('709_profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single()
+        
+        setIsAdmin(['owner', 'admin', 'staff'].includes(profile?.role || ''))
+      } else {
+        setIsAdmin(false)
+      }
     })
 
     return () => {
@@ -32,6 +57,15 @@ export default function Header() {
       subscription.unsubscribe()
     }
   }, [])
+
+  // Determine the account link based on role
+  const accountLink = isLoggedIn 
+    ? (isAdmin ? '/admin/products' : '/account') 
+    : '/login'
+  
+  const accountLabel = isLoggedIn 
+    ? (isAdmin ? 'Admin' : 'Account') 
+    : 'Login'
 
   return (
     <>
@@ -96,10 +130,10 @@ export default function Header() {
 
               {/* Account */}
               <Link 
-                href={isLoggedIn ? "/account" : "/account/login"} 
+                href={accountLink} 
                 className="hidden md:flex px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors rounded-full hover:bg-white/5"
               >
-                {isLoggedIn ? 'Account' : 'Login'}
+                {accountLabel}
               </Link>
 
               {/* Mobile Menu Toggle */}
@@ -160,11 +194,11 @@ export default function Header() {
                 )}
               </Link>
               <Link 
-                href={isLoggedIn ? "/account" : "/account/login"} 
+                href={accountLink} 
                 className="text-2xl font-medium text-[var(--text-muted)] py-4"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                {isLoggedIn ? 'Account' : 'Login'}
+                {accountLabel}
               </Link>
             </nav>
           </div>

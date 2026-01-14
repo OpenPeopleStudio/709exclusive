@@ -11,6 +11,8 @@ interface KeyVerificationProps {
   theirShortFingerprint?: string | null
   theirName?: string
   onClose: () => void
+  isInitialized?: boolean
+  error?: string | null
 }
 
 export default function KeyVerification({
@@ -21,9 +23,14 @@ export default function KeyVerification({
   theirShortFingerprint,
   theirName,
   onClose,
+  isInitialized = true,
+  error = null,
 }: KeyVerificationProps) {
   const [activeTab, setActiveTab] = useState<'my-key' | 'verify'>('my-key')
   const [copied, setCopied] = useState(false)
+
+  // Check if we're still loading
+  const isLoading = !isInitialized && !error && !myPublicKey
 
   // Generate QR data when keys are available
   const qrData = useMemo(() => {
@@ -87,7 +94,27 @@ export default function KeyVerification({
         )}
 
         <div className="p-6">
-          {activeTab === 'my-key' ? (
+          {/* Error State */}
+          {error && (
+            <div className="mb-6 p-4 bg-[var(--error)]/10 border border-[var(--error)]/20 rounded-lg">
+              <p className="text-sm text-[var(--error)] font-medium mb-1">Encryption Error</p>
+              <p className="text-xs text-[var(--text-muted)]">{error}</p>
+              <p className="text-xs text-[var(--text-muted)] mt-2">
+                Try refreshing the page or check if your browser supports IndexedDB.
+              </p>
+            </div>
+          )}
+
+          {/* Loading State */}
+          {isLoading && !error && (
+            <div className="flex flex-col items-center justify-center py-8">
+              <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin mb-4"></div>
+              <p className="text-sm text-[var(--text-muted)]">Initializing encryption keys...</p>
+              <p className="text-xs text-[var(--text-muted)] mt-2">This may take a few seconds</p>
+            </div>
+          )}
+
+          {!isLoading && activeTab === 'my-key' ? (
             <>
               {/* QR Code */}
               <div className="flex justify-center mb-6">
@@ -100,7 +127,7 @@ export default function KeyVerification({
                     />
                   ) : (
                     <div className="w-[180px] h-[180px] flex items-center justify-center text-gray-400">
-                      Loading...
+                      {error ? 'Keys unavailable' : 'Generating...'}
                     </div>
                   )}
                 </div>
@@ -147,7 +174,7 @@ export default function KeyVerification({
                 </p>
               </div>
             </>
-          ) : (
+          ) : !isLoading ? (
             <>
               {/* Verify Their Key */}
               <div className="text-center mb-6">
@@ -194,7 +221,7 @@ export default function KeyVerification({
                 </p>
               </div>
             </>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

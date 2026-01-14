@@ -56,6 +56,7 @@ export default function AdminMessagesPage() {
     fingerprint,
     shortFingerprint,
     publicKey,
+    error: e2eError,
     encrypt,
     decryptMessages,
     backupKeys,
@@ -483,6 +484,8 @@ export default function AdminMessagesPage() {
           theirFingerprint={verifyCustomer?.fingerprint}
           theirShortFingerprint={verifyCustomer?.shortFingerprint}
           theirName={verifyCustomer?.name}
+          isInitialized={isInitialized}
+          error={e2eError}
           onClose={() => {
             setShowKeyVerification(false)
             setVerifyCustomer(null)
