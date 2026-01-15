@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, Suspense, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
@@ -18,106 +18,105 @@ function ResetPasswordContent() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
-  const [mounted, setMounted] = useState(false)
-
-  // Track when component is mounted (client-side)
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const initialized = useRef(false)
 
   useEffect(() => {
-    if (!mounted) return
+    // Prevent double-initialization in StrictMode
+    if (initialized.current) return
+    initialized.current = true
 
-    // Listen for auth state changes - Supabase will automatically 
-    // detect and process the hash fragment
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth event:', event, 'Session:', session?.user?.email)
-      
-      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
-        if (session) {
-          // Clear the hash from URL
-          window.history.replaceState(null, '', window.location.pathname)
-          setPageState('ready')
-        }
-      } else if (event === 'TOKEN_REFRESHED' && session) {
-        setPageState('ready')
-      }
-    })
-
-    // Also check initial state after a brief delay
-    const checkInitialState = async () => {
-      const hash = window.location.hash
-      const code = searchParams.get('code')
-      
-      // If there's a code (PKCE flow), exchange it
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code)
-        if (error) {
-          console.error('Code exchange error:', error)
-          if (error.message.includes('expired') || error.message.includes('invalid')) {
-            setPageState('expired')
-          } else {
-            setError(error.message)
-            setPageState('error')
-          }
-        }
-        return
-      }
-      
-      // If there's a hash with tokens, Supabase should auto-handle it
-      // but let's also manually try in case
-      if (hash && hash.includes('access_token')) {
-        const params = new URLSearchParams(hash.substring(1))
-        const accessToken = params.get('access_token')
-        const refreshToken = params.get('refresh_token')
-        const expiresAt = params.get('expires_at')
+    const processAuth = async () => {
+      try {
+        const hash = window.location.hash
+        const code = searchParams.get('code')
         
-        // Check expiry
-        if (expiresAt) {
-          const expTime = parseInt(expiresAt, 10) * 1000
-          if (Date.now() > expTime) {
-            setPageState('expired')
-            return
-          }
-        }
-        
-        if (accessToken && refreshToken) {
-          const { error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          })
-          
+        // PKCE flow - exchange code for session
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code)
           if (error) {
-            console.error('Session set error:', error)
-            setError(error.message)
-            setPageState('error')
+            if (error.message.includes('expired') || error.message.includes('invalid')) {
+              setPageState('expired')
+            } else {
+              setError(error.message)
+              setPageState('error')
+            }
             return
           }
-          
           window.history.replaceState(null, '', window.location.pathname)
           setPageState('ready')
           return
         }
-      }
-      
-      // Check for existing session
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        setPageState('ready')
-      } else if (pageState === 'loading') {
-        // Only set no-token if we're still in loading state after checks
-        setPageState('no-token')
+        
+        // Implicit flow - hash contains tokens
+        if (hash && hash.includes('access_token')) {
+          const params = new URLSearchParams(hash.substring(1))
+          const accessToken = params.get('access_token')
+          const refreshToken = params.get('refresh_token')
+          const expiresAt = params.get('expires_at')
+          
+          // Check if token expired
+          if (expiresAt) {
+            const expTime = parseInt(expiresAt, 10) * 1000
+            if (Date.now() > expTime) {
+              setPageState('expired')
+              return
+            }
+          }
+          
+          if (accessToken && refreshToken) {
+            // Set the session
+            const { error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            })
+            
+            if (error) {
+              // If "aborted" error, try getting the session instead
+              // as Supabase may have already processed it
+              if (error.message.includes('aborted')) {
+                const { data } = await supabase.auth.getSession()
+                if (data.session) {
+                  window.history.replaceState(null, '', window.location.pathname)
+                  setPageState('ready')
+                  return
+                }
+              }
+              setError(error.message)
+              setPageState('error')
+              return
+            }
+            
+            window.history.replaceState(null, '', window.location.pathname)
+            setPageState('ready')
+            return
+          }
+        }
+        
+        // No tokens in URL - check for existing session
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          setPageState('ready')
+        } else {
+          setPageState('no-token')
+        }
+        
+      } catch (err) {
+        console.error('Auth processing error:', err)
+        // On error, try checking if session exists anyway
+        const { data } = await supabase.auth.getSession()
+        if (data.session) {
+          setPageState('ready')
+        } else {
+          setError(err instanceof Error ? err.message : 'Unknown error')
+          setPageState('error')
+        }
       }
     }
 
-    // Run initial check with delay to ensure hash is available
-    const timer = setTimeout(checkInitialState, 100)
-
-    return () => {
-      subscription.unsubscribe()
-      clearTimeout(timer)
-    }
-  }, [mounted, searchParams, pageState])
+    // Small delay to ensure we're fully client-side
+    const timer = setTimeout(processAuth, 50)
+    return () => clearTimeout(timer)
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
