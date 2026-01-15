@@ -95,12 +95,12 @@ export default function AccountPage() {
               <p className="text-[var(--text-muted)] mt-1">{user?.email}</p>
             </div>
             <div className="hidden sm:block">
-              <PWAInstallButton />
+              <PWAInstallButton label="Install support app" />
             </div>
           </div>
 
           <div className="sm:hidden mb-6">
-            <PWAInstallButton />
+            <PWAInstallButton label="Install support app" />
           </div>
 
           {/* Quick Links */}

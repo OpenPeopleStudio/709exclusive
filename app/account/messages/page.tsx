@@ -263,11 +263,11 @@ export default function MessagesPage() {
             <div className="flex items-center justify-between mt-4">
               <div>
                 <h1 className="text-2xl font-bold text-[var(--text-primary)]">Messages</h1>
-                <p className="text-[var(--text-muted)] text-sm mt-1">Chat with 709exclusive support</p>
+                <p className="text-[var(--text-muted)] text-sm mt-1">Support chat</p>
               </div>
               {/* E2EE Status & Actions */}
               <div className="flex items-center gap-2">
-                <PWAInstallButton />
+                <PWAInstallButton label="Install support app" />
                 {isInitialized ? (
                   <span className="flex items-center gap-1 px-2 py-1 bg-[var(--success)]/10 text-[var(--success)] text-xs rounded-full">
                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">

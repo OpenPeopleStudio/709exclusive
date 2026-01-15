@@ -22,8 +22,10 @@ function isStandalone() {
 
 export default function PWAInstallButton({
   variant = 'button',
+  label = 'Install support app',
 }: {
   variant?: 'button' | 'link'
+  label?: string
 }) {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [isInstalled, setIsInstalled] = useState(() => isStandalone())
@@ -61,8 +63,6 @@ export default function PWAInstallButton({
     variant === 'button'
       ? 'btn-secondary text-sm'
       : 'text-sm text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors'
-
-  const label = 'Install app'
 
   if (deferredPrompt) {
     return (

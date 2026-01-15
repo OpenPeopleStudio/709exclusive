@@ -68,7 +68,7 @@ export async function GET(
                 letterSpacing: '-0.02em',
               },
             },
-            'SHOP'
+            'SUPPORT'
           )
         )
       )
@@ -79,4 +79,3 @@ export async function GET(
   image.headers.set('Cache-Control', 'public, max-age=604800, immutable')
   return image
 }
-

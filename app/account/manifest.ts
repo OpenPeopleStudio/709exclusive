@@ -2,9 +2,9 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: '709',
-    short_name: '709',
-    description: '709 Exclusive customer account',
+    name: '709 Support',
+    short_name: 'Support',
+    description: 'Chat with 709 Exclusive support',
     start_url: '/account/messages',
     scope: '/account/',
     display: 'standalone',
@@ -17,4 +17,3 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
   }
 }
-

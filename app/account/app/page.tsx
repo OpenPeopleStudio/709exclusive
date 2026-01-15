@@ -7,9 +7,9 @@ export default function AccountAppInstallPage() {
         <div className="container max-w-2xl">
           <div className="flex items-center justify-between gap-4 mb-8">
             <div>
-              <h1 className="text-2xl font-bold text-[var(--text-primary)]">Install App</h1>
+              <h1 className="text-2xl font-bold text-[var(--text-primary)]">Install Support App</h1>
               <p className="text-sm text-[var(--text-muted)] mt-1">
-                Add 709 to your home screen for faster messaging and order tracking.
+                Add 709 Support to your home screen for faster replies and a cleaner chat experience.
               </p>
             </div>
             <Link href="/account/messages" className="btn-secondary text-sm">
@@ -39,7 +39,7 @@ export default function AccountAppInstallPage() {
             <div className="p-6 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-lg">
               <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Tip</h2>
               <p className="text-sm text-[var(--text-secondary)]">
-                If you message us from the installed app, you’ll see replies faster and it feels more like iMessage.
+                Use the installed app for support chats. Orders and tracking still live in your account.
               </p>
             </div>
           </div>
@@ -54,4 +54,3 @@ export default function AccountAppInstallPage() {
     </div>
   )
 }
-

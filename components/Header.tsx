@@ -61,11 +61,11 @@ export default function Header() {
   // Determine the account link based on role
   const accountLink = isLoggedIn 
     ? (isAdmin ? '/admin/products' : '/account') 
-    : '/login'
+    : '/account/login'
   
   const accountLabel = isLoggedIn 
     ? (isAdmin ? 'Admin' : 'Account') 
-    : 'Login'
+    : 'Sign in'
 
   return (
     <>

@@ -22,15 +22,29 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
         setError(error.message)
-      } else {
-        router.push('/admin/products')
+      } else if (data.user) {
+        // Check user role to redirect appropriately
+        const { data: profile } = await supabase
+          .from('709_profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .single()
+        
+        const isStaff = ['owner', 'admin', 'staff'].includes(profile?.role || '')
+        
+        if (isStaff) {
+          router.push('/admin/products')
+        } else {
+          // Customers should use the customer login
+          router.push('/account')
+        }
         router.refresh()
       }
     } catch {
@@ -71,7 +85,7 @@ export default function LoginPage() {
         <div className="w-full max-w-md px-6">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-[var(--text-primary)]">
-              {mode === 'login' ? 'Welcome back' : 'Reset password'}
+              {mode === 'login' ? 'Staff Login' : 'Reset password'}
             </h1>
             <p className="text-[var(--text-secondary)] mt-2">
               {mode === 'login' 
@@ -79,6 +93,17 @@ export default function LoginPage() {
                 : 'Enter your email to receive a reset link'}
             </p>
           </div>
+
+          {mode === 'login' && (
+            <div className="mb-6 p-3 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg text-center">
+              <p className="text-sm text-[var(--text-muted)]">
+                Customer?{' '}
+                <Link href="/account/login" className="text-[var(--accent)] hover:underline">
+                  Sign in here
+                </Link>
+              </p>
+            </div>
+          )}
 
           {mode === 'login' ? (
             <form onSubmit={handleLogin} className="space-y-6">
