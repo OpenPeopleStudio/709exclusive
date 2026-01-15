@@ -372,8 +372,8 @@ export default function Header() {
                   <button 
                     className="flex items-center gap-4 px-4 py-4 rounded-xl transition-colors text-[var(--text-secondary)] hover:bg-white/5 hover:text-[var(--text-primary)] w-full"
                     onClick={() => {
+                      setIsLoginModalOpen(true)
                       closeMobileMenu()
-                      setTimeout(() => setIsLoginModalOpen(true), 300)
                     }}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>

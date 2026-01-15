@@ -66,6 +66,13 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
     setLoading(true)
     setError(null)
 
+    // Check if Supabase is configured
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      setError('Authentication is not configured. Please check environment variables.')
+      setLoading(false)
+      return
+    }
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -73,7 +80,14 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
       })
 
       if (error) {
-        setError(error.message)
+        // Provide more user-friendly error messages
+        if (error.message.includes('Invalid login credentials')) {
+          setError('Invalid email or password. Please try again.')
+        } else if (error.message.includes('Email not confirmed')) {
+          setError('Please check your email and confirm your account first.')
+        } else {
+          setError(error.message)
+        }
       } else if (data.session) {
         // Successfully logged in - close modal and refresh
         onClose()
@@ -83,9 +97,12 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
         setTimeout(() => {
           window.location.reload()
         }, 100)
+      } else {
+        setError('Login failed. Please try again.')
       }
-    } catch {
-      setError('An unexpected error occurred')
+    } catch (err) {
+      console.error('Login error:', err)
+      setError('An unexpected error occurred. Please check your connection.')
     } finally {
       setLoading(false)
     }
