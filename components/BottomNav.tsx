@@ -10,7 +10,7 @@ import LoginModal from './LoginModal'
 export default function BottomNav() {
   const pathname = usePathname()
   const router = useRouter()
-  const { itemCount } = useCart()
+  const { itemCount, isHydrated } = useCart()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
@@ -80,7 +80,7 @@ export default function BottomNav() {
         </svg>
       ),
       isActive: pathname === '/cart' || pathname === '/checkout',
-      badge: itemCount > 0 ? (itemCount > 99 ? '99+' : itemCount) : null,
+      badge: isHydrated && itemCount > 0 ? (itemCount > 99 ? '99+' : itemCount) : null,
     },
     {
       href: '/account/orders',

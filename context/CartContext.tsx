@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useState } from 'react'
+import React, { createContext, useContext, useState, useEffect } from 'react'
 import { Cart, getCart, addToCart as addToCartUtil, removeFromCart as removeFromCartUtil, updateQty as updateQtyUtil, clearCart as clearCartUtil } from '@/lib/cart'
 
 interface CartContextType {
@@ -10,12 +10,21 @@ interface CartContextType {
   updateQty: (variantId: string, qty: number) => void
   clearCart: () => void
   itemCount: number
+  isHydrated: boolean
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [cart, setCart] = useState<Cart>(() => getCart())
+  // Start with empty cart to match server render
+  const [cart, setCart] = useState<Cart>([])
+  const [isHydrated, setIsHydrated] = useState(false)
+
+  // Hydrate cart from localStorage after mount
+  useEffect(() => {
+    setCart(getCart())
+    setIsHydrated(true)
+  }, [])
 
   const addToCart = (variantId: string, qty: number = 1) => {
     setCart(currentCart => addToCartUtil([...currentCart], variantId, qty))
@@ -43,7 +52,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       removeFromCart,
       updateQty,
       clearCart,
-      itemCount
+      itemCount,
+      isHydrated
     }}>
       {children}
     </CartContext.Provider>

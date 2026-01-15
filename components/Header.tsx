@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabaseClient'
 import LoginModal from './LoginModal'
 
 export default function Header() {
-  const { itemCount } = useCart()
+  const { itemCount, isHydrated } = useCart()
   const pathname = usePathname()
   const router = useRouter()
   const [isScrolled, setIsScrolled] = useState(false)
@@ -202,7 +202,7 @@ export default function Header() {
                     d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" 
                   />
                 </svg>
-                {itemCount > 0 && (
+                {isHydrated && itemCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center bg-[var(--accent)] text-white text-[10px] font-bold rounded-full px-1">
                     {itemCount > 99 ? '99+' : itemCount}
                   </span>
@@ -325,7 +325,7 @@ export default function Header() {
                     </svg>
                     <span className="text-lg font-medium">Cart</span>
                   </div>
-                  {itemCount > 0 && (
+                  {isHydrated && itemCount > 0 && (
                     <span className="flex items-center justify-center min-w-[24px] h-6 px-2 bg-[var(--accent)] text-white text-sm font-semibold rounded-full">
                       {itemCount > 99 ? '99+' : itemCount}
                     </span>
