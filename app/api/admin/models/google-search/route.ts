@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     .eq('id', user.id)
     .single()
 
-  if (!profile || !['admin', 'owner'].includes(profile.role)) {
+  if (!profile || !['owner', 'admin'].includes(profile.role)) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 
