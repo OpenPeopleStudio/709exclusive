@@ -18,85 +18,106 @@ function ResetPasswordContent() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
+
+  // Track when component is mounted (client-side)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
-    const init = async () => {
-      try {
-        // Check for PKCE code in query params (newer Supabase flow)
-        const code = searchParams.get('code')
-        const hash = window.location.hash
+    if (!mounted) return
+
+    // Listen for auth state changes - Supabase will automatically 
+    // detect and process the hash fragment
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth event:', event, 'Session:', session?.user?.email)
+      
+      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
+        if (session) {
+          // Clear the hash from URL
+          window.history.replaceState(null, '', window.location.pathname)
+          setPageState('ready')
+        }
+      } else if (event === 'TOKEN_REFRESHED' && session) {
+        setPageState('ready')
+      }
+    })
+
+    // Also check initial state after a brief delay
+    const checkInitialState = async () => {
+      const hash = window.location.hash
+      const code = searchParams.get('code')
+      
+      // If there's a code (PKCE flow), exchange it
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code)
+        if (error) {
+          console.error('Code exchange error:', error)
+          if (error.message.includes('expired') || error.message.includes('invalid')) {
+            setPageState('expired')
+          } else {
+            setError(error.message)
+            setPageState('error')
+          }
+        }
+        return
+      }
+      
+      // If there's a hash with tokens, Supabase should auto-handle it
+      // but let's also manually try in case
+      if (hash && hash.includes('access_token')) {
+        const params = new URLSearchParams(hash.substring(1))
+        const accessToken = params.get('access_token')
+        const refreshToken = params.get('refresh_token')
+        const expiresAt = params.get('expires_at')
         
-        if (code) {
-          // PKCE flow - exchange code for session
-          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+        // Check expiry
+        if (expiresAt) {
+          const expTime = parseInt(expiresAt, 10) * 1000
+          if (Date.now() > expTime) {
+            setPageState('expired')
+            return
+          }
+        }
+        
+        if (accessToken && refreshToken) {
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          })
           
-          if (exchangeError) {
-            console.error('Code exchange error:', exchangeError)
-            if (exchangeError.message.includes('expired') || exchangeError.message.includes('invalid')) {
-              setPageState('expired')
-            } else {
-              setError(exchangeError.message)
-              setPageState('error')
-            }
+          if (error) {
+            console.error('Session set error:', error)
+            setError(error.message)
+            setPageState('error')
             return
           }
           
-          // Success - clear the code from URL
           window.history.replaceState(null, '', window.location.pathname)
           setPageState('ready')
           return
         }
-        
-        // Check for hash fragment (older implicit flow)
-        if (hash && hash.includes('access_token')) {
-          const params = new URLSearchParams(hash.substring(1))
-          const accessToken = params.get('access_token')
-          const refreshToken = params.get('refresh_token')
-          const expiresAt = params.get('expires_at')
-
-          if (expiresAt) {
-            const expTime = parseInt(expiresAt, 10) * 1000
-            if (Date.now() > expTime) {
-              setPageState('expired')
-              return
-            }
-          }
-
-          if (accessToken && refreshToken) {
-            const { error: sessionError } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            })
-
-            if (sessionError) {
-              setError(sessionError.message)
-              setPageState('error')
-              return
-            }
-
-            window.history.replaceState(null, '', window.location.pathname)
-            setPageState('ready')
-            return
-          }
-        }
-
-        // No code or hash - check for existing session
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session) {
-          setPageState('ready')
-        } else {
-          setPageState('no-token')
-        }
-
-      } catch (err) {
-        console.error('Reset password init error:', err)
-        setError(err instanceof Error ? err.message : 'Unknown error')
-        setPageState('error')
+      }
+      
+      // Check for existing session
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        setPageState('ready')
+      } else if (pageState === 'loading') {
+        // Only set no-token if we're still in loading state after checks
+        setPageState('no-token')
       }
     }
 
-    init()
-  }, [searchParams])
+    // Run initial check with delay to ensure hash is available
+    const timer = setTimeout(checkInitialState, 100)
+
+    return () => {
+      subscription.unsubscribe()
+      clearTimeout(timer)
+    }
+  }, [mounted, searchParams, pageState])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

@@ -13,6 +13,7 @@ export async function GET(request: Request) {
   const priceMax = searchParams.get('priceMax')
   const sort = searchParams.get('sort') || 'newest'
   const inStock = searchParams.get('inStock') === 'true'
+  const dropsOnly = searchParams.get('dropsOnly') === 'true'
 
   try {
     // Build query for products with aggregated variant data
@@ -48,6 +49,13 @@ export async function GET(request: Request) {
     // Apply brand filter
     if (brands && brands.length > 0) {
       query = query.in('brand', brands)
+    }
+
+    // Filter for drops only
+    if (dropsOnly) {
+      query = query.eq('is_drop', true)
+      // Optionally, only show active drops (not ended)
+      query = query.or('drop_ends_at.is.null,drop_ends_at.gt.' + new Date().toISOString())
     }
 
     const { data: rawProducts, error } = await query

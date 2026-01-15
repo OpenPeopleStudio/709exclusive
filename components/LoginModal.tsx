@@ -67,17 +67,22 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
     setError(null)
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
         setError(error.message)
-      } else {
+      } else if (data.session) {
+        // Successfully logged in - close modal and refresh
         onClose()
-        onSuccess?.()
-        router.refresh()
+        
+        // Small delay to ensure session is propagated, then hard refresh
+        // This ensures all components pick up the new auth state
+        setTimeout(() => {
+          window.location.reload()
+        }, 100)
       }
     } catch {
       setError('An unexpected error occurred')

@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import ProductCard, { ProductCardSkeleton, ProductCardData } from '@/components/ui/ProductCard'
 import FilterPill, { SizeButton, ConditionButton } from '@/components/ui/FilterPill'
 import FilterDrawer from '@/components/ui/FilterDrawer'
+import Link from 'next/link'
 
 interface Product extends ProductCardData {
   category: string
@@ -21,26 +23,42 @@ interface Filters {
   priceMax: string
   sort: 'newest' | 'price_low' | 'price_high' | 'ending_soon'
   inStock: boolean
+  dropsOnly: boolean
 }
+
+type PageMode = 'shop' | 'new' | 'drops'
 
 const SIZE_OPTIONS = ['6', '6.5', '7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12', '13', '14']
 const CONDITION_OPTIONS = ['DS', 'VNDS', 'PADS', 'USED']
 
-export default function ShopPage() {
+function ShopContent() {
+  const searchParams = useSearchParams()
+  
+  // Determine page mode from URL params
+  const getPageMode = (): PageMode => {
+    if (searchParams.get('drops') === 'true') return 'drops'
+    if (searchParams.get('sort') === 'newest' && !searchParams.get('brands')) return 'new'
+    return 'shop'
+  }
+  
+  const pageMode = getPageMode()
+  const initialSearch = searchParams.get('search') || ''
+  
   const [products, setProducts] = useState<Product[]>([])
   const [brands, setBrands] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [currentTime, setCurrentTime] = useState(() => Date.now())
   const [filters, setFilters] = useState<Filters>({
-    search: '',
+    search: initialSearch,
     brands: [],
     sizes: [],
     conditions: [],
     priceMin: '',
     priceMax: '',
-    sort: 'newest',
-    inStock: true
+    sort: pageMode === 'drops' ? 'ending_soon' : 'newest',
+    inStock: true,
+    dropsOnly: pageMode === 'drops'
   })
 
   // Update time periodically for drop countdowns
@@ -67,6 +85,7 @@ export default function ShopPage() {
       if (filters.priceMax) params.set('priceMax', filters.priceMax)
       params.set('sort', filters.sort)
       if (filters.inStock) params.set('inStock', 'true')
+      if (filters.dropsOnly) params.set('dropsOnly', 'true')
 
       const response = await fetch(`/api/shop?${params}`)
       if (response.ok) {
@@ -132,8 +151,9 @@ export default function ShopPage() {
       conditions: [],
       priceMin: '',
       priceMax: '',
-      sort: 'newest',
-      inStock: true
+      sort: pageMode === 'drops' ? 'ending_soon' : 'newest',
+      inStock: true,
+      dropsOnly: pageMode === 'drops'
     })
   }
 
@@ -146,11 +166,71 @@ export default function ShopPage() {
 
       <main className="flex-1 pt-24 pb-16">
         <div className="container">
-          {/* Page Header */}
-          <div className="mb-8 md:mb-10">
-            <h1 className="text-2xl md:text-3xl font-bold text-[var(--text-primary)] mb-2">Shop</h1>
-            <p className="text-[var(--text-secondary)]">Browse our collection of premium sneakers</p>
-          </div>
+          {/* Page Header - Different for each mode */}
+          {pageMode === 'drops' ? (
+            <div className="mb-8 md:mb-10 relative overflow-hidden rounded-2xl bg-gradient-to-br from-[var(--accent)] to-[#8B0000] p-6 md:p-10">
+              <div className="absolute inset-0 bg-[url('/pattern.svg')] opacity-10"></div>
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="px-2.5 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs font-semibold text-white uppercase tracking-wide">
+                    Limited Time
+                  </span>
+                  <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                </div>
+                <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">Active Drops</h1>
+                <p className="text-white/80 max-w-md">
+                  Exclusive releases with limited availability. Don&apos;t miss out—once they&apos;re gone, they&apos;re gone.
+                </p>
+                <div className="flex gap-3 mt-6">
+                  <Link href="/shop" className="px-4 py-2 bg-white/20 backdrop-blur-sm text-white text-sm font-medium rounded-lg hover:bg-white/30 transition-colors">
+                    View All Products
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ) : pageMode === 'new' ? (
+            <div className="mb-8 md:mb-10 relative overflow-hidden rounded-2xl bg-gradient-to-br from-[var(--accent-blue)] to-[#1E3A8A] p-6 md:p-10">
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="px-2.5 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs font-semibold text-white uppercase tracking-wide">
+                    Just Added
+                  </span>
+                </div>
+                <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">New Arrivals</h1>
+                <p className="text-white/80 max-w-md">
+                  The latest additions to our collection. Fresh kicks added daily.
+                </p>
+                <div className="flex gap-3 mt-6">
+                  <Link href="/shop?drops=true" className="px-4 py-2 bg-white/20 backdrop-blur-sm text-white text-sm font-medium rounded-lg hover:bg-white/30 transition-colors">
+                    View Drops
+                  </Link>
+                  <Link href="/shop" className="px-4 py-2 bg-white text-[var(--accent-blue)] text-sm font-medium rounded-lg hover:bg-white/90 transition-colors">
+                    Shop All
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="mb-8 md:mb-10">
+              <h1 className="text-2xl md:text-3xl font-bold text-[var(--text-primary)] mb-2">Shop</h1>
+              <p className="text-[var(--text-secondary)] mb-6">Browse our collection of premium sneakers</p>
+              {/* Quick category pills */}
+              <div className="flex flex-wrap gap-2">
+                <Link 
+                  href="/shop?sort=newest" 
+                  className="px-4 py-2 bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] text-sm font-medium rounded-full hover:bg-[var(--accent-blue)]/20 transition-colors"
+                >
+                  New Arrivals
+                </Link>
+                <Link 
+                  href="/shop?drops=true" 
+                  className="px-4 py-2 bg-[var(--accent)]/10 text-[var(--accent)] text-sm font-medium rounded-full hover:bg-[var(--accent)]/20 transition-colors"
+                >
+                  🔥 Active Drops
+                </Link>
+              </div>
+            </div>
+          )}
 
           <div className="flex gap-8">
             {/* Desktop Sidebar Filters */}
@@ -389,5 +469,31 @@ export default function ShopPage() {
         activeCount={activeFilterCount}
       />
     </div>
+  )
+}
+
+export default function ShopPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[var(--bg-primary)] flex flex-col">
+        <Header />
+        <main className="flex-1 pt-24 pb-16">
+          <div className="container">
+            <div className="mb-8 md:mb-10">
+              <div className="skeleton h-8 w-32 mb-2"></div>
+              <div className="skeleton h-5 w-64"></div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+              {[...Array(9)].map((_, i) => (
+                <ProductCardSkeleton key={i} />
+              ))}
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    }>
+      <ShopContent />
+    </Suspense>
   )
 }

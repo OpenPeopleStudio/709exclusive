@@ -159,15 +159,15 @@ export default function Header() {
               </Link>
               <Link 
                 href="/shop?sort=newest" 
-                className="px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors rounded-full hover:bg-white/5"
+                className="px-4 py-2 text-sm font-medium text-[var(--accent-blue)] hover:bg-[var(--accent-blue)]/10 transition-colors rounded-full"
               >
                 New
               </Link>
               <Link 
                 href="/shop?drops=true" 
-                className="px-4 py-2 text-sm font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors rounded-full hover:bg-white/5"
+                className="px-4 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors rounded-full"
               >
-                Drops
+                🔥 Drops
               </Link>
             </nav>
 
