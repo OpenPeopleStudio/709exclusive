@@ -1,22 +1,31 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 
-export async function GET(request: Request) {
+type Role = 'owner' | 'admin' | 'staff' | 'customer'
+
+async function getAuthedRole() {
   const supabase = await createSupabaseServer()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) as NextResponse }
   }
 
-  // Check admin role
   const { data: profile } = await supabase
     .from('709_profiles')
-    .select('role')
+    .select('role, full_name')
     .eq('id', user.id)
     .single()
 
-  if (!profile || !['admin', 'owner'].includes(profile.role)) {
+  const role = (profile?.role || 'customer') as Role
+  return { supabase, user, role, full_name: profile?.full_name || null }
+}
+
+export async function GET(request: Request) {
+  const auth = await getAuthedRole()
+  if ('error' in auth) return auth.error
+
+  if (!['admin', 'owner'].includes(auth.role)) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 
@@ -24,8 +33,17 @@ export async function GET(request: Request) {
   const tab = searchParams.get('tab')
 
   try {
+    if (tab === 'me') {
+      return NextResponse.json({
+        id: auth.user.id,
+        email: auth.user.email || null,
+        role: auth.role,
+        full_name: auth.full_name,
+      })
+    }
+
     if (tab === 'users') {
-      const { data: profiles } = await supabase
+      const { data: profiles } = await auth.supabase
         .from('709_profiles')
         .select('id, role, full_name, created_at')
         .order('created_at', { ascending: false })
@@ -76,7 +94,7 @@ export async function GET(request: Request) {
     }
 
     if (tab === 'activity') {
-      const { data: logs } = await supabase
+      const { data: logs } = await auth.supabase
         .from('activity_logs')
         .select('*')
         .order('created_at', { ascending: false })
@@ -86,7 +104,7 @@ export async function GET(request: Request) {
     }
 
     if (tab === 'pricing') {
-      const { data: rules } = await supabase
+      const { data: rules } = await auth.supabase
         .from('pricing_rules')
         .select('*')
         .order('rule_type', { ascending: true })
@@ -95,12 +113,12 @@ export async function GET(request: Request) {
     }
 
     if (tab === 'shipping') {
-      const { data: shippingMethods } = await supabase
+      const { data: shippingMethods } = await auth.supabase
         .from('shipping_methods')
         .select('*')
         .order('sort_order', { ascending: true })
 
-      const { data: deliveryZones } = await supabase
+      const { data: deliveryZones } = await auth.supabase
         .from('local_delivery_zones')
         .select('*')
         .order('sort_order', { ascending: true })
@@ -117,4 +135,77 @@ export async function GET(request: Request) {
     console.error('Settings fetch error:', error)
     return NextResponse.json({ error: 'Failed to fetch settings' }, { status: 500 })
   }
+}
+
+export async function POST(request: Request) {
+  const auth = await getAuthedRole()
+  if ('error' in auth) return auth.error
+
+  if (auth.role !== 'owner') {
+    return NextResponse.json({ error: 'Owner access required' }, { status: 403 })
+  }
+
+  const body = (await request.json().catch(() => null)) as
+    | { action?: string; confirm?: string }
+    | null
+
+  if (!body || body.action !== 'purge_customers') {
+    return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+  }
+
+  if (body.confirm !== 'DELETE ALL CUSTOMERS') {
+    return NextResponse.json({ error: 'Confirmation text mismatch' }, { status: 400 })
+  }
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !serviceRoleKey) {
+    return NextResponse.json({ error: 'Service role key not configured' }, { status: 500 })
+  }
+
+  const { createClient } = await import('@supabase/supabase-js')
+  const adminClient = createClient(url, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+
+  // Clear all messages first.
+  const { error: messagesError, count: messagesDeleted } = await adminClient
+    .from('messages')
+    .delete({ count: 'exact' })
+    .neq('id', '00000000-0000-0000-0000-000000000000')
+
+  if (messagesError) {
+    console.error('Purge messages error:', messagesError)
+    return NextResponse.json({ error: 'Failed to clear messages' }, { status: 500 })
+  }
+
+  const { data: customers, error: customersError } = await adminClient
+    .from('709_profiles')
+    .select('id')
+    .eq('role', 'customer')
+
+  if (customersError) {
+    console.error('Purge customers fetch error:', customersError)
+    return NextResponse.json({ error: 'Failed to load customers' }, { status: 500 })
+  }
+
+  const customerIds = (customers || []).map((c) => c.id).filter(Boolean)
+
+  // Unlink blocking foreign keys so auth.users deletion can proceed.
+  for (const customerId of customerIds) {
+    await adminClient.from('orders').update({ customer_id: null }).eq('customer_id', customerId)
+    await adminClient.from('activity_logs').update({ user_id: null, user_email: null }).eq('user_id', customerId)
+    await adminClient.from('operations').update({ created_by: null }).eq('created_by', customerId)
+
+    const { error: deleteError } = await adminClient.auth.admin.deleteUser(customerId)
+    if (deleteError) {
+      console.error('Delete user error:', customerId, deleteError)
+    }
+  }
+
+  return NextResponse.json({
+    ok: true,
+    messages_deleted: messagesDeleted ?? null,
+    customers_targeted: customerIds.length,
+  })
 }

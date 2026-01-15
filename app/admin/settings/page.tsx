@@ -55,41 +55,128 @@ interface LocalDeliveryZone {
   sort_order: number
 }
 
+interface MaintenanceMode {
+  enabled: boolean
+  message: string | null
+}
+
 export default function AdminSettingsPage() {
-  const [activeTab, setActiveTab] = useState<'users' | 'activity' | 'pricing' | 'shipping' | 'alerts'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'activity' | 'pricing' | 'shipping' | 'alerts' | 'site'>('users')
+  const [isOwner, setIsOwner] = useState(false)
+  const [roleLoaded, setRoleLoaded] = useState(false)
   const [users, setUsers] = useState<User[]>([])
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([])
   const [pricingRules, setPricingRules] = useState<PricingRule[]>([])
   const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>([])
   const [deliveryZones, setDeliveryZones] = useState<LocalDeliveryZone[]>([])
+  const [maintenance, setMaintenance] = useState<MaintenanceMode>({ enabled: false, message: null })
   const [loading, setLoading] = useState(true)
   const [showAddUser, setShowAddUser] = useState(false)
   const [showAddRule, setShowAddRule] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<User | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [savingMaintenance, setSavingMaintenance] = useState(false)
+  const [showPurgeConfirm, setShowPurgeConfirm] = useState(false)
+  const [purgeConfirmText, setPurgeConfirmText] = useState('')
+  const [purging, setPurging] = useState(false)
+
+  useEffect(() => {
+    const loadRole = async () => {
+      try {
+        const res = await fetch('/api/admin/settings?tab=me')
+        if (res.ok) {
+          const me = await res.json()
+          setIsOwner(me.role === 'owner')
+        }
+      } finally {
+        setRoleLoaded(true)
+      }
+    }
+    loadRole()
+  }, [])
 
   useEffect(() => {
     fetchData()
   }, [activeTab])
 
+  useEffect(() => {
+    if (roleLoaded && !isOwner && activeTab === 'site') {
+      setActiveTab('users')
+    }
+  }, [roleLoaded, isOwner, activeTab])
+
   const fetchData = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/admin/settings?tab=${activeTab}`)
-      if (response.ok) {
-        const data = await response.json()
-        if (activeTab === 'users') setUsers(data.users || [])
-        if (activeTab === 'activity') setActivityLogs(data.logs || [])
-        if (activeTab === 'pricing') setPricingRules(data.rules || [])
-        if (activeTab === 'shipping') {
-          setShippingMethods(data.shippingMethods || [])
-          setDeliveryZones(data.deliveryZones || [])
+      if (activeTab === 'site') {
+        if (!isOwner) return
+        const res = await fetch('/api/admin/settings/maintenance')
+        if (res.ok) setMaintenance(await res.json())
+      } else {
+        const response = await fetch(`/api/admin/settings?tab=${activeTab}`)
+        if (response.ok) {
+          const data = await response.json()
+          if (activeTab === 'users') setUsers(data.users || [])
+          if (activeTab === 'activity') setActivityLogs(data.logs || [])
+          if (activeTab === 'pricing') setPricingRules(data.rules || [])
+          if (activeTab === 'shipping') {
+            setShippingMethods(data.shippingMethods || [])
+            setDeliveryZones(data.deliveryZones || [])
+          }
         }
       }
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const saveMaintenance = async (next: MaintenanceMode) => {
+    setSavingMaintenance(true)
+    try {
+      const res = await fetch('/api/admin/settings/maintenance', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        alert(data.error || 'Failed to update maintenance mode')
+      } else {
+        setMaintenance(next)
+      }
+    } catch (e) {
+      console.error('Maintenance save error:', e)
+      alert('Failed to update maintenance mode')
+    } finally {
+      setSavingMaintenance(false)
+    }
+  }
+
+  const purgeCustomers = async () => {
+    setPurging(true)
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'purge_customers', confirm: purgeConfirmText }),
+      })
+
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        alert(data.error || 'Purge failed')
+        return
+      }
+
+      alert(`Done. Messages cleared: ${data.messages_deleted ?? 'unknown'}. Customers deleted: ${data.customers_targeted ?? 'unknown'}.`)
+      setShowPurgeConfirm(false)
+      setPurgeConfirmText('')
+    } catch (e) {
+      console.error('Purge error:', e)
+      alert('Purge failed')
+    } finally {
+      setPurging(false)
     }
   }
 
@@ -185,7 +272,11 @@ export default function AdminSettingsPage() {
 
       {/* Tabs */}
       <div className="flex gap-2 mb-6">
-        {(['users', 'activity', 'pricing', 'shipping', 'alerts'] as const).map((tab) => (
+        {(
+          (isOwner
+            ? (['users', 'activity', 'pricing', 'shipping', 'alerts', 'site'] as Array<typeof activeTab>)
+            : (['users', 'activity', 'pricing', 'shipping', 'alerts'] as Array<typeof activeTab>))
+        ).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -200,6 +291,7 @@ export default function AdminSettingsPage() {
             {tab === 'pricing' && 'Pricing Rules'}
             {tab === 'shipping' && 'Shipping & Delivery'}
             {tab === 'alerts' && 'Alerts & Cleanup'}
+            {tab === 'site' && 'Site & Safety'}
           </button>
         ))}
       </div>
@@ -243,6 +335,85 @@ export default function AdminSettingsPage() {
               onUpdateMethod={updateShippingMethod}
               onUpdateZone={updateDeliveryZone}
             />
+          )}
+
+          {/* Site & Safety Tab */}
+          {activeTab === 'site' && (
+            <div className="space-y-6">
+              <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-[var(--text-primary)]">Maintenance Mode</h2>
+                    <p className="text-sm text-[var(--text-muted)] mt-1">
+                      When enabled, customers are redirected to `/maintenance`. Admin and APIs remain accessible.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={savingMaintenance}
+                    onClick={() => saveMaintenance({ ...maintenance, enabled: !maintenance.enabled })}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      maintenance.enabled
+                        ? 'bg-[var(--error)] text-white hover:bg-[var(--error)]/90'
+                        : 'bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]'
+                    } ${savingMaintenance ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  >
+                    {maintenance.enabled ? 'Disable' : 'Enable'}
+                  </button>
+                </div>
+
+                <div className="mt-6">
+                  <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+                    Optional message
+                  </label>
+                  <textarea
+                    value={maintenance.message || ''}
+                    onChange={(e) => setMaintenance((prev) => ({ ...prev, message: e.target.value }))}
+                    rows={3}
+                    placeholder="Example: Restocking + site updates. Back at 6pm NDT."
+                    className="w-full resize-none"
+                    disabled={savingMaintenance}
+                  />
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <p className="text-xs text-[var(--text-muted)]">Shows on the maintenance page.</p>
+                    <button
+                      type="button"
+                      disabled={savingMaintenance}
+                      onClick={() =>
+                        saveMaintenance({
+                          ...maintenance,
+                          message: (maintenance.message || '').trim() || null,
+                        })
+                      }
+                      className={`btn-secondary text-sm ${savingMaintenance ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    >
+                      Save message
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6">
+                <h2 className="text-lg font-semibold text-[var(--text-primary)]">Danger Zone</h2>
+                <p className="text-sm text-[var(--text-muted)] mt-1">
+                  Permanently deletes all customer accounts and clears all messages. Orders are retained but unlinked from customers.
+                </p>
+
+                <div className="mt-5 flex items-center justify-between gap-4">
+                  <div className="text-sm text-[var(--text-secondary)]">
+                    Confirmation phrase: <span className="font-mono text-[var(--text-primary)]">DELETE ALL CUSTOMERS</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPurgeConfirm(true)}
+                    className="px-4 py-2 rounded-lg text-sm font-medium bg-[var(--error)] text-white hover:bg-[var(--error)]/90 transition-colors"
+                  >
+                    Delete customers + messages
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Alerts Tab */}
@@ -322,6 +493,67 @@ export default function AdminSettingsPage() {
                   className="flex-1 px-4 py-2 bg-[var(--error)] text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
                 >
                   {deleting ? 'Deleting...' : 'Delete Forever'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Purge Confirmation Modal */}
+      {showPurgeConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl max-w-md w-full">
+            <div className="p-6">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--error)]/10 flex items-center justify-center">
+                <svg className="w-8 h-8 text-[var(--error)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+
+              <h2 className="text-xl font-bold text-[var(--text-primary)] text-center mb-2">
+                Delete all customer accounts?
+              </h2>
+
+              <p className="text-[var(--text-secondary)] text-center mb-5">
+                This permanently deletes all customer accounts and clears all messages. This cannot be undone.
+              </p>
+
+              <div className="bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-lg p-4 mb-6">
+                <p className="text-xs text-[var(--text-muted)] mb-2">Type to confirm:</p>
+                <p className="text-xs font-mono text-[var(--text-primary)]">DELETE ALL CUSTOMERS</p>
+                <input
+                  value={purgeConfirmText}
+                  onChange={(e) => setPurgeConfirmText(e.target.value)}
+                  className="mt-3 w-full"
+                  placeholder="Type the phrase exactly"
+                  disabled={purging}
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPurgeConfirm(false)
+                    setPurgeConfirmText('')
+                  }}
+                  className="flex-1 btn-secondary"
+                  disabled={purging}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={purgeCustomers}
+                  disabled={purging || purgeConfirmText !== 'DELETE ALL CUSTOMERS'}
+                  className={`flex-1 px-4 py-3 rounded-lg font-medium transition-colors ${
+                    purging || purgeConfirmText !== 'DELETE ALL CUSTOMERS'
+                      ? 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] cursor-not-allowed'
+                      : 'bg-[var(--error)] text-white hover:bg-[var(--error)]/90'
+                  }`}
+                >
+                  {purging ? 'Deleting…' : 'Delete'}
                 </button>
               </div>
             </div>

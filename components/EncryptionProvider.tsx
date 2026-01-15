@@ -27,10 +27,22 @@ interface EncryptionContextType {
 
 const EncryptionContext = createContext<EncryptionContextType | null>(null)
 
-export function useEncryption() {
+export function useEncryption(): EncryptionContextType {
   const context = useContext(EncryptionContext)
+  // Return safe defaults if no provider (for pages that don't need encryption)
   if (!context) {
-    throw new Error('useEncryption must be used within EncryptionProvider')
+    return {
+      isInitialized: false,
+      isInitializing: false,
+      hasKeys: false,
+      needsBackup: false,
+      fingerprint: null,
+      shortFingerprint: null,
+      error: null,
+      backupKeys: async () => { throw new Error('Encryption not available') },
+      restoreKeys: async () => { throw new Error('Encryption not available') },
+      dismissBackupReminder: () => {},
+    }
   }
   return context
 }

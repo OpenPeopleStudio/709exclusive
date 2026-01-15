@@ -33,6 +33,7 @@ files=(
     "012_order_status.sql"
     "013_shipping.sql"
     "014_create_variant_with_sku.sql"
+    "024_maintenance_mode.sql"
 )
 
 for file in "${files[@]}"; do
