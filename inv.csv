@@ -1,0 +1,109 @@
+brand,model,size,condition,price,stock
+Nike,Air Force 1 Low,10,DS,180,3
+Nike,Air Force 1 Mid,10,DS,180,3
+Nike,Air Force 1 High,10,DS,180,3
+Nike,Dunk Low,10,DS,180,3
+Nike,Dunk High,10,DS,180,3
+Nike,SB Dunk Low,10,DS,180,3
+Nike,SB Dunk High,10,DS,180,3
+Nike,Air Max 1,10,DS,180,3
+Nike,Air Max 90,10,DS,180,3
+Nike,Air Max 95,10,DS,180,3
+Nike,Air Max 97,10,DS,180,3
+Nike,Air Max Plus,10,DS,180,3
+Nike,Air Max 270,10,DS,180,3
+Nike,Air Max 98,10,DS,180,3
+Nike,Blazer Mid 77,10,DS,180,3
+Nike,Air Presto,10,DS,180,3
+Nike,Air Huarache,10,DS,180,3
+Nike,Zoom Vomero 5,10,DS,180,3
+Nike,P-6000,10,DS,180,3
+Nike,Cortez,10,DS,180,3
+Jordan,Air Jordan 1 High,10,DS,180,3
+Jordan,Air Jordan 1 Mid,10,DS,180,3
+Jordan,Air Jordan 1 Low,10,DS,180,3
+Jordan,Air Jordan 3,10,DS,180,3
+Jordan,Air Jordan 4,10,DS,180,3
+Jordan,Air Jordan 5,10,DS,180,3
+Jordan,Air Jordan 6,10,DS,180,3
+Jordan,Air Jordan 11,10,DS,180,3
+Jordan,Air Jordan 12,10,DS,180,3
+Jordan,Air Jordan 13,10,DS,180,3
+Jordan,Air Jordan 14,10,DS,180,3
+Yeezy,Boost 350 V2,10,DS,180,3
+Yeezy,Boost 380,10,DS,180,3
+Yeezy,Boost 700,10,DS,180,3
+Yeezy,Boost 700 V2,10,DS,180,3
+Yeezy,Boost 700 V3,10,DS,180,3
+Yeezy,500,10,DS,180,3
+Yeezy,450,10,DS,180,3
+Yeezy,Foam Runner,10,DS,180,3
+Yeezy,Slide,10,DS,180,3
+Adidas,Samba,10,DS,180,3
+Adidas,Gazelle,10,DS,180,3
+Adidas,Campus 00s,10,DS,180,3
+Adidas,Forum Low,10,DS,180,3
+Adidas,Forum High,10,DS,180,3
+Adidas,Superstar,10,DS,180,3
+Adidas,Stan Smith,10,DS,180,3
+Adidas,Ultraboost,10,DS,180,3
+Adidas,NMD R1,10,DS,180,3
+Adidas,Handball Spezial,10,DS,180,3
+New Balance,550,10,DS,180,3
+New Balance,2002R,10,DS,180,3
+New Balance,1906R,10,DS,180,3
+New Balance,9060,10,DS,180,3
+New Balance,990v3,10,DS,180,3
+New Balance,990v4,10,DS,180,3
+New Balance,990v5,10,DS,180,3
+New Balance,990v6,10,DS,180,3
+New Balance,992,10,DS,180,3
+New Balance,993,10,DS,180,3
+New Balance,327,10,DS,180,3
+New Balance,530,10,DS,180,3
+New Balance,574,10,DS,180,3
+ASICS,Gel-Kayano 14,10,DS,180,3
+ASICS,Gel-1130,10,DS,180,3
+ASICS,Gel-Nimbus 9,10,DS,180,3
+ASICS,Gel-Lyte III,10,DS,180,3
+Salomon,XT-6,10,DS,180,3
+Salomon,XT-4,10,DS,180,3
+Salomon,ACS Pro,10,DS,180,3
+Salomon,Speedcross 5,10,DS,180,3
+Converse,Chuck 70,10,DS,180,3
+Converse,Chuck Taylor All Star,10,DS,180,3
+Converse,One Star,10,DS,180,3
+Vans,Old Skool,10,DS,180,3
+Vans,Sk8-Hi,10,DS,180,3
+Vans,Authentic,10,DS,180,3
+Vans,Slip-On,10,DS,180,3
+Reebok,Club C 85,10,DS,180,3
+Reebok,Classic Leather,10,DS,180,3
+Reebok,Question Mid,10,DS,180,3
+Puma,Suede Classic,10,DS,180,3
+Puma,RS-X,10,DS,180,3
+Puma,Slipstream,10,DS,180,3
+Crocs,Classic Clog,10,DS,180,3
+Crocs,Echo Clog,10,DS,180,3
+Birkenstock,Boston,10,DS,180,3
+Birkenstock,Arizona,10,DS,180,3
+UGG,Tasman,10,DS,180,3
+UGG,Classic Mini,10,DS,180,3
+Hoka,Clifton 9,10,DS,180,3
+Hoka,Bondi 8,10,DS,180,3
+Hoka,Speedgoat 5,10,DS,180,3
+Hoka,Mafate Speed 4,10,DS,180,3
+On,Cloud 5,10,DS,180,3
+On,Cloudmonster,10,DS,180,3
+On,Cloudnova,10,DS,180,3
+On,Cloudsurfer,10,DS,180,3
+Saucony,Shadow 6000,10,DS,180,3
+Saucony,Jazz Original,10,DS,180,3
+Saucony,Grid 9000,10,DS,180,3
+Saucony,ProGrid Triumph 4,10,DS,180,3
+Mizuno,Wave Rider 10,10,DS,180,3
+Mizuno,Wave Prophecy LS,10,DS,180,3
+Timberland,6-Inch Premium Boot,10,DS,180,3
+Timberland,3-Eye Lug Shoe,10,DS,180,3
+Dr Martens,1460 Boot,10,DS,180,3
+Dr Martens,1461 Shoe,10,DS,180,3

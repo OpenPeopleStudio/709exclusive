@@ -91,10 +91,21 @@ export async function POST(request: Request) {
           productCache[cacheKey] = productId
         }
 
-        // Create variant
+        // Create variant with proper validation
         const priceCents = Math.round(parseFloat(row.price) * 100)
-        const stock = parseInt(row.stock) || 1
-        const sku = `${row.brand.substring(0, 3)}-${row.model.substring(0, 3)}-${row.size}-${row.condition}-${Date.now().toString(36)}`.toUpperCase()
+        const stock = Math.max(0, parseInt(row.stock) || 0) // Ensure stock is not negative
+
+        if (priceCents <= 0) {
+          console.error(`Invalid price for ${row.brand} ${row.model}: ${row.price}`)
+          errors++
+          continue
+        }
+
+        // Generate a more robust SKU
+        const sizeCode = row.size.replace(/[^\w]/g, '').toUpperCase()
+        const conditionCode = row.condition.toUpperCase()
+        const timestamp = Date.now().toString(36).toUpperCase()
+        const sku = `${row.brand.substring(0, 3).toUpperCase()}-${row.model.substring(0, 3).toUpperCase()}-${sizeCode}-${conditionCode}-${timestamp}`
 
         const { error: variantError } = await supabase
           .from('product_variants')
@@ -104,7 +115,7 @@ export async function POST(request: Request) {
             brand: row.brand,
             model: row.model,
             size: row.size,
-            condition_code: row.condition.toUpperCase(),
+            condition_code: conditionCode,
             price_cents: priceCents,
             stock,
             reserved: 0
