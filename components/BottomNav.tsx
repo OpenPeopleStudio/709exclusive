@@ -1,16 +1,19 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useCart } from '@/context/CartContext'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
+import LoginModal from './LoginModal'
 
 export default function BottomNav() {
   const pathname = usePathname()
+  const router = useRouter()
   const { itemCount } = useCart()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -101,23 +104,55 @@ export default function BottomNav() {
     },
   ]
 
+  // Separate account item for special handling
+  const accountItem = navItems[navItems.length - 1]
+  const mainNavItems = navItems.slice(0, -1)
+
   return (
-    <nav className="bottom-nav md:hidden">
-      <div className="bottom-nav-inner">
-        {navItems.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`bottom-nav-item ${item.isActive ? 'active' : ''}`}
-          >
-            {item.icon}
-            <span className="bottom-nav-label">{item.label}</span>
-            {item.badge && (
-              <span className="bottom-nav-badge">{item.badge}</span>
-            )}
-          </Link>
-        ))}
-      </div>
-    </nav>
+    <>
+      <nav className="bottom-nav md:hidden">
+        <div className="bottom-nav-inner">
+          {mainNavItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`bottom-nav-item ${item.isActive ? 'active' : ''}`}
+            >
+              {item.icon}
+              <span className="bottom-nav-label">{item.label}</span>
+              {item.badge && (
+                <span className="bottom-nav-badge">{item.badge}</span>
+              )}
+            </Link>
+          ))}
+          
+          {/* Account - opens modal if not logged in */}
+          {isLoggedIn ? (
+            <Link
+              href={accountItem.href}
+              className={`bottom-nav-item ${accountItem.isActive ? 'active' : ''}`}
+            >
+              {accountItem.icon}
+              <span className="bottom-nav-label">{accountItem.label}</span>
+            </Link>
+          ) : (
+            <button
+              onClick={() => setIsLoginModalOpen(true)}
+              className="bottom-nav-item"
+            >
+              {accountItem.icon}
+              <span className="bottom-nav-label">Sign in</span>
+            </button>
+          )}
+        </div>
+      </nav>
+
+      {/* Login Modal */}
+      <LoginModal 
+        isOpen={isLoginModalOpen} 
+        onClose={() => setIsLoginModalOpen(false)}
+        onSuccess={() => router.refresh()}
+      />
+    </>
   )
 }

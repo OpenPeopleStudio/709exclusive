@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCart } from '@/context/CartContext'
 import { supabase } from '@/lib/supabaseClient'
+import LoginModal from './LoginModal'
 
 export default function Header() {
   const { itemCount } = useCart()
@@ -17,6 +18,7 @@ export default function Header() {
   const [searchQuery, setSearchQuery] = useState('')
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
@@ -208,12 +210,21 @@ export default function Header() {
               </Link>
 
               {/* Account */}
-              <Link 
-                href={accountLink} 
-                className="hidden md:flex px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors rounded-full hover:bg-white/5"
-              >
-                {accountLabel}
-              </Link>
+              {isLoggedIn ? (
+                <Link 
+                  href={accountLink} 
+                  className="hidden md:flex px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors rounded-full hover:bg-white/5"
+                >
+                  {accountLabel}
+                </Link>
+              ) : (
+                <button
+                  onClick={() => setIsLoginModalOpen(true)}
+                  className="hidden md:flex px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors rounded-full hover:bg-white/5"
+                >
+                  Sign in
+                </button>
+              )}
 
               {/* Mobile Menu Toggle */}
               <button
@@ -342,20 +353,35 @@ export default function Header() {
 
               {/* Secondary Navigation */}
               <div className="space-y-1">
-                <Link 
-                  href={accountLink} 
-                  className={`flex items-center gap-4 px-4 py-4 rounded-xl transition-colors ${
-                    pathname === accountLink 
-                      ? 'bg-[var(--accent)]/10 text-[var(--accent)]' 
-                      : 'text-[var(--text-secondary)] hover:bg-white/5 hover:text-[var(--text-primary)]'
-                  }`}
-                  onClick={closeMobileMenu}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-                  </svg>
-                  <span className="text-lg font-medium">{accountLabel}</span>
-                </Link>
+                {isLoggedIn ? (
+                  <Link 
+                    href={accountLink} 
+                    className={`flex items-center gap-4 px-4 py-4 rounded-xl transition-colors ${
+                      pathname === accountLink 
+                        ? 'bg-[var(--accent)]/10 text-[var(--accent)]' 
+                        : 'text-[var(--text-secondary)] hover:bg-white/5 hover:text-[var(--text-primary)]'
+                    }`}
+                    onClick={closeMobileMenu}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                    </svg>
+                    <span className="text-lg font-medium">{accountLabel}</span>
+                  </Link>
+                ) : (
+                  <button 
+                    className="flex items-center gap-4 px-4 py-4 rounded-xl transition-colors text-[var(--text-secondary)] hover:bg-white/5 hover:text-[var(--text-primary)] w-full"
+                    onClick={() => {
+                      closeMobileMenu()
+                      setTimeout(() => setIsLoginModalOpen(true), 300)
+                    }}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                    </svg>
+                    <span className="text-lg font-medium">Sign in</span>
+                  </button>
+                )}
               </div>
             </nav>
 
@@ -428,6 +454,13 @@ export default function Header() {
           </div>
         </>
       )}
+
+      {/* Login Modal */}
+      <LoginModal 
+        isOpen={isLoginModalOpen} 
+        onClose={() => setIsLoginModalOpen(false)}
+        onSuccess={() => router.refresh()}
+      />
     </>
   )
 }
