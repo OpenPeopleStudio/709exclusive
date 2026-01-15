@@ -17,10 +17,20 @@
   --text-secondary: #B5B5B5;
   --text-muted: #7A7A7A;
   
-  /* Accent - Red */
+  /* Accent 1 - Red (CTA/Brand - buy, primary actions) */
   --accent: #E10600;
   --accent-hover: #FF1A14;
   --accent-muted: #991A1A;
+  
+  /* Accent 2 - Blue (Info/Highlight - new, links, view details) */
+  --accent-blue: #3B82F6;
+  --accent-blue-hover: #60A5FA;
+  --accent-blue-muted: #1E40AF;
+  
+  /* Accent 3 - Amber (Drops/Time - countdowns, ending soon, limited) */
+  --accent-amber: #F59E0B;
+  --accent-amber-hover: #FBBF24;
+  --accent-amber-muted: #B45309;
   
   /* Borders */
   --border-primary: #2A2A2A;
@@ -56,6 +66,10 @@
   --color-text-muted: var(--text-muted);
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-blue-hover: var(--accent-blue-hover);
+  --color-accent-amber: var(--accent-amber);
+  --color-accent-amber-hover: var(--accent-amber-hover);
   --color-border-primary: var(--border-primary);
   --color-border-secondary: var(--border-secondary);
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
@@ -433,6 +447,38 @@ label {
   border-radius: var(--radius-sm);
 }
 
+/* Primary/CTA badge (red) - for drops, buy actions */
+.badge-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Info badge (blue) - for new, highlights */
+.badge-info {
+  background: var(--accent-blue);
+  color: #fff;
+}
+
+/* Time/Urgency badge (amber) - for ending soon, limited time */
+.badge-time {
+  background: var(--accent-amber);
+  color: #000;
+}
+
+/* Success badge (green) - for price drops, in stock */
+.badge-success {
+  background: var(--success);
+  color: #fff;
+}
+
+/* Neutral/Limited badge - for general labels */
+.badge-neutral {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-secondary);
+}
+
+/* Legacy aliases */
 .badge-new {
   background: var(--accent);
   color: #fff;
@@ -814,4 +860,247 @@ label {
 
 .toggle input:focus + .toggle-slider {
   box-shadow: 0 0 0 3px rgba(225, 6, 0, 0.15);
+}
+
+/* ========================================
+   MOBILE OPTIMIZATIONS
+   ======================================== */
+
+/* Safe area insets for notched devices */
+@supports (padding: env(safe-area-inset-bottom)) {
+  :root {
+    --safe-area-top: env(safe-area-inset-top, 0px);
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-left: env(safe-area-inset-left, 0px);
+    --safe-area-right: env(safe-area-inset-right, 0px);
+  }
+  
+  body {
+    padding-top: var(--safe-area-top);
+    padding-left: var(--safe-area-left);
+    padding-right: var(--safe-area-right);
+  }
+}
+
+/* Touch optimizations */
+@media (hover: none) and (pointer: coarse) {
+  /* Larger touch targets on mobile */
+  a, button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Remove hover effects on touch devices for better performance */
+  .product-card:hover {
+    transform: none;
+    box-shadow: none;
+  }
+  
+  /* Active state for touch feedback */
+  .product-card:active {
+    transform: scale(0.98);
+    transition: transform 100ms ease-out;
+  }
+  
+  /* Improve tap highlight */
+  * {
+    -webkit-tap-highlight-color: rgba(225, 6, 0, 0.1);
+  }
+  
+  /* Smooth scrolling momentum */
+  .overflow-x-auto,
+  .overflow-y-auto {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+}
+
+/* Mobile button improvements */
+@media (max-width: 767px) {
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost {
+    padding: 14px 24px;
+    font-size: 1rem;
+    width: 100%;
+    justify-content: center;
+  }
+  
+  /* Stack form buttons on mobile */
+  .modal-footer {
+    flex-direction: column-reverse;
+  }
+  
+  .modal-footer > * {
+    width: 100%;
+  }
+  
+  /* Larger form inputs on mobile */
+  input, select, textarea {
+    padding: 14px 16px;
+    font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+  
+  /* Mobile container padding */
+  .container {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+/* Bottom navigation spacing */
+.has-bottom-nav {
+  padding-bottom: calc(64px + var(--safe-area-bottom, 0px));
+}
+
+/* Mobile menu animations */
+.mobile-menu-enter {
+  opacity: 0;
+  transform: translateX(100%);
+}
+
+.mobile-menu-enter-active {
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 200ms ease-out, transform 300ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.mobile-menu-exit {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.mobile-menu-exit-active {
+  opacity: 0;
+  transform: translateX(100%);
+  transition: opacity 200ms ease-out, transform 300ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Slide up animation for bottom sheet style */
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.animate-slide-up {
+  animation: slideUp 300ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 200ms ease-out forwards;
+}
+
+/* Bottom navigation bar */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-primary);
+  padding-bottom: var(--safe-area-bottom, 0px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.bottom-nav-inner {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  height: 64px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 16px;
+  color: var(--text-muted);
+  transition: color var(--transition-fast);
+  text-decoration: none;
+  position: relative;
+}
+
+.bottom-nav-item:hover,
+.bottom-nav-item.active {
+  color: var(--text-primary);
+}
+
+.bottom-nav-item.active::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+}
+
+.bottom-nav-label {
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.bottom-nav-badge {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  min-width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: white;
+  font-size: 0.625rem;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 0 4px;
+}
+
+/* Hide scrollbar on mobile for horizontal scroll areas */
+@media (max-width: 767px) {
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }

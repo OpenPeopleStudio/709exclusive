@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
+import BottomNav from "@/components/BottomNav";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -15,6 +16,21 @@ export const metadata: Metadata = {
   icons: {
     icon: '/favicon.ico',
   },
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+    viewportFit: 'cover',
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: '709exclusive',
+  },
+  formatDetection: {
+    telephone: false,
+  },
 };
 
 export default function RootLayout({
@@ -26,7 +42,10 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className={`${inter.variable} font-sans antialiased`}>
         <CartProvider>
-          {children}
+          <div className="min-h-screen pb-16 md:pb-0">
+            {children}
+          </div>
+          <BottomNav />
         </CartProvider>
       </body>
     </html>

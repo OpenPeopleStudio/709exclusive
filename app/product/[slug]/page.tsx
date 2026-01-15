@@ -12,6 +12,8 @@ import Footer from '@/components/Footer'
 import ShippingEstimator from '@/components/ShippingEstimator'
 import ConditionGuide from '@/components/ConditionGuide'
 import SizingGuide from '@/components/SizingGuide'
+import Badge from '@/components/ui/Badge'
+import Accordion, { AccordionItem } from '@/components/ui/Accordion'
 
 interface PriceHistory {
   price_cents: number
@@ -281,15 +283,16 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
 
   const dropStatus = getDropStatus(product)
   const isOutOfStock = !selectedVariant || (selectedVariant.stock - selectedVariant.reserved) <= 0
+  const canPurchase = selectedVariant && dropStatus.isPurchasable && !isOutOfStock
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] flex flex-col">
       <Header />
 
-      <main className="flex-1 pt-24 pb-16 md:pt-28 md:pb-24">
+      <main className="flex-1 pt-24 pb-32 md:pb-16 lg:pb-24">
         <div className="container">
           {/* Breadcrumb */}
-          <nav className="mb-8 flex items-center gap-2 text-sm">
+          <nav className="mb-6 flex items-center gap-2 text-sm">
             <Link href="/shop" className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
               Shop
             </Link>
@@ -308,11 +311,11 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
             <span className="text-[var(--text-secondary)] truncate">{product.name}</span>
           </nav>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
             {/* Product Images */}
             <div className="space-y-4">
               {/* Main Image */}
-              <div className="relative aspect-square bg-[var(--bg-secondary)] rounded-lg overflow-hidden">
+              <div className="relative aspect-square bg-[var(--bg-secondary)] rounded-xl overflow-hidden">
                 {images.length > 0 ? (
                   <Image
                     src={images[selectedImage]?.url || images[0].url}
@@ -324,7 +327,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                   />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <svg className="w-20 h-20 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-20 h-20 text-[var(--text-muted)] opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                   </div>
@@ -333,12 +336,13 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                 {/* Badges */}
                 <div className="absolute top-4 left-4 flex flex-col gap-2">
                   {product.is_drop && dropStatus.status === 'live' && (
-                    <span className="badge badge-new">LIVE DROP</span>
+                    <Badge variant="primary">Live Drop</Badge>
+                  )}
+                  {product.is_drop && dropStatus.status === 'upcoming' && (
+                    <Badge variant="time">Upcoming</Badge>
                   )}
                   {marketContext && selectedVariant && selectedVariant.price_cents < marketContext.avgPrice && (
-                    <span className="px-2 py-1 bg-[var(--success)] text-white text-xs font-medium rounded">
-                      BELOW AVG
-                    </span>
+                    <Badge variant="success">Below Avg</Badge>
                   )}
                 </div>
 
@@ -359,12 +363,12 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
 
               {/* Thumbnails */}
               {images.length > 1 && (
-                <div className="grid grid-cols-5 gap-2">
+                <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
                   {images.map((image, index) => (
                     <button
                       key={image.id}
                       onClick={() => setSelectedImage(index)}
-                      className={`relative aspect-square rounded-md overflow-hidden border-2 transition-colors ${
+                      className={`relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-colors ${
                         selectedImage === index 
                           ? 'border-[var(--accent)]' 
                           : 'border-transparent hover:border-[var(--border-secondary)]'
@@ -375,50 +379,51 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                         alt={`${product.name} view ${index + 1}`}
                         fill
                         className="object-cover"
-                        sizes="80px"
+                        sizes="64px"
                       />
                     </button>
                   ))}
                 </div>
               )}
 
-              {/* Trust Builders */}
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="p-3 bg-[var(--bg-secondary)] rounded-lg">
-                  <span className="text-lg">✓</span>
-                  <p className="text-xs text-[var(--text-secondary)] mt-1">100% Authentic</p>
+              {/* Trust Builders - Desktop only */}
+              <div className="hidden md:grid grid-cols-3 gap-3 pt-4">
+                <div className="flex flex-col items-center p-4 bg-[var(--bg-secondary)] rounded-lg text-center">
+                  <span className="text-xl mb-2">✓</span>
+                  <p className="text-xs text-[var(--text-secondary)]">100% Authentic</p>
                 </div>
-                <div className="p-3 bg-[var(--bg-secondary)] rounded-lg">
-                  <span className="text-lg">📦</span>
-                  <p className="text-xs text-[var(--text-secondary)] mt-1">Secure Packaging</p>
+                <div className="flex flex-col items-center p-4 bg-[var(--bg-secondary)] rounded-lg text-center">
+                  <span className="text-xl mb-2">📦</span>
+                  <p className="text-xs text-[var(--text-secondary)]">Secure Packaging</p>
                 </div>
-                <div className="p-3 bg-[var(--bg-secondary)] rounded-lg">
-                  <span className="text-lg">↩️</span>
-                  <p className="text-xs text-[var(--text-secondary)] mt-1">7-Day Returns</p>
+                <div className="flex flex-col items-center p-4 bg-[var(--bg-secondary)] rounded-lg text-center">
+                  <span className="text-xl mb-2">↩️</span>
+                  <p className="text-xs text-[var(--text-secondary)]">7-Day Returns</p>
                 </div>
               </div>
             </div>
 
-            {/* Product Info */}
-            <div className="lg:py-4">
-              {/* Brand */}
-              {product.brand && (
-                <p className="label-uppercase mb-2">{product.brand}</p>
-              )}
+            {/* Product Info - Sticky on Desktop */}
+            <div className="lg:sticky lg:top-28 lg:self-start space-y-6">
+              {/* Brand & Name */}
+              <div>
+                {product.brand && (
+                  <p className="label-uppercase mb-1">{product.brand}</p>
+                )}
+                <h1 className="text-2xl md:text-3xl font-bold text-[var(--text-primary)]">
+                  {product.name}
+                </h1>
+              </div>
 
-              {/* Name */}
-              <h1 className="text-2xl md:text-3xl font-bold text-[var(--text-primary)] mb-4">
-                {product.name}
-              </h1>
-
-              {/* Price Range */}
+              {/* Price */}
               {priceRange && (
-                <div className="mb-4">
+                <div>
                   {selectedVariant ? (
                     <div className="flex items-baseline gap-3">
                       <span className="text-3xl font-bold text-[var(--text-primary)]">
-                        ${(selectedVariant.price_cents / 100).toFixed(0)} CAD
+                        ${(selectedVariant.price_cents / 100).toFixed(0)}
                       </span>
+                      <span className="text-sm text-[var(--text-muted)]">CAD</span>
                       {marketContext && (
                         <span className="text-sm text-[var(--text-muted)]">
                           avg ${(marketContext.avgPrice / 100).toFixed(0)}
@@ -426,25 +431,23 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                       )}
                     </div>
                   ) : (
-                    <span className="text-2xl font-bold text-[var(--text-primary)]">
-                      From ${(priceRange.min / 100).toFixed(0)} CAD
-                    </span>
-                  )}
-                  {priceRange.min !== priceRange.max && !selectedVariant && (
-                    <p className="text-sm text-[var(--text-muted)]">
-                      ${(priceRange.min / 100).toFixed(0)} - ${(priceRange.max / 100).toFixed(0)} depending on size/condition
-                    </p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-2xl font-bold text-[var(--text-primary)]">
+                        From ${(priceRange.min / 100).toFixed(0)}
+                      </span>
+                      <span className="text-sm text-[var(--text-muted)]">CAD</span>
+                    </div>
                   )}
                 </div>
               )}
 
-              {/* Market Context */}
+              {/* Market Context Pills */}
               {marketContext && (
-                <div className="flex flex-wrap gap-3 mb-6 text-sm">
-                  <span className="px-3 py-1 bg-[var(--bg-tertiary)] rounded-full text-[var(--text-secondary)]">
+                <div className="flex flex-wrap gap-2">
+                  <span className="px-3 py-1.5 bg-[var(--bg-secondary)] rounded-full text-xs text-[var(--text-secondary)]">
                     Last sold: ${(marketContext.lastSold / 100).toFixed(0)}
                   </span>
-                  <span className="px-3 py-1 bg-[var(--bg-tertiary)] rounded-full text-[var(--text-secondary)]">
+                  <span className="px-3 py-1.5 bg-[var(--bg-secondary)] rounded-full text-xs text-[var(--text-secondary)]">
                     Typical: ${(marketContext.lowestRecent / 100).toFixed(0)} - ${(marketContext.highestRecent / 100).toFixed(0)}
                   </span>
                 </div>
@@ -452,37 +455,47 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
 
               {/* Drop Status */}
               {product.is_drop && (
-                <div className="mb-6 p-4 bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-primary)]">
+                <div className="p-4 bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-primary)]">
                   {dropStatus.status === 'upcoming' && (
-                    <div>
-                      <p className="text-sm font-medium text-[var(--text-secondary)] mb-1">DROP STARTS IN</p>
-                      <p className="text-2xl font-bold text-[var(--text-primary)] font-mono">{timeRemaining}</p>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-[var(--accent-amber)]/20 flex items-center justify-center">
+                        <span className="text-lg">⏰</span>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-[var(--accent-amber)] uppercase tracking-wider">Drop Starts In</p>
+                        <p className="text-xl font-bold text-[var(--text-primary)] font-mono">{timeRemaining}</p>
+                      </div>
                     </div>
                   )}
                   {dropStatus.status === 'live' && (
-                    <div>
-                      <p className="text-sm font-medium text-[var(--accent)] mb-1">🔥 DROP IS LIVE</p>
-                      {timeRemaining && (
-                        <p className="text-lg font-bold text-[var(--text-primary)] font-mono">Ends in {timeRemaining}</p>
-                      )}
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-[var(--accent)]/20 flex items-center justify-center">
+                        <span className="text-lg">🔥</span>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-[var(--accent)] uppercase tracking-wider">Drop Is Live</p>
+                        {timeRemaining && (
+                          <p className="text-lg font-bold text-[var(--text-primary)] font-mono">Ends in {timeRemaining}</p>
+                        )}
+                      </div>
                     </div>
                   )}
                   {dropStatus.status === 'ended' && (
-                    <p className="text-sm font-medium text-[var(--text-muted)]">This drop has ended</p>
+                    <p className="text-sm text-[var(--text-muted)]">This drop has ended</p>
                   )}
                 </div>
               )}
 
-              {/* Size/Condition Grid */}
+              {/* Size/Condition Selection */}
               {variants.length > 0 && (
-                <div className="mb-6 space-y-4">
+                <div className="space-y-5">
                   {/* Size Selection */}
                   <div>
                     <div className="flex items-center justify-between mb-3">
-                      <p className="label-uppercase">Select Size</p>
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">Size</p>
                       <SizingGuide brand={product.brand || ''} model={product.name} />
                     </div>
-                    <div className="grid grid-cols-5 gap-2">
+                    <div className="grid grid-cols-5 sm:grid-cols-6 gap-2">
                       {sizes.map((size) => {
                         const hasAnyAvailable = Object.values(sizeConditionGrid[size!] || {}).some(v => v !== null)
                         const isSelected = selectedSize === size
@@ -492,27 +505,22 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                             key={size}
                             onClick={() => {
                               setSelectedSize(size!)
-                              // Auto-select first available condition for this size
                               const firstAvailable = Object.entries(sizeConditionGrid[size!] || {})
                                 .find(([, variant]) => variant !== null)
                               if (firstAvailable) {
                                 setSelectedCondition(firstAvailable[0])
                               }
                             }}
-                            className={`relative py-3 px-2 text-center rounded-md border transition-all ${
+                            disabled={!hasAnyAvailable}
+                            className={`relative py-3 text-center rounded-lg border transition-all ${
                               isSelected
                                 ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--text-primary)]'
                                 : hasAnyAvailable
                                   ? 'border-[var(--border-secondary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:border-[var(--text-muted)]'
-                                  : 'border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-muted)] cursor-not-allowed'
+                                  : 'border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-muted)] cursor-not-allowed opacity-50'
                             }`}
                           >
                             <span className="text-sm font-medium">{size}</span>
-                            {!hasAnyAvailable && (
-                              <span className="absolute inset-0 flex items-center justify-center">
-                                <span className="w-full h-px bg-[var(--text-muted)] rotate-[-20deg]"></span>
-                              </span>
-                            )}
                           </button>
                         )
                       })}
@@ -523,7 +531,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                   {selectedSize && (
                     <div>
                       <div className="flex items-center justify-between mb-3">
-                        <p className="label-uppercase">Select Condition</p>
+                        <p className="text-sm font-semibold text-[var(--text-primary)]">Condition</p>
                         <ConditionGuide currentCondition={selectedCondition} />
                       </div>
                       <div className="flex gap-2 flex-wrap">
@@ -536,12 +544,12 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                               key={condition}
                               onClick={() => variant && setSelectedCondition(condition!)}
                               disabled={!variant}
-                              className={`px-4 py-2 rounded-lg border transition-all ${
+                              className={`px-4 py-2.5 rounded-lg border transition-all ${
                                 isSelected
                                   ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--text-primary)]'
                                   : variant
                                     ? 'border-[var(--border-secondary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:border-[var(--text-muted)]'
-                                    : 'border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-muted)] cursor-not-allowed'
+                                    : 'border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-muted)] cursor-not-allowed opacity-50'
                               }`}
                             >
                               <span className="text-sm font-medium">{condition}</span>
@@ -554,46 +562,51 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                           )
                         })}
                       </div>
+                      {/* Inline Condition Guide */}
+                      {selectedCondition && (
+                        <div className="mt-3">
+                          <ConditionGuide currentCondition={selectedCondition} inline />
+                        </div>
+                      )}
                     </div>
-                  )}
-
-                  {/* Condition Guide Inline */}
-                  {selectedCondition && (
-                    <ConditionGuide currentCondition={selectedCondition} inline />
                   )}
                 </div>
               )}
 
               {/* Stock Info */}
               {selectedVariant && (
-                <div className="mb-6 text-sm text-[var(--text-muted)]">
+                <div className="text-sm">
                   {selectedVariant.stock - selectedVariant.reserved > 0 ? (
-                    <span className="text-[var(--success)]">
-                      ✓ {selectedVariant.stock - selectedVariant.reserved} in stock
+                    <span className="text-[var(--success)] flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-[var(--success)]"></span>
+                      {selectedVariant.stock - selectedVariant.reserved} in stock
                     </span>
                   ) : (
-                    <span className="text-[var(--error)]">Out of stock</span>
+                    <span className="text-[var(--error)] flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-[var(--error)]"></span>
+                      Out of stock
+                    </span>
                   )}
                 </div>
               )}
 
-              {/* Add to Cart / Stock Alert */}
-              <div className="space-y-3 mb-8">
-                {selectedVariant && dropStatus.isPurchasable && !isOutOfStock ? (
+              {/* Add to Cart - Desktop */}
+              <div className="hidden md:block space-y-3">
+                {canPurchase ? (
                   <button
                     onClick={handleAddToCart}
-                    className={`w-full py-4 px-6 rounded-md font-medium text-lg transition-all ${
+                    className={`w-full py-4 px-6 rounded-lg font-semibold text-lg transition-all ${
                       addedToCart
                         ? 'bg-[var(--success)] text-white'
                         : 'bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]'
                     }`}
                   >
-                    {addedToCart ? '✓ Added to Cart' : `Add to Cart - $${(selectedVariant.price_cents / 100).toFixed(0)}`}
+                    {addedToCart ? '✓ Added to Cart' : `Add to Cart — $${(selectedVariant!.price_cents / 100).toFixed(0)}`}
                   </button>
                 ) : (
                   <button
                     onClick={handleStockAlert}
-                    className="w-full py-4 px-6 rounded-md font-medium text-lg bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-primary)] hover:border-[var(--accent)]"
+                    className="w-full py-4 px-6 rounded-lg font-semibold text-lg bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-primary)] hover:border-[var(--accent)] transition-colors"
                   >
                     🔔 Notify When Available
                   </button>
@@ -601,52 +614,88 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
               </div>
 
               {/* Shipping Estimator */}
-              <div className="mb-8">
-                <ShippingEstimator priceCents={selectedVariant?.price_cents || priceRange?.min || 0} />
-              </div>
+              <ShippingEstimator priceCents={selectedVariant?.price_cents || priceRange?.min || 0} />
 
-              {/* What's Included */}
-              <div className="mb-8 p-4 bg-[var(--bg-secondary)] rounded-lg">
-                <h3 className="font-medium text-[var(--text-primary)] mb-3">What&apos;s Included</h3>
-                <ul className="text-sm text-[var(--text-secondary)] space-y-2">
-                  <li className="flex items-center gap-2">
-                    <span className="text-[var(--success)]">✓</span>
-                    {selectedCondition === 'DS' ? 'Original box & all accessories' : 'Original box (when available)'}
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="text-[var(--success)]">✓</span>
-                    Detailed condition photos provided
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="text-[var(--success)]">✓</span>
-                    Certificate of authenticity
-                  </li>
-                </ul>
-              </div>
+              {/* Accordion Sections */}
+              <Accordion>
+                <AccordionItem title="What's Included" defaultOpen>
+                  <ul className="text-sm text-[var(--text-secondary)] space-y-2">
+                    <li className="flex items-center gap-2">
+                      <span className="text-[var(--success)]">✓</span>
+                      {selectedCondition === 'DS' ? 'Original box & all accessories' : 'Original box (when available)'}
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="text-[var(--success)]">✓</span>
+                      Detailed condition photos provided
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="text-[var(--success)]">✓</span>
+                      Certificate of authenticity
+                    </li>
+                  </ul>
+                </AccordionItem>
 
-              {/* Description */}
-              {product.description && (
-                <div className="mb-8">
-                  <h3 className="font-medium text-[var(--text-primary)] mb-3">Description</h3>
-                  <p className="text-[var(--text-secondary)] leading-relaxed">{product.description}</p>
-                </div>
-              )}
+                {product.description && (
+                  <AccordionItem title="Description">
+                    <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-prose">
+                      {product.description}
+                    </p>
+                  </AccordionItem>
+                )}
 
-              {/* Policies */}
-              <div className="grid grid-cols-2 gap-4">
-                <Link href="/policies/returns" className="p-4 bg-[var(--bg-secondary)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors">
-                  <h4 className="font-medium text-[var(--text-primary)] mb-1">Returns</h4>
-                  <p className="text-xs text-[var(--text-muted)]">7-day returns if item doesn&apos;t match description</p>
-                </Link>
-                <Link href="/policies/authenticity" className="p-4 bg-[var(--bg-secondary)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors">
-                  <h4 className="font-medium text-[var(--text-primary)] mb-1">Authenticity</h4>
-                  <p className="text-xs text-[var(--text-muted)]">Every item verified by trained staff</p>
-                </Link>
-              </div>
+                <AccordionItem title="Shipping & Returns">
+                  <div className="text-sm text-[var(--text-secondary)] space-y-3">
+                    <p>Free shipping on orders over $200 CAD within Canada.</p>
+                    <p>7-day returns if item doesn&apos;t match description. Items must be unworn and in original packaging.</p>
+                    <p>Every item is verified by trained staff before shipping.</p>
+                  </div>
+                </AccordionItem>
+              </Accordion>
             </div>
           </div>
         </div>
       </main>
+
+      {/* Mobile Sticky Add to Cart */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-[var(--bg-primary)] border-t border-[var(--border-primary)]" style={{ paddingBottom: 'calc(64px + var(--safe-area-bottom, 0px))' }}>
+        <div className="container py-3">
+          <div className="flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              {selectedVariant ? (
+                <p className="font-bold text-[var(--text-primary)]">
+                  ${(selectedVariant.price_cents / 100).toFixed(0)} CAD
+                </p>
+              ) : priceRange ? (
+                <p className="font-bold text-[var(--text-primary)]">
+                  From ${(priceRange.min / 100).toFixed(0)}
+                </p>
+              ) : null}
+              <p className="text-xs text-[var(--text-muted)] truncate">
+                {selectedSize && selectedCondition ? `Size ${selectedSize} • ${selectedCondition}` : 'Select size & condition'}
+              </p>
+            </div>
+            {canPurchase ? (
+              <button
+                onClick={handleAddToCart}
+                className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                  addedToCart
+                    ? 'bg-[var(--success)] text-white'
+                    : 'bg-[var(--accent)] text-white'
+                }`}
+              >
+                {addedToCart ? '✓ Added' : 'Add to Cart'}
+              </button>
+            ) : (
+              <button
+                onClick={handleStockAlert}
+                className="px-6 py-3 rounded-lg font-semibold bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-primary)]"
+              >
+                🔔 Notify Me
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
 
       <Footer />
 

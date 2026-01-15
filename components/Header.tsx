@@ -1,16 +1,24 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
 import { useCart } from '@/context/CartContext'
 import { supabase } from '@/lib/supabaseClient'
 
 export default function Header() {
   const { itemCount } = useCart()
+  const pathname = usePathname()
+  const router = useRouter()
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isClosing, setIsClosing] = useState(false)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const handleScroll = () => {
@@ -58,6 +66,56 @@ export default function Header() {
     }
   }, [])
 
+  // Close menu with animation
+  const closeMobileMenu = () => {
+    setIsClosing(true)
+    setTimeout(() => {
+      setIsMobileMenuOpen(false)
+      setIsClosing(false)
+    }, 250)
+  }
+
+  // Lock body scroll when menu is open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [isMobileMenuOpen])
+
+  // Close menu on route change
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      closeMobileMenu()
+    }
+    if (isSearchOpen) {
+      setIsSearchOpen(false)
+      setSearchQuery('')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname])
+
+  // Focus search input when opening
+  useEffect(() => {
+    if (isSearchOpen && searchInputRef.current) {
+      searchInputRef.current.focus()
+    }
+  }, [isSearchOpen])
+
+  // Handle search submit
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      router.push(`/shop?search=${encodeURIComponent(searchQuery.trim())}`)
+      setIsSearchOpen(false)
+      setSearchQuery('')
+    }
+  }
+
   // Determine the account link based on role
   const accountLink = isLoggedIn 
     ? (isAdmin ? '/admin/products' : '/account') 
@@ -88,21 +146,42 @@ export default function Header() {
             {/* Center Navigation - Desktop */}
             <nav className="hidden md:flex items-center gap-1">
               <Link 
-                href="/" 
-                className="px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors rounded-full hover:bg-white/5"
+                href="/shop" 
+                className={`px-4 py-2 text-sm font-medium transition-colors rounded-full hover:bg-white/5 ${
+                  pathname === '/shop' || pathname?.startsWith('/product')
+                    ? 'text-[var(--text-primary)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
               >
                 Shop
               </Link>
               <Link 
-                href="/account/orders" 
+                href="/shop?sort=newest" 
                 className="px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors rounded-full hover:bg-white/5"
               >
-                Orders
+                New
+              </Link>
+              <Link 
+                href="/shop?drops=true" 
+                className="px-4 py-2 text-sm font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors rounded-full hover:bg-white/5"
+              >
+                Drops
               </Link>
             </nav>
 
             {/* Right side */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              {/* Search */}
+              <button
+                onClick={() => setIsSearchOpen(true)}
+                className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-white/5 transition-colors"
+                aria-label="Search"
+              >
+                <svg className="w-5 h-5 text-[var(--text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                </svg>
+              </button>
+
               {/* Cart */}
               <Link 
                 href="/cart" 
@@ -139,22 +218,28 @@ export default function Header() {
               {/* Mobile Menu Toggle */}
               <button
                 className="md:hidden flex items-center justify-center w-10 h-10 rounded-full hover:bg-white/5 transition-colors"
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                onClick={() => isMobileMenuOpen ? closeMobileMenu() : setIsMobileMenuOpen(true)}
                 aria-label="Toggle menu"
+                aria-expanded={isMobileMenuOpen}
               >
-                <svg 
-                  className="w-5 h-5 text-[var(--text-primary)]" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                  strokeWidth={1.5}
-                >
-                  {isMobileMenuOpen ? (
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  ) : (
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9h16.5m-16.5 6.75h16.5" />
-                  )}
-                </svg>
+                <div className="relative w-5 h-5">
+                  {/* Animated hamburger to X */}
+                  <span 
+                    className={`absolute left-0 w-5 h-0.5 bg-[var(--text-primary)] transition-all duration-300 ease-out ${
+                      isMobileMenuOpen ? 'top-[9px] rotate-45' : 'top-[5px] rotate-0'
+                    }`}
+                  />
+                  <span 
+                    className={`absolute left-0 top-[9px] w-5 h-0.5 bg-[var(--text-primary)] transition-all duration-300 ease-out ${
+                      isMobileMenuOpen ? 'opacity-0 scale-0' : 'opacity-100 scale-100'
+                    }`}
+                  />
+                  <span 
+                    className={`absolute left-0 w-5 h-0.5 bg-[var(--text-primary)] transition-all duration-300 ease-out ${
+                      isMobileMenuOpen ? 'top-[9px] -rotate-45' : 'top-[13px] rotate-0'
+                    }`}
+                  />
+                </div>
               </button>
             </div>
           </div>
@@ -163,46 +248,185 @@ export default function Header() {
 
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 z-40 bg-[var(--bg-primary)]/95 backdrop-blur-xl md:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
-        >
-          <div className="container pt-24">
-            <nav className="flex flex-col gap-2">
-              <Link 
-                href="/" 
-                className="text-2xl font-medium text-[var(--text-primary)] py-4 border-b border-white/10"
-                onClick={() => setIsMobileMenuOpen(false)}
+        <>
+          {/* Backdrop */}
+          <div 
+            className={`fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden transition-opacity duration-300 ${
+              isClosing ? 'opacity-0' : 'opacity-100'
+            }`}
+            onClick={closeMobileMenu}
+            aria-hidden="true"
+          />
+          
+          {/* Menu Panel */}
+          <div 
+            ref={menuRef}
+            className={`fixed top-0 right-0 bottom-0 z-40 w-full max-w-sm bg-[var(--bg-primary)] md:hidden shadow-2xl transition-transform duration-300 ease-out ${
+              isClosing ? 'translate-x-full' : 'translate-x-0'
+            }`}
+            style={{ paddingTop: 'var(--safe-area-top, 0px)' }}
+          >
+            {/* Menu Header */}
+            <div className="flex items-center justify-between h-20 px-6 border-b border-[var(--border-primary)]">
+              <span className="text-lg font-semibold text-[var(--text-primary)]">Menu</span>
+              <button
+                className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-white/5 transition-colors"
+                onClick={closeMobileMenu}
+                aria-label="Close menu"
               >
-                Shop
-              </Link>
-              <Link 
-                href="/account/orders" 
-                className="text-2xl font-medium text-[var(--text-primary)] py-4 border-b border-white/10"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Orders
-              </Link>
-              <Link 
-                href="/cart" 
-                className="text-2xl font-medium text-[var(--text-primary)] py-4 border-b border-white/10 flex items-center justify-between"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Cart
-                {itemCount > 0 && (
-                  <span className="text-base text-[var(--text-muted)]">{itemCount} items</span>
-                )}
-              </Link>
-              <Link 
-                href={accountLink} 
-                className="text-2xl font-medium text-[var(--text-muted)] py-4"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                {accountLabel}
-              </Link>
+                <svg className="w-5 h-5 text-[var(--text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Menu Content */}
+            <nav className="flex flex-col p-6">
+              {/* Primary Navigation */}
+              <div className="space-y-1">
+                <Link 
+                  href="/" 
+                  className={`flex items-center gap-4 px-4 py-4 rounded-xl transition-colors ${
+                    pathname === '/' 
+                      ? 'bg-[var(--accent)]/10 text-[var(--accent)]' 
+                      : 'text-[var(--text-primary)] hover:bg-white/5'
+                  }`}
+                  onClick={closeMobileMenu}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />
+                  </svg>
+                  <span className="text-lg font-medium">Shop</span>
+                </Link>
+
+                <Link 
+                  href="/cart" 
+                  className={`flex items-center justify-between px-4 py-4 rounded-xl transition-colors ${
+                    pathname === '/cart' 
+                      ? 'bg-[var(--accent)]/10 text-[var(--accent)]' 
+                      : 'text-[var(--text-primary)] hover:bg-white/5'
+                  }`}
+                  onClick={closeMobileMenu}
+                >
+                  <div className="flex items-center gap-4">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                    </svg>
+                    <span className="text-lg font-medium">Cart</span>
+                  </div>
+                  {itemCount > 0 && (
+                    <span className="flex items-center justify-center min-w-[24px] h-6 px-2 bg-[var(--accent)] text-white text-sm font-semibold rounded-full">
+                      {itemCount > 99 ? '99+' : itemCount}
+                    </span>
+                  )}
+                </Link>
+
+                <Link 
+                  href="/account/orders" 
+                  className={`flex items-center gap-4 px-4 py-4 rounded-xl transition-colors ${
+                    pathname === '/account/orders' 
+                      ? 'bg-[var(--accent)]/10 text-[var(--accent)]' 
+                      : 'text-[var(--text-primary)] hover:bg-white/5'
+                  }`}
+                  onClick={closeMobileMenu}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
+                  </svg>
+                  <span className="text-lg font-medium">Orders</span>
+                </Link>
+              </div>
+
+              {/* Divider */}
+              <div className="my-6 border-t border-[var(--border-primary)]" />
+
+              {/* Secondary Navigation */}
+              <div className="space-y-1">
+                <Link 
+                  href={accountLink} 
+                  className={`flex items-center gap-4 px-4 py-4 rounded-xl transition-colors ${
+                    pathname === accountLink 
+                      ? 'bg-[var(--accent)]/10 text-[var(--accent)]' 
+                      : 'text-[var(--text-secondary)] hover:bg-white/5 hover:text-[var(--text-primary)]'
+                  }`}
+                  onClick={closeMobileMenu}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                  </svg>
+                  <span className="text-lg font-medium">{accountLabel}</span>
+                </Link>
+              </div>
             </nav>
+
+            {/* Footer */}
+            <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-[var(--border-primary)]" style={{ paddingBottom: 'calc(24px + var(--safe-area-bottom, 0px))' }}>
+              <p className="text-xs text-[var(--text-muted)] text-center">
+                709exclusive &middot; St. John&apos;s, NL
+              </p>
+            </div>
           </div>
-        </div>
+        </>
+      )}
+
+      {/* Search Overlay */}
+      {isSearchOpen && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm"
+            onClick={() => { setIsSearchOpen(false); setSearchQuery(''); }}
+          />
+          
+          {/* Search Panel */}
+          <div className="fixed inset-x-0 top-0 z-50 bg-[var(--bg-primary)] border-b border-[var(--border-primary)]">
+            <div className="container">
+              <form onSubmit={handleSearch} className="flex items-center h-20 gap-4">
+                <svg className="w-5 h-5 text-[var(--text-muted)] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                </svg>
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search sneakers, brands..."
+                  className="flex-1 bg-transparent border-none outline-none text-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  onClick={() => { setIsSearchOpen(false); setSearchQuery(''); }}
+                  className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-white/5 transition-colors"
+                >
+                  <svg className="w-5 h-5 text-[var(--text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </form>
+            </div>
+            
+            {/* Quick Links */}
+            <div className="container pb-6">
+              <p className="text-xs text-[var(--text-muted)] mb-3">Popular searches</p>
+              <div className="flex flex-wrap gap-2">
+                {['Jordan', 'Yeezy', 'Dunk', 'New Balance'].map((term) => (
+                  <button
+                    key={term}
+                    onClick={() => {
+                      router.push(`/shop?search=${encodeURIComponent(term)}`)
+                      setIsSearchOpen(false)
+                      setSearchQuery('')
+                    }}
+                    className="px-3 py-1.5 text-sm bg-[var(--bg-secondary)] text-[var(--text-secondary)] rounded-full hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+                  >
+                    {term}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </>
   )
