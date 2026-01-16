@@ -69,7 +69,7 @@ export async function POST(req: Request) {
     // Get order and release reserved inventory
     const { data: order } = await supabase
       .from('orders')
-      .select('id')
+      .select('id, status')
       .eq('stripe_payment_intent', intent.id)
       .single()
 

@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useCart } from '@/context/CartContext'
 import { supabase } from '@/lib/supabaseClient'
 import LoginModal from './LoginModal'
 
-export default function Header() {
+function HeaderContent() {
   const { itemCount, isHydrated } = useCart()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -494,5 +494,13 @@ export default function Header() {
         onSuccess={() => router.refresh()}
       />
     </>
+  )
+}
+
+export default function Header() {
+  return (
+    <Suspense fallback={<div className="h-20" />}>
+      <HeaderContent />
+    </Suspense>
   )
 }
