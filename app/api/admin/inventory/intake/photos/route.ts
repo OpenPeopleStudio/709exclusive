@@ -20,7 +20,38 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { modelId, images } = await request.json()
+    const contentType = request.headers.get('content-type') || ''
+    let modelId = ''
+    let entries: Array<{
+      kind: 'file' | 'existing'
+      position: number
+      isPrimary: boolean
+      url?: string | null
+    }> = []
+    let files: File[] = []
+
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await request.formData()
+      modelId = String(formData.get('modelId') || '')
+      const rawEntries = formData.get('entries')
+      entries = rawEntries ? JSON.parse(String(rawEntries)) : []
+      files = formData.getAll('files').filter((file): file is File => file instanceof File)
+    } else {
+      const body = await request.json().catch(() => null)
+      modelId = body?.modelId || ''
+      if (Array.isArray(body?.images)) {
+        entries = body.images.map((img: { url?: string; isPrimary?: boolean }, index: number) => ({
+          kind: 'existing',
+          position: index,
+          isPrimary: Boolean(img.isPrimary),
+          url: img.url || null,
+        }))
+      }
+    }
+
+    if (!modelId || entries.length === 0) {
+      return NextResponse.json({ error: 'Model ID and images required' }, { status: 400 })
+    }
 
     // Get model info
     const { data: modelInfo } = await supabase
@@ -45,45 +76,93 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    // Add images to product_images
+    const uploadFileToStorage = async (file: File) => {
+      if (!file.type.startsWith('image/')) {
+        throw new Error('Only image uploads are supported')
+      }
+
+      const fileExt = file.name.split('.').pop() || 'jpg'
+      const filePath = `${product.id}/${crypto.randomUUID()}.${fileExt}`
+      const buffer = Buffer.from(await file.arrayBuffer())
+
+      const { error } = await supabase.storage
+        .from('product-images')
+        .upload(filePath, buffer, {
+          contentType: file.type || 'image/jpeg',
+          upsert: false,
+        })
+
+      if (error) {
+        throw new Error(`Upload failed: ${error.message}`)
+      }
+
+      const { data: publicUrlData } = supabase
+        .storage
+        .from('product-images')
+        .getPublicUrl(filePath)
+
+      if (!publicUrlData.publicUrl) {
+        throw new Error('Failed to generate public URL')
+      }
+
+      return publicUrlData.publicUrl
+    }
+
     let attached = 0
-    for (const image of images) {
-      // If it's a model image, just link it
-      if (image.isModelImage) {
-        const { error } = await supabase
-          .from('product_images')
-          .insert({
-            product_id: product.id,
-            url: image.url,
-            is_primary: image.isPrimary,
-            sort_order: attached
-          })
+    const insertedUrls: string[] = []
+    let primaryUrl: string | null = null
+    let fileCursor = 0
 
-        if (!error) attached++
-      } else {
-        // For new uploads, you'd typically upload to Supabase Storage here
-        // For now, we'll just store the URL
-        const { error } = await supabase
-          .from('product_images')
-          .insert({
-            product_id: product.id,
-            url: image.url,
-            is_primary: image.isPrimary,
-            sort_order: attached
-          })
+    for (const entry of entries) {
+      let imageUrl = entry.url || null
 
-        if (!error) attached++
+      if (entry.kind === 'file') {
+        const file = files[fileCursor]
+        fileCursor += 1
+        if (!file) {
+          continue
+        }
+        imageUrl = await uploadFileToStorage(file)
+      }
+
+      if (!imageUrl) {
+        continue
+      }
+
+      const { error } = await supabase
+        .from('product_images')
+        .insert({
+          product_id: product.id,
+          url: imageUrl,
+          is_primary: entry.isPrimary,
+          sort_order: entry.position,
+        })
+
+      if (!error) {
+        attached += 1
+        insertedUrls.push(imageUrl)
+        if (entry.isPrimary) primaryUrl = imageUrl
       }
     }
 
-    // If setting a new primary, unset others
-    const primaryImage = images.find((img: { isPrimary: boolean }) => img.isPrimary)
-    if (primaryImage) {
+    if (!primaryUrl && insertedUrls.length > 0) {
+      primaryUrl = insertedUrls[0]
       await supabase
         .from('product_images')
         .update({ is_primary: false })
         .eq('product_id', product.id)
-        .neq('url', primaryImage.url)
+
+      await supabase
+        .from('product_images')
+        .update({ is_primary: true })
+        .eq('product_id', product.id)
+        .eq('url', primaryUrl)
+    } else if (primaryUrl) {
+      await supabase
+        .from('product_images')
+        .update({ is_primary: false })
+        .eq('product_id', product.id)
+        .neq('url', primaryUrl)
     }
 
     // Log the action
@@ -93,7 +172,7 @@ export async function POST(request: Request) {
       action: 'attach_product_images',
       entity_type: 'product',
       entity_id: product.id,
-      details: { modelId, attached, total: images.length }
+      details: { modelId, attached, total: entries.length }
     })
 
     return NextResponse.json({ 

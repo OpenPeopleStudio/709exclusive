@@ -8,6 +8,7 @@ import ProductCard, { ProductCardSkeleton, ProductCardData } from '@/components/
 import FilterPill, { SizeButton, ConditionButton } from '@/components/ui/FilterPill'
 import FilterDrawer from '@/components/ui/FilterDrawer'
 import Link from 'next/link'
+import Button from '@/components/ui/Button'
 
 interface Product extends ProductCardData {
   category: string
@@ -166,71 +167,31 @@ function ShopContent() {
 
       <main className="flex-1 pt-24 pb-16">
         <div className="container">
-          {/* Page Header - Different for each mode */}
-          {pageMode === 'drops' ? (
-            <div className="mb-8 md:mb-10 relative overflow-hidden rounded-2xl bg-gradient-to-br from-[var(--accent)] to-[#8B0000] p-6 md:p-10">
-              <div className="absolute inset-0 bg-[url('/pattern.svg')] opacity-10"></div>
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="px-2.5 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs font-semibold text-white uppercase tracking-wide">
-                    Limited Time
-                  </span>
-                  <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
-                </div>
-                <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">Active Drops</h1>
-                <p className="text-white/80 max-w-md">
-                  Exclusive releases with limited availability. Don&apos;t miss out—once they&apos;re gone, they&apos;re gone.
-                </p>
-                <div className="flex gap-3 mt-6">
-                  <Link href="/shop" className="px-4 py-2 bg-white/20 backdrop-blur-sm text-white text-sm font-medium rounded-lg hover:bg-white/30 transition-colors">
-                    View All Products
-                  </Link>
-                </div>
-              </div>
+          {/* Page Header */}
+          <div className="mb-8 md:mb-10">
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">
+              {pageMode === 'drops' ? 'Drops' : pageMode === 'new' ? 'New' : 'Shop'}
+            </p>
+            <h1 className="text-2xl md:text-3xl font-semibold text-[var(--text-primary)] mt-2">
+              {pageMode === 'drops'
+                ? 'Active drops'
+                : pageMode === 'new'
+                  ? 'New arrivals'
+                  : 'All inventory'}
+            </h1>
+            <p className="text-[var(--text-secondary)] mt-2 max-w-2xl">
+              {pageMode === 'drops'
+                ? 'Limited releases with local delivery and pickup options.'
+                : pageMode === 'new'
+                  ? 'The most recent additions to the marketplace.'
+                  : 'Browse verified sneakers and streetwear across all sizes and conditions.'}
+            </p>
+            <div className="flex flex-wrap gap-3 mt-5">
+              <Button href="/shop" variant="secondary" size="sm">All inventory</Button>
+              <Button href="/shop?sort=newest" variant="secondary" size="sm">New arrivals</Button>
+              <Button href="/shop?drops=true" variant="secondary" size="sm">Drops</Button>
             </div>
-          ) : pageMode === 'new' ? (
-            <div className="mb-8 md:mb-10 relative overflow-hidden rounded-2xl bg-gradient-to-br from-[var(--accent-blue)] to-[#1E3A8A] p-6 md:p-10">
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="px-2.5 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs font-semibold text-white uppercase tracking-wide">
-                    Just Added
-                  </span>
-                </div>
-                <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">New Arrivals</h1>
-                <p className="text-white/80 max-w-md">
-                  The latest additions to our collection. Fresh kicks added daily.
-                </p>
-                <div className="flex gap-3 mt-6">
-                  <Link href="/shop?drops=true" className="px-4 py-2 bg-white/20 backdrop-blur-sm text-white text-sm font-medium rounded-lg hover:bg-white/30 transition-colors">
-                    View Drops
-                  </Link>
-                  <Link href="/shop" className="px-4 py-2 bg-white text-[var(--accent-blue)] text-sm font-medium rounded-lg hover:bg-white/90 transition-colors">
-                    Shop All
-                  </Link>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="mb-8 md:mb-10">
-              <h1 className="text-2xl md:text-3xl font-bold text-[var(--text-primary)] mb-2">Shop</h1>
-              <p className="text-[var(--text-secondary)] mb-6">Browse our collection of premium sneakers</p>
-              {/* Quick category pills */}
-              <div className="flex flex-wrap gap-2">
-                <Link 
-                  href="/shop?sort=newest" 
-                  className="px-4 py-2 bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] text-sm font-medium rounded-full hover:bg-[var(--accent-blue)]/20 transition-colors"
-                >
-                  New Arrivals
-                </Link>
-                <Link 
-                  href="/shop?drops=true" 
-                  className="px-4 py-2 bg-[var(--accent)]/10 text-[var(--accent)] text-sm font-medium rounded-full hover:bg-[var(--accent)]/20 transition-colors"
-                >
-                  🔥 Active Drops
-                </Link>
-              </div>
-            </div>
-          )}
+          </div>
 
           <div className="flex gap-8">
             {/* Desktop Sidebar Filters */}

@@ -20,6 +20,7 @@ export async function POST(req: Request) {
       postal_code: string
       country: string
       phone?: string
+      email?: string
     }
     shippingMethodCode?: string
   } = await req.json()
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
   if (!shippingAddress) return NextResponse.json({ error: 'Shipping address required' }, { status: 400 })
 
   // Validate shipping address
-  const required = ['name', 'line1', 'city', 'province', 'postal_code', 'country']
+  const required = ['name', 'line1', 'city', 'province', 'postal_code', 'country', 'email']
   for (const field of required) {
     if (!shippingAddress[field as keyof typeof shippingAddress]) {
       return NextResponse.json({ error: `Missing required field: ${field}` }, { status: 400 })
@@ -96,6 +97,7 @@ export async function POST(req: Request) {
       tax_rate: quote.taxRate,
       total_cents: quote.totalCents,
       currency: quote.currency,
+      payment_method: 'card',
     })
     .select()
     .single()
@@ -147,6 +149,7 @@ export async function POST(req: Request) {
     intent = await stripe.paymentIntents.create({
       amount: quote.totalCents,
       currency: quote.currency,
+      receipt_email: shippingAddress.email,
       metadata: {
         order_id: order.id,
         shipping_method_code: quote.selectedShippingMethodCode,

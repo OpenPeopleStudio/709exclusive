@@ -14,6 +14,7 @@ import ConditionGuide from '@/components/ConditionGuide'
 import SizingGuide from '@/components/SizingGuide'
 import Badge from '@/components/ui/Badge'
 import Accordion, { AccordionItem } from '@/components/ui/Accordion'
+import Surface from '@/components/ui/Surface'
 
 interface PriceHistory {
   price_cents: number
@@ -388,18 +389,15 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
 
               {/* Trust Builders - Desktop only */}
               <div className="hidden md:grid grid-cols-3 gap-3 pt-4">
-                <div className="flex flex-col items-center p-4 bg-[var(--bg-secondary)] rounded-lg text-center">
-                  <span className="text-xl mb-2">✓</span>
-                  <p className="text-xs text-[var(--text-secondary)]">100% Authentic</p>
-                </div>
-                <div className="flex flex-col items-center p-4 bg-[var(--bg-secondary)] rounded-lg text-center">
-                  <span className="text-xl mb-2">📦</span>
-                  <p className="text-xs text-[var(--text-secondary)]">Secure Packaging</p>
-                </div>
-                <div className="flex flex-col items-center p-4 bg-[var(--bg-secondary)] rounded-lg text-center">
-                  <span className="text-xl mb-2">↩️</span>
-                  <p className="text-xs text-[var(--text-secondary)]">7-Day Returns</p>
-                </div>
+                <Surface padding="sm" className="text-center">
+                  <p className="text-xs text-[var(--text-secondary)]">Verified authenticity</p>
+                </Surface>
+                <Surface padding="sm" className="text-center">
+                  <p className="text-xs text-[var(--text-secondary)]">Secure packaging</p>
+                </Surface>
+                <Surface padding="sm" className="text-center">
+                  <p className="text-xs text-[var(--text-secondary)]">7-day returns</p>
+                </Surface>
               </div>
             </div>
 
@@ -459,7 +457,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                   {dropStatus.status === 'upcoming' && (
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-[var(--accent-amber)]/20 flex items-center justify-center">
-                        <span className="text-lg">⏰</span>
+                        <span className="text-xs font-semibold text-[var(--accent-amber)]">Soon</span>
                       </div>
                       <div>
                         <p className="text-xs font-medium text-[var(--accent-amber)] uppercase tracking-wider">Drop Starts In</p>
@@ -470,7 +468,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                   {dropStatus.status === 'live' && (
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-[var(--accent)]/20 flex items-center justify-center">
-                        <span className="text-lg">🔥</span>
+                        <span className="text-xs font-semibold text-[var(--accent)]">Live</span>
                       </div>
                       <div>
                         <p className="text-xs font-medium text-[var(--accent)] uppercase tracking-wider">Drop Is Live</p>
@@ -601,14 +599,14 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                         : 'bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]'
                     }`}
                   >
-                    {addedToCart ? '✓ Added to Cart' : `Add to Cart — $${(selectedVariant!.price_cents / 100).toFixed(0)}`}
+                    {addedToCart ? 'Added to cart' : `Add to cart — $${(selectedVariant!.price_cents / 100).toFixed(0)}`}
                   </button>
                 ) : (
                   <button
                     onClick={handleStockAlert}
                     className="w-full py-4 px-6 rounded-lg font-semibold text-lg bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-primary)] hover:border-[var(--accent)] transition-colors"
                   >
-                    🔔 Notify When Available
+                    Notify when available
                   </button>
                 )}
               </div>
@@ -620,18 +618,11 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
               <Accordion>
                 <AccordionItem title="What's Included" defaultOpen>
                   <ul className="text-sm text-[var(--text-secondary)] space-y-2">
-                    <li className="flex items-center gap-2">
-                      <span className="text-[var(--success)]">✓</span>
-                      {selectedCondition === 'DS' ? 'Original box & all accessories' : 'Original box (when available)'}
+                    <li>
+                      {selectedCondition === 'DS' ? 'Original box and all accessories' : 'Original box when available'}
                     </li>
-                    <li className="flex items-center gap-2">
-                      <span className="text-[var(--success)]">✓</span>
-                      Detailed condition photos provided
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="text-[var(--success)]">✓</span>
-                      Certificate of authenticity
-                    </li>
+                    <li>Detailed condition photos</li>
+                    <li>Certificate of authenticity</li>
                   </ul>
                 </AccordionItem>
 
@@ -683,14 +674,14 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                     : 'bg-[var(--accent)] text-white'
                 }`}
               >
-                {addedToCart ? '✓ Added' : 'Add to Cart'}
+                {addedToCart ? 'Added' : 'Add to cart'}
               </button>
             ) : (
               <button
                 onClick={handleStockAlert}
                 className="px-6 py-3 rounded-lg font-semibold bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-primary)]"
               >
-                🔔 Notify Me
+                Notify me
               </button>
             )}
           </div>
@@ -703,12 +694,9 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
       {showAlertModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 pointer-events-none">
           <div className="bg-[var(--success)] text-white px-6 py-4 rounded-lg shadow-lg animate-fade-in pointer-events-auto">
-            <div className="flex items-center gap-3">
-              <span className="text-xl">🔔</span>
-              <div>
-                <p className="font-medium">Alert Set!</p>
-                <p className="text-sm opacity-90">We&apos;ll email you when this size is back in stock.</p>
-              </div>
+            <div>
+              <p className="font-medium">Alert set</p>
+              <p className="text-sm opacity-90">We&apos;ll email you when this size is back in stock.</p>
             </div>
           </div>
         </div>

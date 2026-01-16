@@ -7,6 +7,8 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { useEncryption } from '@/components/EncryptionProvider'
 import PWAInstallButton from '@/components/account/PWAInstallButton'
+import Surface from '@/components/ui/Surface'
+import Button from '@/components/ui/Button'
 
 interface Order {
   id: string
@@ -107,8 +109,9 @@ export default function AccountPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <Link 
               href="/account/orders"
-              className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-4 md:p-6 hover:border-[var(--border-secondary)] transition-colors"
+              className="block"
             >
+              <Surface padding="md" className="hover:border-[var(--border-secondary)] transition-colors">
               <div className="w-10 h-10 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center mb-3">
                 <svg className="w-5 h-5 text-[var(--text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
@@ -116,12 +119,14 @@ export default function AccountPage() {
               </div>
               <h3 className="font-medium text-[var(--text-primary)]">Orders</h3>
               <p className="text-xs text-[var(--text-muted)] mt-1 hidden md:block">View & track orders</p>
+              </Surface>
             </Link>
 
             <Link 
               href="/account/wishlist"
-              className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-4 md:p-6 hover:border-[var(--border-secondary)] transition-colors"
+              className="block"
             >
+              <Surface padding="md" className="hover:border-[var(--border-secondary)] transition-colors">
               <div className="w-10 h-10 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center mb-3">
                 <svg className="w-5 h-5 text-[var(--text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
@@ -129,12 +134,14 @@ export default function AccountPage() {
               </div>
               <h3 className="font-medium text-[var(--text-primary)]">Wishlist</h3>
               <p className="text-xs text-[var(--text-muted)] mt-1 hidden md:block">Saved items</p>
+              </Surface>
             </Link>
 
             <Link 
               href="/account/messages"
-              className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-4 md:p-6 hover:border-[var(--border-secondary)] transition-colors"
+              className="block"
             >
+              <Surface padding="md" className="hover:border-[var(--border-secondary)] transition-colors">
               <div className="w-10 h-10 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center mb-3 relative">
                 <svg className="w-5 h-5 text-[var(--text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -156,12 +163,14 @@ export default function AccountPage() {
               <p className="text-xs text-[var(--text-muted)] mt-1 hidden md:block">
                 {hasKeys ? 'Encrypted chat' : 'Chat with seller'}
               </p>
+              </Surface>
             </Link>
 
             <Link 
               href="/account/settings"
-              className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-4 md:p-6 hover:border-[var(--border-secondary)] transition-colors"
+              className="block"
             >
+              <Surface padding="md" className="hover:border-[var(--border-secondary)] transition-colors">
               <div className="w-10 h-10 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center mb-3">
                 <svg className="w-5 h-5 text-[var(--text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -170,24 +179,23 @@ export default function AccountPage() {
               </div>
               <h3 className="font-medium text-[var(--text-primary)]">Settings</h3>
               <p className="text-xs text-[var(--text-muted)] mt-1 hidden md:block">Account & preferences</p>
+              </Surface>
             </Link>
           </div>
 
           {/* Recent Orders */}
-          <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg overflow-hidden">
+          <Surface padding="none" className="overflow-hidden">
             <div className="px-6 py-4 border-b border-[var(--border-primary)] flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Recent Orders</h2>
-              <Link href="/account/orders" className="text-sm text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors">
-                View all →
-              </Link>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Recent orders</h2>
+              <Button href="/account/orders" variant="ghost" size="sm">View all</Button>
             </div>
 
             {orders.length === 0 ? (
               <div className="p-12 text-center">
                 <p className="text-[var(--text-muted)]">No orders yet</p>
-                <Link href="/" className="btn-primary mt-4 inline-block">
-                  Start Shopping
-                </Link>
+                <Button href="/shop" variant="primary" size="sm" className="mt-4 inline-flex">
+                  Start shopping
+                </Button>
               </div>
             ) : (
               <div className="divide-y divide-[var(--border-primary)]">
@@ -224,7 +232,7 @@ export default function AccountPage() {
                 ))}
               </div>
             )}
-          </div>
+          </Surface>
         </div>
       </main>
 

@@ -6,6 +6,8 @@ import { useCart } from '@/context/CartContext'
 import { getCartDisplayData } from '@/lib/cart'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
+import Surface from '@/components/ui/Surface'
+import Button from '@/components/ui/Button'
 
 interface CartDisplayItem {
   variant_id: string
@@ -147,9 +149,9 @@ export default function CartPage() {
             </div>
             <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Your cart is empty</h1>
             <p className="text-[var(--text-secondary)] mb-8">Looks like you haven&apos;t added anything yet.</p>
-            <Link href="/shop" className="btn-primary">
-              Continue Shopping
-            </Link>
+            <Button href="/shop" variant="primary">
+              Continue shopping
+            </Button>
           </div>
         </div>
         <Footer />
@@ -165,26 +167,20 @@ export default function CartPage() {
         <div className="container max-w-4xl">
           {/* Hold Timer Warning */}
           {holdTimeRemaining > 0 && holdTimeRemaining < 300 && (
-            <div className="mb-6 p-4 bg-[var(--warning)]/10 border border-[var(--warning)]/20 rounded-lg flex items-center gap-3">
-              <span className="text-2xl">⏱️</span>
-              <div className="flex-1">
-                <p className="font-medium text-[var(--warning)]">Items Reserved</p>
-                <p className="text-sm text-[var(--text-secondary)]">
-                  Complete checkout in <span className="font-mono font-bold">{formatHoldTime(holdTimeRemaining)}</span> to secure your items
-                </p>
-              </div>
+            <div className="mb-6 p-4 bg-[var(--warning)]/10 border border-[var(--warning)]/20 rounded-lg">
+              <p className="font-medium text-[var(--warning)]">Items reserved</p>
+              <p className="text-sm text-[var(--text-secondary)]">
+                Complete checkout in <span className="font-mono font-bold">{formatHoldTime(holdTimeRemaining)}</span> to secure your items.
+              </p>
             </div>
           )}
 
           {holdTimeRemaining === 0 && (
-            <div className="mb-6 p-4 bg-[var(--error)]/10 border border-[var(--error)]/20 rounded-lg flex items-center gap-3">
-              <span className="text-2xl">⚠️</span>
-              <div className="flex-1">
-                <p className="font-medium text-[var(--error)]">Reservation Expired</p>
-                <p className="text-sm text-[var(--text-secondary)]">
-                  Items may no longer be available. Complete checkout now to attempt purchase.
-                </p>
-              </div>
+            <div className="mb-6 p-4 bg-[var(--error)]/10 border border-[var(--error)]/20 rounded-lg">
+              <p className="font-medium text-[var(--error)]">Reservation expired</p>
+              <p className="text-sm text-[var(--text-secondary)]">
+                Items may no longer be available. Complete checkout now to attempt purchase.
+              </p>
             </div>
           )}
 
@@ -317,9 +313,9 @@ export default function CartPage() {
 
             {/* Order Summary */}
             <div className="lg:col-span-1">
-              <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6 sticky top-24">
+              <Surface padding="lg" className="sticky top-24">
                 <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
-                  Order Summary
+                  Order summary
                 </h2>
 
                 <div className="space-y-3 mb-6">
@@ -352,7 +348,7 @@ export default function CartPage() {
                     <div className="mt-3 space-y-2 text-sm">
                       {shippingEstimate.isLocal && (
                         <div className="flex justify-between text-[var(--success)]">
-                          <span>🚗 Local Delivery</span>
+                          <span>Local delivery</span>
                           <span>{cartDisplayData.subtotal >= 15000 ? 'FREE' : '$10.00'}</span>
                         </div>
                       )}
@@ -384,30 +380,24 @@ export default function CartPage() {
                   </div>
                 </div>
 
-                <Link
-                  href="/checkout"
-                  className="btn-primary w-full justify-center"
-                >
-                  Proceed to Checkout
-                </Link>
+                <Button href="/checkout" fullWidth>
+                  Proceed to checkout
+                </Button>
 
                 {/* Payment Methods */}
-                <div className="mt-4 flex justify-center gap-2">
-                  <span className="text-xs text-[var(--text-muted)]">We accept:</span>
-                  <div className="flex gap-1">
-                    <span className="text-xs text-[var(--text-secondary)]">💳</span>
-                    <span className="text-xs text-[var(--text-secondary)]">Apple Pay</span>
-                    <span className="text-xs text-[var(--text-secondary)]">• Crypto</span>
-                  </div>
+                <div className="mt-4 text-center text-xs text-[var(--text-muted)]">
+                  Card and crypto payments supported.
                 </div>
 
-                <Link
+                <Button
                   href="/shop"
-                  className="block text-center mt-4 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                  variant="ghost"
+                  fullWidth
+                  className="mt-4 text-sm"
                 >
-                  ← Continue Shopping
-                </Link>
-              </div>
+                  Continue shopping
+                </Button>
+              </Surface>
             </div>
           </div>
         </div>

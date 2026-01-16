@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
+import Button from '@/components/ui/Button'
+import Surface from '@/components/ui/Surface'
 
 interface ModelImage {
   id: string
@@ -36,6 +38,9 @@ export default function ModelImagesPage() {
   const [importing, setImporting] = useState(false)
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set())
   const [colorSearch, setColorSearch] = useState('')
+  const [manualUrls, setManualUrls] = useState('')
+  const [manualImporting, setManualImporting] = useState(false)
+  const [manualError, setManualError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     try {
@@ -126,6 +131,47 @@ export default function ModelImagesPage() {
     }
   }
 
+  const importManualUrls = async () => {
+    const urls = manualUrls
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+
+    if (urls.length === 0) {
+      setManualError('Enter at least one image URL')
+      return
+    }
+
+    setManualImporting(true)
+    setManualError(null)
+    try {
+      const response = await fetch('/api/admin/models/import-images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modelId,
+          images: urls,
+          source: 'manual',
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        alert(`Imported ${data.imported} of ${data.total} images`)
+        setManualUrls('')
+        await fetchData()
+      } else {
+        const data = await response.json().catch(() => null)
+        setManualError(data?.error || 'Import failed')
+      }
+    } catch (error) {
+      console.error('Manual import error:', error)
+      setManualError('Import failed')
+    } finally {
+      setManualImporting(false)
+    }
+  }
+
   const deleteImage = async (imageId: string) => {
     if (!confirm('Delete this image?')) return
 
@@ -189,13 +235,15 @@ export default function ModelImagesPage() {
               onChange={(e) => setColorSearch(e.target.value)}
               className="min-w-[180px]"
             />
-            <button
+            <Button
               onClick={searchGoogleImages}
               disabled={searching}
-              className="btn-primary whitespace-nowrap"
+              variant="primary"
+              size="sm"
+              className="whitespace-nowrap"
             >
-              {searching ? 'Searching...' : 'Search Images'}
-            </button>
+              {searching ? 'Searching...' : 'Search images'}
+            </Button>
           </div>
         </div>
         
@@ -227,6 +275,34 @@ export default function ModelImagesPage() {
           </div>
         )}
       </div>
+
+      {/* Manual URL Import */}
+      <Surface padding="md" className="mb-6">
+        <h2 className="font-semibold text-[var(--text-primary)] mb-2">Manual URL import</h2>
+        <p className="text-sm text-[var(--text-muted)] mb-4">
+          Paste one image URL per line. Images are stored in the model images bucket.
+        </p>
+        <textarea
+          value={manualUrls}
+          onChange={(e) => setManualUrls(e.target.value)}
+          rows={4}
+          placeholder="https://example.com/image1.jpg"
+          className="w-full"
+        />
+        {manualError && (
+          <p className="text-sm text-[var(--error)] mt-2">{manualError}</p>
+        )}
+        <div className="mt-4">
+          <Button
+            onClick={importManualUrls}
+            disabled={manualImporting}
+            variant="secondary"
+            size="sm"
+          >
+            {manualImporting ? 'Importing...' : 'Import URLs'}
+          </Button>
+        </div>
+      </Surface>
 
       {/* Existing Images */}
       <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg overflow-hidden">

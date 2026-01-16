@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabaseClient'
 import { useE2EEncryption } from '@/hooks/useE2EEncryption'
 import KeyVerification from '@/components/KeyVerification'
 import KeyBackup from '@/components/KeyBackup'
+import Button from '@/components/ui/Button'
+import Surface from '@/components/ui/Surface'
 
 interface Conversation {
   customer_id: string
@@ -335,7 +337,7 @@ export default function AdminMessagesPage() {
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">Messages</h1>
         
         {/* E2EE Status & Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {isInitialized ? (
             <span className="flex items-center gap-2 px-3 py-1.5 bg-[var(--success)]/10 text-[var(--success)] text-sm rounded-full">
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -349,21 +351,30 @@ export default function AdminMessagesPage() {
             </span>
           )}
           
-          <button
+          <Button
             onClick={() => setShowKeyVerification(true)}
-            className="btn-secondary text-sm"
+            variant="ghost"
+            size="sm"
           >
             Verify keys
-          </button>
+          </Button>
           
-          <button
+          <Button
             onClick={() => setShowKeyBackup(true)}
-            className="btn-secondary text-sm"
+            variant="ghost"
+            size="sm"
           >
             Backup
-          </button>
+          </Button>
         </div>
       </div>
+
+      <Surface padding="md" className="mb-4">
+        <p className="text-sm text-[var(--text-primary)] font-medium">Encrypted support inbox</p>
+        <p className="text-xs text-[var(--text-muted)] mt-1">
+          Messages are end-to-end encrypted on this device. Verify customer keys and back up your keys to avoid lockouts.
+        </p>
+      </Surface>
 
       {encryptionError && (
         <div className="mb-4 p-3 bg-[var(--warning)]/10 border border-[var(--warning)]/20 rounded-lg text-sm text-[var(--text-secondary)]">

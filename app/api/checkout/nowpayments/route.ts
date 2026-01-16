@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Shipping address required' }, { status: 400 })
     }
 
-    const required = ['name', 'line1', 'city', 'province', 'postal_code', 'country']
+    const required = ['name', 'line1', 'city', 'province', 'postal_code', 'country', 'email']
     for (const field of required) {
       if (!(shippingAddress as Record<string, unknown>)[field]) {
         return NextResponse.json({ error: `Missing required field: ${field}` }, { status: 400 })
@@ -165,7 +165,10 @@ export async function POST(request: Request) {
     }).join(', ')
 
     // Create NOWPayments invoice
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://709exclusive.shop'
+    const baseUrl =
+      process.env.NEXT_PUBLIC_BASE_URL ||
+      process.env.NEXT_PUBLIC_APP_URL ||
+      'https://709exclusive.shop'
     
     let invoice
     try {

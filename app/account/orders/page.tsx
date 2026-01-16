@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
+import Surface from '@/components/ui/Surface'
+import Button from '@/components/ui/Button'
 
 interface Order {
   id: string
@@ -69,8 +71,8 @@ export default function OrdersPage() {
 
       <main className="flex-1 pt-24 pb-16 md:pt-28 md:pb-24">
         <div className="container max-w-4xl">
-          <h1 className="text-2xl md:text-3xl font-bold text-[var(--text-primary)] mb-8">
-            Your Orders
+          <h1 className="text-2xl md:text-3xl font-semibold text-[var(--text-primary)] mb-8">
+            Your orders
           </h1>
 
           {orders.length === 0 ? (
@@ -81,16 +83,14 @@ export default function OrdersPage() {
                 </svg>
               </div>
               <p className="text-[var(--text-secondary)] mb-8">You haven&apos;t placed any orders yet.</p>
-              <Link href="/" className="btn-primary">
-                Start Shopping
-              </Link>
+              <Button href="/shop" variant="primary">Start shopping</Button>
             </div>
           ) : (
             <div className="space-y-4">
               {orders.map((order) => (
-                <div 
+                <Surface 
                   key={order.id} 
-                  className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6"
+                  padding="md"
                 >
                   <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-4">
                     <div>
@@ -120,7 +120,7 @@ export default function OrdersPage() {
                         href={`/account/orders/${order.id}`}
                         className="text-sm text-[var(--accent)] hover:text-[var(--accent-hover)] font-medium transition-colors"
                       >
-                        View Details →
+                        View details
                       </Link>
                     </div>
                   </div>
@@ -140,7 +140,7 @@ export default function OrdersPage() {
                       Shipped
                     </div>
                   </div>
-                </div>
+                </Surface>
               ))}
             </div>
           )}

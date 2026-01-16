@@ -9,6 +9,8 @@ import { loadStripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
+import Surface from '@/components/ui/Surface'
+import Button from '@/components/ui/Button'
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
@@ -54,19 +56,19 @@ function CheckoutForm({ clientSecret, onSuccess }: { clientSecret: string; onSuc
     <form onSubmit={handleSubmit} className="space-y-6">
       <div>
         <label className="block text-sm font-medium text-[var(--text-secondary)] mb-3">
-          Card Information
+          Card details
         </label>
-        <div className="p-4 bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md">
+        <div className="p-4 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg">
           <CardElement
             options={{
               style: {
                 base: {
                   fontSize: '16px',
-                  color: '#F2F2F2',
+                  color: '#F8F8F8',
                   '::placeholder': {
-                    color: '#7A7A7A',
+                    color: '#8A8F98',
                   },
-                  iconColor: '#B5B5B5',
+                  iconColor: '#8A8F98',
                 },
                 invalid: {
                   color: '#EF4444',
@@ -84,10 +86,12 @@ function CheckoutForm({ clientSecret, onSuccess }: { clientSecret: string; onSuc
         </div>
       )}
 
-      <button
+      <Button
         type="submit"
         disabled={!stripe || isProcessing}
-        className="btn-primary w-full justify-center py-4 text-lg"
+        variant="primary"
+        fullWidth
+        className="py-4 text-lg"
       >
         {isProcessing ? (
           <span className="flex items-center gap-2">
@@ -95,9 +99,9 @@ function CheckoutForm({ clientSecret, onSuccess }: { clientSecret: string; onSuc
             Processing...
           </span>
         ) : (
-          'Complete Payment'
+          'Complete payment'
         )}
-      </button>
+      </Button>
     </form>
   )
 }
@@ -368,7 +372,7 @@ export default function CheckoutPage() {
           {/* Breadcrumb */}
           <nav className="mb-8">
             <Link href="/cart" className="text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
-              ← Back to Cart
+              Back to cart
             </Link>
           </nav>
 
@@ -385,9 +389,9 @@ export default function CheckoutPage() {
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
             {/* Shipping Address */}
             <div className="lg:col-span-3">
-              <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6">
+              <Surface padding="lg">
                 <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-6">
-                  Shipping Address
+                  Delivery details
                 </h2>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -529,13 +533,13 @@ export default function CheckoutPage() {
                     />
                   </div>
 	                </div>
-	              </div>
+	              </Surface>
 
               {/* Delivery Method */}
               {!checkoutData && (
-                <div className="mt-6 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6">
+                <Surface padding="lg" className="mt-6">
                   <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">
-                    Delivery
+                    Delivery options
                   </h2>
                   <p className="text-sm text-[var(--text-muted)] mb-4">
                     Enter your province and postal code to see shipping and local delivery options.
@@ -544,7 +548,7 @@ export default function CheckoutPage() {
                   {quoteLoading && (
                     <div className="flex items-center gap-3 text-sm text-[var(--text-muted)]">
                       <span className="w-4 h-4 border-2 border-[var(--text-muted)]/30 border-t-[var(--text-muted)] rounded-full animate-spin" />
-                      Calculating…
+                      Calculating...
                     </div>
                   )}
 
@@ -593,14 +597,14 @@ export default function CheckoutPage() {
                       ))}
                     </div>
                   )}
-                </div>
+                </Surface>
               )}
 
               {/* Payment Method Selector */}
               {!checkoutData && (
-                <div className="mt-6 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6">
+                <Surface padding="lg" className="mt-6">
                   <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-6">
-                    Payment Method
+                    Payment method
                   </h2>
                   
                   <div className="grid grid-cols-2 gap-4">
@@ -618,7 +622,7 @@ export default function CheckoutPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                         </svg>
                         <span className={`font-medium ${paymentMethod === 'card' ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>
-                          Credit Card
+                          Card
                         </span>
                         <span className="text-xs text-[var(--text-muted)]">Visa, Mastercard, Amex</span>
                       </div>
@@ -639,7 +643,7 @@ export default function CheckoutPage() {
                           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-1.81v-1.91c-1.29-.18-2.37-.67-3.24-1.46l1.14-1.36c.72.62 1.52.99 2.4 1.09v-2.84l-.47-.15c-1.54-.47-2.46-1.37-2.46-2.77 0-1.51 1.09-2.65 2.93-2.93V6h1.81v1.67c1.08.17 1.96.55 2.64 1.14l-1.08 1.38c-.58-.44-1.23-.73-1.94-.85v2.72l.52.17c1.64.53 2.53 1.35 2.53 2.85 0 1.59-1.13 2.72-2.97 3.01zm-1.01-8.64c-.66.1-1.02.49-1.02 1.04 0 .45.26.78.93 1.01l.09.03V8.45zm1.81 6.14v-2.14l-.12-.04c-.8-.26-1.2-.65-1.2-1.18 0-.51.38-.89 1.11-1.01v4.37z"/>
                         </svg>
                         <span className={`font-medium ${paymentMethod === 'crypto' ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>
-                          Cryptocurrency
+                          Crypto
                         </span>
                         <span className="text-xs text-[var(--text-muted)]">BTC, ETH, DOGE & 100+ more</span>
                       </div>
@@ -649,49 +653,50 @@ export default function CheckoutPage() {
                   {paymentMethod === 'crypto' && (
                     <div className="mt-4 p-3 bg-[var(--bg-tertiary)] rounded-lg">
                       <p className="text-sm text-[var(--text-secondary)]">
-                        <span className="font-medium">Accepted:</span> Bitcoin, Ethereum, USDT, USDC, Dogecoin, Shiba Inu, XRP, Solana, Cardano, Polygon, and 100+ more cryptocurrencies
+                        <span className="font-medium">Accepted:</span> BTC, ETH, USDT, USDC, DOGE, SOL, and 100+ more.
                       </p>
                     </div>
                   )}
 
                   {/* Proceed Button */}
-	                  <div className="mt-6">
-	                    <button
-	                      onClick={handleProceedToPayment}
-	                      disabled={!isReadyToProceed || isLoading}
-	                      className="btn-primary w-full justify-center py-4"
-	                    >
+                  <div className="mt-6">
+                    <Button
+                      onClick={handleProceedToPayment}
+                      disabled={!isReadyToProceed || isLoading}
+                      fullWidth
+                      className="py-4"
+                    >
                       {isLoading ? (
                         <span className="flex items-center gap-2">
                           <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
                           Processing...
                         </span>
                       ) : paymentMethod === 'crypto' ? (
-                        'Pay with Crypto'
+                        'Pay with crypto'
                       ) : (
-                        'Continue to Card Payment'
+                        'Continue to card payment'
                       )}
-	                    </button>
-	                    {!isReadyToProceed && (
-	                      <p className="mt-3 text-sm text-[var(--text-muted)] text-center">
-	                        {!isShippingValid
-	                          ? 'Please fill in all required fields (*)'
-	                          : quoteLoading
-	                            ? 'Calculating shipping and tax…'
-	                            : quoteError
-	                              ? quoteError
-	                              : isLocalDelivery && !shippingAddress.phone.trim()
-	                                ? 'Phone number is required for local delivery'
-	                                : 'Select a delivery option above'}
-	                      </p>
-	                    )}
-	                  </div>
-                </div>
+                    </Button>
+                    {!isReadyToProceed && (
+                      <p className="mt-3 text-sm text-[var(--text-muted)] text-center">
+                        {!isShippingValid
+                          ? 'Please fill in all required fields (*)'
+                          : quoteLoading
+                            ? 'Calculating shipping and tax...'
+                            : quoteError
+                              ? quoteError
+                              : isLocalDelivery && !shippingAddress.phone.trim()
+                                ? 'Phone number is required for local delivery'
+                                : 'Select a delivery option above'}
+                      </p>
+                    )}
+                  </div>
+                </Surface>
               )}
 
               {/* Payment Form */}
               {checkoutData && (
-                <div className="mt-6 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6">
+                <Surface padding="lg" className="mt-6">
                   <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-6">
                     Payment
                   </h2>
@@ -706,15 +711,15 @@ export default function CheckoutPage() {
                       onSuccess={handlePaymentSuccess}
                     />
                   </Elements>
-                </div>
+                </Surface>
               )}
             </div>
 
             {/* Order Summary */}
             <div className="lg:col-span-2">
-              <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6 sticky top-24">
+              <Surface padding="lg" className="sticky top-24">
                 <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-6">
-                  Order Summary
+                  Order summary
                 </h2>
 
                 <div className="space-y-4">
@@ -736,7 +741,7 @@ export default function CheckoutPage() {
                     <div className="text-center py-4">
                       <p className="text-[var(--text-secondary)]">{cart.length} item(s) in cart</p>
                       <p className="text-sm text-[var(--text-muted)] mt-2">
-                        Loading items…
+                        Loading items...
                       </p>
                     </div>
                   )}
@@ -790,7 +795,7 @@ export default function CheckoutPage() {
                     Secure checkout
                   </div>
                 </div>
-              </div>
+              </Surface>
             </div>
           </div>
         </div>

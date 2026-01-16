@@ -395,7 +395,7 @@ export default function AdminSettingsPage() {
               </div>
 
               <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6">
-                <h2 className="text-lg font-semibold text-[var(--text-primary)]">Danger Zone</h2>
+                <h2 className="text-lg font-semibold text-[var(--text-primary)]">Kill switch</h2>
                 <p className="text-sm text-[var(--text-muted)] mt-1">
                   Permanently deletes all customer accounts and clears all messages. Orders are retained but unlinked from customers.
                 </p>
@@ -409,7 +409,7 @@ export default function AdminSettingsPage() {
                     onClick={() => setShowPurgeConfirm(true)}
                     className="px-4 py-2 rounded-lg text-sm font-medium bg-[var(--error)] text-white hover:bg-[var(--error)]/90 transition-colors"
                   >
-                    Delete customers + messages
+                    Purge customers + messages
                   </button>
                 </div>
               </div>

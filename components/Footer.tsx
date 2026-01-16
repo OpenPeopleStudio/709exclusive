@@ -57,7 +57,7 @@ export default function Footer() {
             </span>
           </Link>
           <p className="mt-3 text-sm text-[var(--text-muted)]">
-            Premium sneakers & streetwear. St. John&apos;s, NL.
+            Authentic sneakers and streetwear with local delivery and pickup.
           </p>
           
           {/* Social links for mobile */}
@@ -85,9 +85,7 @@ export default function Footer() {
               </span>
             </Link>
             <p className="mt-4 text-sm text-[var(--text-muted)]">
-              Premium sneakers & streetwear.
-              <br />
-              St. John&apos;s, NL.
+              Modern resale marketplace for verified sneakers and streetwear.
             </p>
           </div>
 
@@ -95,17 +93,17 @@ export default function Footer() {
           <FooterSection title="Shop">
             <ul className="space-y-3">
               <li>
-                <Link href="/" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
-                  All Products
+                <Link href="/shop" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+                  Shop all
                 </Link>
               </li>
               <li>
-                <Link href="/" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
-                  New Arrivals
+                <Link href="/shop?sort=newest" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+                  New arrivals
                 </Link>
               </li>
               <li>
-                <Link href="/" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+                <Link href="/shop?drops=true" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
                   Drops
                 </Link>
               </li>
@@ -121,9 +119,19 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <span className="text-sm text-[var(--text-secondary)]">
-                  Shipping & Returns
-                </span>
+                <Link href="/policies/shipping" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+                  Shipping & Delivery
+                </Link>
+              </li>
+              <li>
+                <Link href="/policies/returns" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+                  Returns
+                </Link>
+              </li>
+              <li>
+                <Link href="/policies/authenticity" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+                  Authenticity
+                </Link>
               </li>
               <li>
                 <a 

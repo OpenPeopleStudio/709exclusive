@@ -10,6 +10,8 @@ import KeyBackup from '@/components/KeyBackup'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import PWAInstallButton from '@/components/account/PWAInstallButton'
+import Button from '@/components/ui/Button'
+import Surface from '@/components/ui/Surface'
 
 interface Message {
   id: string
@@ -290,18 +292,20 @@ export default function MessagesPage() {
 
           {/* E2EE Action Buttons */}
           <div className="flex gap-2 mb-4">
-            <button
+            <Button
               onClick={() => setShowKeyVerification(true)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+              variant="ghost"
+              size="sm"
             >
               Verify keys
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setShowKeyBackup(true)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+              variant="ghost"
+              size="sm"
             >
               Backup
-            </button>
+            </Button>
           </div>
 
           <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg overflow-hidden flex flex-col" style={{ height: 'calc(100vh - 380px)', minHeight: '400px' }}>
@@ -385,11 +389,11 @@ export default function MessagesPage() {
           </div>
 
           {/* E2EE Info */}
-          <div className="mt-4 p-3 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg">
+          <Surface padding="md" className="mt-4">
             <p className="text-xs text-[var(--text-muted)]">
-              <strong className="text-[var(--text-secondary)]">End-to-end encrypted:</strong> Messages are encrypted on your device before sending. Only you and support can read them.
+              <span className="text-[var(--text-secondary)] font-medium">End-to-end encrypted:</span> Messages are encrypted on your device before sending. Only you and support can read them.
             </p>
-          </div>
+          </Surface>
         </div>
       </main>
 

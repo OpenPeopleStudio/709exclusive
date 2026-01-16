@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
+import Button from '@/components/ui/Button'
+import Surface from '@/components/ui/Surface'
 
 interface ProductModel {
   id: string
@@ -70,54 +72,81 @@ export default function InventoryIntakePage() {
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-8">
+    <div className="space-y-6">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
         <div>
-          <Link href="/admin/inventory" className="text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] mb-2 inline-block">
-            ← Back to Inventory
+          <Link href="/admin/inventory" className="text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)]">
+            Back to inventory
           </Link>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Inventory Intake</h1>
+          <h1 className="text-2xl font-semibold text-[var(--text-primary)] mt-2">Inventory intake</h1>
+          <p className="text-sm text-[var(--text-muted)] mt-1">
+            Create variants, import CSVs, and attach photos in one flow.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button href="/admin/models" variant="secondary" size="sm">View models</Button>
+          <Button href="/admin/products/new" variant="ghost" size="sm">New product</Button>
         </div>
       </div>
 
+      <Surface padding="md">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">Step 1</p>
+            <p className="text-[var(--text-primary)] font-medium mt-1">Select or create model</p>
+            <p className="text-[var(--text-muted)] mt-1">Search by brand and model, then save.</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">Step 2</p>
+            <p className="text-[var(--text-primary)] font-medium mt-1">Add sizes and pricing</p>
+            <p className="text-[var(--text-muted)] mt-1">Use the generator or CSV import.</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">Step 3</p>
+            <p className="text-[var(--text-primary)] font-medium mt-1">Attach photos</p>
+            <p className="text-[var(--text-muted)] mt-1">Upload images and set a primary shot.</p>
+          </div>
+        </div>
+      </Surface>
+
       {/* Tabs */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex flex-wrap gap-2">
         <button
           onClick={() => setActiveTab('generator')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+          className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
             activeTab === 'generator'
-              ? 'bg-[var(--accent)] text-white'
-              : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+              ? 'bg-[var(--accent)] text-white border-transparent'
+              : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--border-secondary)]'
           }`}
         >
-          Variant Generator
+          Variant generator
         </button>
         <button
           onClick={() => setActiveTab('csv')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+          className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
             activeTab === 'csv'
-              ? 'bg-[var(--accent)] text-white'
-              : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+              ? 'bg-[var(--accent)] text-white border-transparent'
+              : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--border-secondary)]'
           }`}
         >
-          CSV Import
+          CSV import
         </button>
         <button
           onClick={() => setActiveTab('photos')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+          className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
             activeTab === 'photos'
-              ? 'bg-[var(--accent)] text-white'
-              : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+              ? 'bg-[var(--accent)] text-white border-transparent'
+              : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--border-secondary)]'
           }`}
         >
-          Photo Upload
+          Photo upload
         </button>
       </div>
 
       {loading ? (
-        <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-8 text-center">
+        <Surface padding="lg" className="text-center">
           <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin mx-auto"></div>
-        </div>
+        </Surface>
       ) : (
         <>
           {activeTab === 'generator' && (
@@ -855,6 +884,7 @@ function PhotoUpload({ models }: { models: ProductModel[] }) {
   const [modelImages, setModelImages] = useState<Array<{ id: string; url: string }>>([])
   const [uploading, setUploading] = useState(false)
   const [dragOver, setDragOver] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const dropRef = useRef<HTMLDivElement>(null)
 
   const filteredModels = models.filter(m => 
@@ -935,28 +965,42 @@ function PhotoUpload({ models }: { models: ProductModel[] }) {
     if (!selectedModel || images.length === 0) return
 
     setUploading(true)
+    setUploadError(null)
 
     try {
-      // For now, just log - in production you'd upload to storage
+      const entries = images.map((img, index) => ({
+        kind: img.file ? 'file' : 'existing',
+        position: index,
+        isPrimary: img.isPrimary,
+        url: img.file ? null : img.url,
+      }))
+
+      const formData = new FormData()
+      formData.append('modelId', selectedModel.id)
+      formData.append('entries', JSON.stringify(entries))
+
+      images.forEach((img) => {
+        if (img.file) {
+          formData.append('files', img.file, img.file.name)
+        }
+      })
+
       const response = await fetch('/api/admin/inventory/intake/photos', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          modelId: selectedModel.id,
-          images: images.map(img => ({
-            url: img.url,
-            isPrimary: img.isPrimary,
-            isModelImage: img.id.startsWith('model-')
-          }))
-        })
+        body: formData,
       })
 
       if (response.ok) {
-        alert('Images attached successfully!')
+        const data = await response.json()
+        alert(`Images attached: ${data.attached ?? images.length}`)
         setImages([])
+      } else {
+        const data = await response.json().catch(() => null)
+        setUploadError(data?.error || 'Upload failed')
       }
     } catch (error) {
       console.error('Upload error:', error)
+      setUploadError('Upload failed')
     } finally {
       setUploading(false)
     }
@@ -1068,7 +1112,7 @@ function PhotoUpload({ models }: { models: ProductModel[] }) {
                   disabled={uploading}
                   className="btn-primary"
                 >
-                  {uploading ? 'Uploading...' : 'Attach to Product'}
+                  {uploading ? 'Uploading...' : 'Attach to product'}
                 </button>
               </div>
 
@@ -1106,6 +1150,12 @@ function PhotoUpload({ models }: { models: ProductModel[] }) {
                   </div>
                 ))}
               </div>
+
+              {uploadError && (
+                <div className="mt-4 p-3 bg-[var(--error)]/10 border border-[var(--error)]/20 rounded-lg">
+                  <p className="text-sm text-[var(--error)]">{uploadError}</p>
+                </div>
+              )}
             </div>
           )}
         </>

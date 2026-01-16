@@ -2,11 +2,12 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import ProductCard, { ProductCardSkeleton, ProductCardData } from '@/components/ui/ProductCard'
+import Button from '@/components/ui/Button'
+import Surface from '@/components/ui/Surface'
 
 interface Product {
   id: string
@@ -150,47 +151,37 @@ export default function Home() {
       <Header />
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 md:pt-44 md:pb-28">
+      <section className="pt-28 pb-16 md:pt-40 md:pb-24">
         <div className="container">
-          <div className="max-w-3xl">
-            <h1 className="text-4xl md:text-6xl lg:text-7xl font-black tracking-tight text-[var(--text-primary)] leading-[0.9]">
-              AUTHENTIC
-              <br />
-              <span className="text-[var(--accent)]">SNEAKERS</span>
-              <br />
-              & STREETWEAR
-            </h1>
-            <p className="mt-6 md:mt-8 text-lg md:text-xl text-[var(--text-secondary)] max-w-xl">
-              St. John&apos;s premier destination for authentic kicks and exclusive drops.
+          <div className="max-w-3xl space-y-6">
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">
+              709exclusive
             </p>
-            <div className="mt-8 md:mt-10 flex flex-wrap gap-4">
-              <Link href="/shop" className="btn-primary">
-                Shop All
-              </Link>
-              <Link href="/shop?drops=true" className="btn-secondary">
-                View Drops
-              </Link>
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-semibold text-[var(--text-primary)] leading-tight">
+              Authentic sneakers with local delivery and pickup.
+            </h1>
+            <p className="text-base md:text-lg text-[var(--text-secondary)] max-w-xl">
+              A modern resale marketplace built for Newfoundland. Shop verified inventory, pay with card or crypto, and track every order in one place.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button href="/shop" variant="primary">Browse inventory</Button>
+              <Button href="/shop?sort=newest" variant="secondary">New arrivals</Button>
             </div>
           </div>
         </div>
       </section>
 
       {/* Products Section */}
-      <section className="py-16 md:py-24 flex-1">
+      <section className="py-12 md:py-20 flex-1">
         <div className="container">
-          <div className="flex items-center justify-between mb-10 md:mb-14">
-            <h2 className="text-2xl md:text-3xl font-bold text-[var(--text-primary)]">
-              Latest Arrivals
-            </h2>
-            <Link 
-              href="/shop" 
-              className="text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-1"
-            >
-              View All
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-10">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">Latest</p>
+              <h2 className="text-2xl md:text-3xl font-semibold text-[var(--text-primary)]">
+                Recently added inventory
+              </h2>
+            </div>
+            <Button href="/shop" variant="ghost">View all</Button>
           </div>
 
           {loading ? (
@@ -220,30 +211,21 @@ export default function Home() {
       </section>
 
       {/* Features Section */}
-      <section className="py-16 md:py-20 border-t border-[var(--border-primary)]">
+      <section className="py-12 md:py-20 border-t border-[var(--border-primary)]">
         <div className="container">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
-            <div className="text-center md:text-left">
-              <div className="w-12 h-12 mx-auto md:mx-0 mb-4 rounded-full bg-[var(--bg-secondary)] flex items-center justify-center">
-                <span className="text-xl">✓</span>
-              </div>
-              <h3 className="font-semibold text-[var(--text-primary)] mb-2">100% Authentic</h3>
-              <p className="text-sm text-[var(--text-secondary)]">Every item verified by trained authenticators before shipping.</p>
-            </div>
-            <div className="text-center md:text-left">
-              <div className="w-12 h-12 mx-auto md:mx-0 mb-4 rounded-full bg-[var(--bg-secondary)] flex items-center justify-center">
-                <span className="text-xl">📦</span>
-              </div>
-              <h3 className="font-semibold text-[var(--text-primary)] mb-2">Fast Shipping</h3>
-              <p className="text-sm text-[var(--text-secondary)]">Free shipping on orders over $200 CAD across Canada.</p>
-            </div>
-            <div className="text-center md:text-left">
-              <div className="w-12 h-12 mx-auto md:mx-0 mb-4 rounded-full bg-[var(--bg-secondary)] flex items-center justify-center">
-                <span className="text-xl">↩️</span>
-              </div>
-              <h3 className="font-semibold text-[var(--text-primary)] mb-2">Easy Returns</h3>
-              <p className="text-sm text-[var(--text-secondary)]">7-day returns if the item doesn&apos;t match description.</p>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            <Surface padding="lg">
+              <h3 className="font-semibold text-[var(--text-primary)] mb-2">Local delivery</h3>
+              <p className="text-sm text-[var(--text-secondary)]">Same-day in St. John&apos;s with real-time order updates.</p>
+            </Surface>
+            <Surface padding="lg">
+              <h3 className="font-semibold text-[var(--text-primary)] mb-2">Pickup ready</h3>
+              <p className="text-sm text-[var(--text-secondary)]">Skip the wait and pick up in-store as soon as it&apos;s verified.</p>
+            </Surface>
+            <Surface padding="lg">
+              <h3 className="font-semibold text-[var(--text-primary)] mb-2">Card + crypto</h3>
+              <p className="text-sm text-[var(--text-secondary)]">Pay with Stripe cards or NOWPayments crypto at checkout.</p>
+            </Surface>
           </div>
         </div>
       </section>

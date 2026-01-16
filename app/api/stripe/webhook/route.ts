@@ -6,13 +6,23 @@ import { sendOrderConfirmation } from '@/lib/email'
 export async function POST(req: Request) {
   const body = await req.text()
   const headersList = await headers()
-  const sig = headersList.get('stripe-signature')!
+  const sig = headersList.get('stripe-signature')
 
-  const event = stripe.webhooks.constructEvent(
-    body,
-    sig,
-    process.env.STRIPE_WEBHOOK_SECRET!
-  )
+  if (!sig) {
+    return new Response('Missing stripe signature', { status: 400 })
+  }
+
+  let event
+  try {
+    event = stripe.webhooks.constructEvent(
+      body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET!
+    )
+  } catch (error) {
+    console.error('Stripe webhook signature error:', error)
+    return new Response('Invalid signature', { status: 400 })
+  }
 
   const supabase = await createSupabaseServer()
 
@@ -63,7 +73,7 @@ export async function POST(req: Request) {
       .eq('stripe_payment_intent', intent.id)
       .single()
 
-    if (order) {
+    if (order && order.status === 'pending') {
       // Get order items and release reservations
       const { data: orderItems } = await supabase
         .from('order_items')

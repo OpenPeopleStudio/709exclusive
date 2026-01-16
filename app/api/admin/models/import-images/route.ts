@@ -22,9 +22,10 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { modelId, images }: {
+    const { modelId, images, source }: {
       modelId: string
       images: string[]
+      source?: string
     } = await req.json()
 
     if (!modelId || !images?.length) {
@@ -59,9 +60,9 @@ export async function POST(req: Request) {
           .from('model_images')
           .insert({
             model_id: modelId,
-            source: 'google',
+            source: source || 'google',
             url: storedUrl,
-            is_primary: i === 0 && importedImages.length === 0, // First successful import becomes primary
+            is_primary: i === 0 && importedImages.length === 0,
             position: i
           })
 
