@@ -11,6 +11,7 @@ interface EncryptionStatusBannerProps {
   fingerprint: string | null
   shortFingerprint: string | null
   error: string | null
+  isLocked: boolean
   recipientHasKey: boolean
   recipientId: string | null
   onBackupKeys?: () => void
@@ -24,6 +25,7 @@ export default function EncryptionStatusBanner({
   fingerprint,
   shortFingerprint,
   error,
+  isLocked,
   recipientHasKey,
   recipientId,
   onBackupKeys,
@@ -76,7 +78,8 @@ export default function EncryptionStatusBanner({
   }
 
   // Encryption is working
-  const isSecure = isInitialized && publicKey && (!recipientId || recipientHasKey)
+  const isDeviceReady = isInitialized && publicKey && !isLocked
+  const isSecure = isDeviceReady && (!recipientId || recipientHasKey)
 
   return (
     <Surface padding="sm" className={`mb-4 ${
@@ -100,7 +103,11 @@ export default function EncryptionStatusBanner({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 0h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
                 </svg>
                 <span className="text-sm text-[var(--warning)]">
-                  {recipientId && !recipientHasKey ? 'Recipient has no encryption key' : 'Partial encryption'}
+                  {isLocked
+                    ? 'Security is locked on this device'
+                    : recipientId && !recipientHasKey
+                      ? 'Recipient has no encryption key'
+                      : 'Partial encryption'}
                 </span>
               </>
             )}

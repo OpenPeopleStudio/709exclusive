@@ -8,6 +8,11 @@ import KeyBackup from '@/components/KeyBackup'
 import EncryptionSettings from '@/components/EncryptionSettings'
 import EncryptionStatusBanner from '@/components/admin/EncryptionStatusBanner'
 import EncryptionSetupPanel from '@/components/admin/EncryptionSetupPanel'
+import MessagesLayout from '@/components/admin/MessagesLayout'
+import ConversationListItem from '@/components/admin/ConversationListItem'
+import MessageBubble from '@/components/admin/MessageBubble'
+import MessageInput from '@/components/admin/MessageInput'
+import MessageDebugPanel from '@/components/admin/MessageDebugPanel'
 import Button from '@/components/ui/Button'
 import Surface from '@/components/ui/Surface'
 import { generateFileKey, encryptFileWithKey, decryptFileWithKey } from '@/lib/crypto/e2e'
@@ -424,12 +429,15 @@ export default function AdminMessagesPage() {
 
   // Realtime updates for usability: new messages appear without refresh.
   useEffect(() => {
+    console.log('🔌 Setting up realtime subscription...')
+    
     const channel = supabase
       .channel('admin-messages')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
+          console.log('📨 Realtime message received:', payload)
           const msg = payload.new as { customer_id?: string } | null
           loadConversations()
           if (selectedCustomer && msg?.customer_id === selectedCustomer) {
@@ -437,9 +445,17 @@ export default function AdminMessagesPage() {
           }
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        console.log('🔌 Realtime subscription status:', status)
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Realtime connected successfully')
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('❌ Realtime connection failed:', status)
+        }
+      })
 
     return () => {
+      console.log('🔌 Cleaning up realtime subscription')
       supabase.removeChannel(channel)
     }
   }, [loadConversations, loadMessages, selectedCustomer])
@@ -448,20 +464,32 @@ export default function AdminMessagesPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newMessage.trim() || !selectedCustomer) return
+  const sendMessage = async (
+    plaintextInput: string,
+    options?: { forceStandard?: boolean; notice?: string; clearComposer?: boolean }
+  ) => {
+    const plaintext = plaintextInput.trim()
+    if (!plaintext || !selectedCustomer) return
+
+    const shouldClearComposer = options?.clearComposer ?? true
 
     setSending(true)
     setAttachmentError(null)
     setSendNotice(null)
-    const plaintext = newMessage.trim()
     let didEncrypt = false
 
     try {
-      if (!tenantId) {
+      // Enhanced tenant validation with logging
+      if (!tenantId || tenantId === 'default') {
+        console.error('❌ Tenant validation failed:', { tenantId })
         setSending(false)
-        setAttachmentError('Tenant not resolved')
+        setAttachmentError('Tenant not properly configured. Please refresh the page.')
+        return
+      }
+      console.log('✅ Tenant validated:', tenantId)
+      if (attachmentFile && options?.forceStandard) {
+        setAttachmentError('Attachments require secure chat to be ready.')
+        setSending(false)
         return
       }
       if (attachmentFile && !(selectedConvo?.has_encryption && isInitialized)) {
@@ -505,7 +533,7 @@ export default function AdminMessagesPage() {
       }
 
       // Attempt encryption if E2EE is initialized
-      if (isInitialized) {
+      if (isInitialized && !options?.forceStandard) {
         const recipientPublicKey = await getRecipientPublicKey(selectedCustomer)
         console.log('Recipient public key:', recipientPublicKey ? 'Found' : 'Missing')
         if (recipientPublicKey) {
@@ -532,7 +560,7 @@ export default function AdminMessagesPage() {
             didEncrypt = true
           }
         }
-      } else {
+      } else if (!isInitialized) {
         console.log('Encryption not initialized, sending unencrypted')
       }
 
@@ -547,11 +575,14 @@ export default function AdminMessagesPage() {
         messageData = { ...messageData, ...attachmentData }
       }
 
-      console.log('Inserting message with data:', {
+      console.log('📤 Inserting message with data:', {
         encrypted: messageData.encrypted,
         hasSenderKey: !!messageData.sender_public_key,
         hasIv: !!messageData.iv,
-        messageIndex: messageData.message_index
+        messageIndex: messageData.message_index,
+        tenantId: messageData.tenant_id,
+        customerId: messageData.customer_id,
+        senderType: messageData.sender_type
       })
 
       const { data, error } = await supabase
@@ -561,7 +592,19 @@ export default function AdminMessagesPage() {
         .single()
 
       if (error) {
-        console.error('Message insert error:', error)
+        console.error('❌ Message insert error:', error)
+        console.error('Failed message data:', messageData)
+        
+        // Show user-friendly error
+        if (error.code === '42501') {
+          setAttachmentError('Permission denied. Please verify your admin role.')
+        } else if (error.code === '23503') {
+          setAttachmentError('Invalid customer or tenant reference.')
+        } else {
+          setAttachmentError(`Failed to send: ${error.message}`)
+        }
+        setSending(false)
+        return
       }
 
       if (!error && data) {
@@ -575,8 +618,10 @@ export default function AdminMessagesPage() {
           ...data, 
           decryptedContent: plaintext 
         }])
-        setNewMessage('')
-        setAttachmentFile(null)
+        if (shouldClearComposer) {
+          setNewMessage('')
+          setAttachmentFile(null)
+        }
         
         // Update conversation
         setConversations(prev => prev.map(c => 
@@ -584,8 +629,9 @@ export default function AdminMessagesPage() {
             ? { ...c, last_message: data.encrypted ? 'Secure message' : plaintext, last_message_at: data.created_at }
             : c
         ))
-        if (!didEncrypt) {
-          setSendNotice('Sent standard')
+        const notice = options?.notice || (!didEncrypt ? 'Sent standard' : null)
+        if (notice) {
+          setSendNotice(notice)
           setTimeout(() => setSendNotice(null), 4000)
         }
       }
@@ -597,6 +643,20 @@ export default function AdminMessagesPage() {
     }
 
     setSending(false)
+  }
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await sendMessage(newMessage)
+  }
+
+  const handleSendSetupPrompt = async () => {
+    const prompt = 'To enable secure chat, open Messages in your account to finish encryption setup.'
+    await sendMessage(prompt, {
+      forceStandard: true,
+      notice: 'Sent encryption setup prompt',
+      clearComposer: false,
+    })
   }
 
   const startNewConversation = async () => {
@@ -870,6 +930,9 @@ export default function AdminMessagesPage() {
   }
 
   const selectedConvo = conversations.find(c => c.customer_id === selectedCustomer)
+  const recipientHasKey = selectedCustomer ? !!selectedConvo?.has_encryption : false
+  const deviceSecureReady = isInitialized && !!publicKey && !isLocked
+  const conversationSecureReady = deviceSecureReady && (!selectedCustomer || recipientHasKey)
   const filteredConversations = conversations.filter((c) => {
     if (showUnreadOnly && c.unread_count === 0) return false
     if (!search.trim()) return true
@@ -882,25 +945,41 @@ export default function AdminMessagesPage() {
 
   return (
     <div>
+      {/* Debug Panel (dev only) */}
+      {process.env.NODE_ENV === 'development' && (
+        <MessageDebugPanel
+          isInitialized={isInitialized}
+          isLocked={isLocked}
+          publicKey={publicKey}
+          adminId={adminId}
+        />
+      )}
+
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">Messages</h1>
         
         {/* E2EE Status & Actions */}
         <div className="flex items-center gap-2">
-          {isInitialized ? (
+          {encryptionError ? (
+            <span className="text-sm text-[var(--warning)]">
+              Secure chat unavailable
+            </span>
+          ) : deviceSecureReady && (!selectedCustomer || recipientHasKey) ? (
             <span className="flex items-center gap-2 px-3 py-1.5 bg-[var(--success)]/10 text-[var(--success)] text-sm rounded-full">
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
               </svg>
               Secure
             </span>
-          ) : encryptionError ? (
-            <span className="text-sm text-[var(--warning)]">
-              Secure chat unavailable
-            </span>
           ) : (
             <span className="text-sm text-[var(--text-muted)]">
-              {isInitializing ? 'Securing your chat...' : 'Securing your chat...'}
+              {isLocked
+                ? 'Security locked'
+                : selectedCustomer && !recipientHasKey
+                  ? 'Recipient not secured'
+                  : isInitializing
+                    ? 'Securing your chat...'
+                    : 'Secure chat unavailable'}
             </span>
           )}
 
@@ -963,7 +1042,8 @@ export default function AdminMessagesPage() {
         fingerprint={fingerprint}
         shortFingerprint={shortFingerprint}
         error={encryptionError}
-        recipientHasKey={selectedCustomer ? (filteredConversations.find(c => c.customer_id === selectedCustomer)?.has_encryption || false) : false}
+        isLocked={isLocked}
+        recipientHasKey={recipientHasKey}
         recipientId={selectedCustomer}
         onBackupKeys={() => setShowKeyBackup(true)}
         onVerifyKeys={() => setShowKeyVerification(true)}
@@ -1199,135 +1279,139 @@ export default function AdminMessagesPage() {
                   <p className="px-4 pb-2 text-xs text-[var(--text-muted)]">{sendNotice}</p>
                 )}
 
-                {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {messages.map(msg => (
-                    <div
-                      key={msg.id}
-                      className={`flex ${msg.sender_type === 'admin' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div
-                        className={`group relative max-w-[70%] px-4 py-3 rounded-2xl ${
-                          msg.sender_type === 'admin'
-                            ? 'bg-[var(--accent)] text-white rounded-br-md'
-                            : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-bl-md'
-                        }`}
-                      >
-                        <p className="text-sm">{msg.decryptedContent || msg.content}</p>
+                {/* Messages - iMessage style bubbles */}
+                <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-1 bg-[var(--bg-primary)]">
+                  {messages.map((msg, index) => {
+                    const isOwn = msg.sender_type === 'admin'
+                    const senderName = isOwn ? 'You' : (selectedConvo?.customer_name || 'Customer')
+                    
+                    return (
+                      <div key={msg.id} className="group relative">
+                        <MessageBubble
+                          content={msg.decryptedContent || msg.content}
+                          isOwn={isOwn}
+                          timestamp={msg.created_at}
+                          isEncrypted={msg.encrypted}
+                          senderName={senderName}
+                          showAvatar={index === 0 || messages[index - 1]?.sender_type !== msg.sender_type}
+                        />
+                        
+                        {/* Location link */}
                         {msg.message_type === 'location' && msg.location && !msg.deleted_at && (
-                          <a
-                            href={`https://www.google.com/maps?q=${msg.location.lat},${msg.location.lng}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`mt-2 block text-xs underline ${
-                              msg.sender_type === 'admin'
-                                ? 'text-white/80 hover:text-white'
-                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                            }`}
-                          >
-                            📍 View on map ({msg.location.lat.toFixed(5)}, {msg.location.lng.toFixed(5)})
-                            {msg.location.accuracy && ` ±${Math.round(msg.location.accuracy)}m`}
-                          </a>
+                          <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-2`}>
+                            <a
+                              href={`https://www.google.com/maps?q=${msg.location.lat},${msg.location.lng}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-[var(--accent-blue)] hover:underline"
+                            >
+                              📍 View on map
+                            </a>
+                          </div>
                         )}
+                        
+                        {/* Attachment */}
                         {msg.attachment_path && !msg.deleted_at && (
-                          <button
-                            onClick={() => handleDownloadAttachment(msg)}
-                            className={`mt-2 text-xs underline ${
-                              msg.sender_type === 'admin'
-                                ? 'text-white/80 hover:text-white'
-                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                            }`}
-                          >
-                            📎 {msg.attachment_name || 'Attachment'}
-                          </button>
+                          <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-2`}>
+                            <button
+                              onClick={() => handleDownloadAttachment(msg)}
+                              className="text-xs text-[var(--accent-blue)] hover:underline flex items-center gap-1"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                              {msg.attachment_name || 'Download attachment'}
+                            </button>
+                          </div>
                         )}
-                        <div className={`flex items-center gap-1 text-[10px] mt-1 ${
-                          msg.sender_type === 'admin' ? 'text-white/60' : 'text-[var(--text-muted)]'
-                        }`}>
-                          {msg.encrypted && (
-                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                            </svg>
-                          )}
-                          {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </div>
+                        
+                        {/* Delete button (desktop only) */}
                         {!msg.deleted_at && (
                           <button
                             onClick={() => handleDeleteMessage(msg.id)}
-                            className="absolute -top-2 -right-2 bg-[var(--bg-secondary)] text-[var(--text-muted)] border border-[var(--border-primary)] rounded-full w-6 h-6 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="hidden md:block absolute top-0 right-0 -mt-2 -mr-2 bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:text-[var(--error)] border border-[var(--border-primary)] rounded-full w-6 h-6 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                             title="Delete message"
                           >
                             ✕
                           </button>
                         )}
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                   <div ref={messagesEndRef} />
                 </div>
 
                 {/* Input */}
-                <form onSubmit={handleSend} className="p-4 border-t border-[var(--border-primary)]">
-                  <input
-                    ref={attachmentInputRef}
-                    type="file"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      setAttachmentFile(file || null)
-                      setAttachmentError(null)
-                    }}
-                  />
-                  <div className="flex gap-3 items-end">
-                    <div className="flex-1 space-y-2">
-                      <textarea
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder="Type a message..."
-                        className="flex-1 resize-none w-full"
-                        rows={2}
-                        disabled={sending}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault()
-                            ;(e.currentTarget.form as HTMLFormElement | null)?.requestSubmit()
-                          }
+                {/* Hidden file input */}
+                <input
+                  ref={attachmentInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    setAttachmentFile(file || null)
+                    setAttachmentError(null)
+                  }}
+                />
+
+                {/* Attachment preview (if file selected) */}
+                {attachmentFile && (
+                  <div className="px-3 md:px-4 py-2 border-t border-[var(--border-primary)] bg-[var(--bg-secondary)]">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-tertiary)] rounded-lg text-sm">
+                      <svg className="w-4 h-4 text-[var(--accent-blue)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                      </svg>
+                      <span className="flex-1 truncate text-[var(--text-primary)]">{attachmentFile.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAttachmentFile(null)
+                          setAttachmentError(null)
                         }}
-                      />
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
-                        <button
-                          type="button"
-                          onClick={() => attachmentInputRef.current?.click()}
-                          className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                        >
-                          Attach file
-                        </button>
-                        {attachmentFile && (
-                          <div className="flex items-center gap-2">
-                            <span>{attachmentFile.name}</span>
-                            <button
-                              type="button"
-                              onClick={() => setAttachmentFile(null)}
-                              className="text-[var(--text-muted)] hover:text-[var(--error)]"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      {attachmentError && (
-                        <p className="text-xs text-[var(--error)]">{attachmentError}</p>
-                      )}
+                        className="text-[var(--text-muted)] hover:text-[var(--error)] transition-colors"
+                      >
+                        ✕
+                      </button>
                     </div>
-                    <button
-                      type="submit"
-                      disabled={!newMessage.trim() || sending}
-                      className="btn-primary px-6"
-                    >
-                      Send
-                    </button>
+                    {attachmentError && (
+                      <p className="text-xs text-[var(--error)] mt-1 px-3">{attachmentError}</p>
+                    )}
                   </div>
-                </form>
+                )}
+
+                {!conversationSecureReady && (
+                  <div className="px-3 md:px-4 py-2 border-t border-[var(--border-primary)] bg-[var(--bg-secondary)] text-xs text-[var(--text-muted)] flex flex-wrap items-center gap-2 justify-between">
+                    <span>
+                      {isLocked
+                        ? 'Unlock security to send encrypted messages.'
+                        : selectedCustomer && !recipientHasKey
+                          ? 'Recipient has not set up encryption. Messages will send standard.'
+                          : 'Encryption is still initializing. Messages will send standard.'}
+                    </span>
+                    {selectedCustomer && !recipientHasKey && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleSendSetupPrompt}
+                        disabled={sending || !!attachmentFile}
+                      >
+                        Send setup prompt
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                {/* iMessage-style input */}
+                <MessageInput
+                  value={newMessage}
+                  onChange={setNewMessage}
+                  onSend={() => handleSend({ preventDefault: () => {} } as any)}
+                  onAttach={attachmentFile ? undefined : () => attachmentInputRef.current?.click()}
+                  disabled={sending}
+                  sending={sending}
+                  placeholder="Message..."
+                />
               </>
             ) : (
               <div className="flex-1 flex items-center justify-center">
