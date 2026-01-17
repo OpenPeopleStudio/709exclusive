@@ -8,6 +8,10 @@ import KeyBackup from '@/components/KeyBackup'
 import EncryptionSettings from '@/components/EncryptionSettings'
 import EncryptionStatusBanner from '@/components/admin/EncryptionStatusBanner'
 import EncryptionSetupPanel from '@/components/admin/EncryptionSetupPanel'
+import MessagesLayout from '@/components/admin/MessagesLayout'
+import ConversationListItem from '@/components/admin/ConversationListItem'
+import MessageBubble from '@/components/admin/MessageBubble'
+import MessageInput from '@/components/admin/MessageInput'
 import Button from '@/components/ui/Button'
 import Surface from '@/components/ui/Surface'
 import { generateFileKey, encryptFileWithKey, decryptFileWithKey } from '@/lib/crypto/e2e'
@@ -1199,135 +1203,116 @@ export default function AdminMessagesPage() {
                   <p className="px-4 pb-2 text-xs text-[var(--text-muted)]">{sendNotice}</p>
                 )}
 
-                {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {messages.map(msg => (
-                    <div
-                      key={msg.id}
-                      className={`flex ${msg.sender_type === 'admin' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div
-                        className={`group relative max-w-[70%] px-4 py-3 rounded-2xl ${
-                          msg.sender_type === 'admin'
-                            ? 'bg-[var(--accent)] text-white rounded-br-md'
-                            : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-bl-md'
-                        }`}
-                      >
-                        <p className="text-sm">{msg.decryptedContent || msg.content}</p>
+                {/* Messages - iMessage style bubbles */}
+                <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-1 bg-[var(--bg-primary)]">
+                  {messages.map((msg, index) => {
+                    const isOwn = msg.sender_type === 'admin'
+                    const senderName = isOwn ? 'You' : (selectedConvo?.customer_name || 'Customer')
+                    
+                    return (
+                      <div key={msg.id} className="group relative">
+                        <MessageBubble
+                          content={msg.decryptedContent || msg.content}
+                          isOwn={isOwn}
+                          timestamp={msg.created_at}
+                          isEncrypted={msg.encrypted}
+                          senderName={senderName}
+                          showAvatar={index === 0 || messages[index - 1]?.sender_type !== msg.sender_type}
+                        />
+                        
+                        {/* Location link */}
                         {msg.message_type === 'location' && msg.location && !msg.deleted_at && (
-                          <a
-                            href={`https://www.google.com/maps?q=${msg.location.lat},${msg.location.lng}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`mt-2 block text-xs underline ${
-                              msg.sender_type === 'admin'
-                                ? 'text-white/80 hover:text-white'
-                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                            }`}
-                          >
-                            📍 View on map ({msg.location.lat.toFixed(5)}, {msg.location.lng.toFixed(5)})
-                            {msg.location.accuracy && ` ±${Math.round(msg.location.accuracy)}m`}
-                          </a>
+                          <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-2`}>
+                            <a
+                              href={`https://www.google.com/maps?q=${msg.location.lat},${msg.location.lng}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-[var(--accent-blue)] hover:underline"
+                            >
+                              📍 View on map
+                            </a>
+                          </div>
                         )}
+                        
+                        {/* Attachment */}
                         {msg.attachment_path && !msg.deleted_at && (
-                          <button
-                            onClick={() => handleDownloadAttachment(msg)}
-                            className={`mt-2 text-xs underline ${
-                              msg.sender_type === 'admin'
-                                ? 'text-white/80 hover:text-white'
-                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                            }`}
-                          >
-                            📎 {msg.attachment_name || 'Attachment'}
-                          </button>
+                          <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-2`}>
+                            <button
+                              onClick={() => handleDownloadAttachment(msg)}
+                              className="text-xs text-[var(--accent-blue)] hover:underline flex items-center gap-1"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                              {msg.attachment_name || 'Download attachment'}
+                            </button>
+                          </div>
                         )}
-                        <div className={`flex items-center gap-1 text-[10px] mt-1 ${
-                          msg.sender_type === 'admin' ? 'text-white/60' : 'text-[var(--text-muted)]'
-                        }`}>
-                          {msg.encrypted && (
-                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                            </svg>
-                          )}
-                          {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </div>
+                        
+                        {/* Delete button (desktop only) */}
                         {!msg.deleted_at && (
                           <button
                             onClick={() => handleDeleteMessage(msg.id)}
-                            className="absolute -top-2 -right-2 bg-[var(--bg-secondary)] text-[var(--text-muted)] border border-[var(--border-primary)] rounded-full w-6 h-6 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="hidden md:block absolute top-0 right-0 -mt-2 -mr-2 bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:text-[var(--error)] border border-[var(--border-primary)] rounded-full w-6 h-6 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                             title="Delete message"
                           >
                             ✕
                           </button>
                         )}
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                   <div ref={messagesEndRef} />
                 </div>
 
                 {/* Input */}
-                <form onSubmit={handleSend} className="p-4 border-t border-[var(--border-primary)]">
-                  <input
-                    ref={attachmentInputRef}
-                    type="file"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      setAttachmentFile(file || null)
-                      setAttachmentError(null)
-                    }}
-                  />
-                  <div className="flex gap-3 items-end">
-                    <div className="flex-1 space-y-2">
-                      <textarea
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder="Type a message..."
-                        className="flex-1 resize-none w-full"
-                        rows={2}
-                        disabled={sending}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault()
-                            ;(e.currentTarget.form as HTMLFormElement | null)?.requestSubmit()
-                          }
+                {/* Hidden file input */}
+                <input
+                  ref={attachmentInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    setAttachmentFile(file || null)
+                    setAttachmentError(null)
+                  }}
+                />
+
+                {/* Attachment preview (if file selected) */}
+                {attachmentFile && (
+                  <div className="px-3 md:px-4 py-2 border-t border-[var(--border-primary)] bg-[var(--bg-secondary)]">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-tertiary)] rounded-lg text-sm">
+                      <svg className="w-4 h-4 text-[var(--accent-blue)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                      </svg>
+                      <span className="flex-1 truncate text-[var(--text-primary)]">{attachmentFile.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAttachmentFile(null)
+                          setAttachmentError(null)
                         }}
-                      />
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
-                        <button
-                          type="button"
-                          onClick={() => attachmentInputRef.current?.click()}
-                          className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                        >
-                          Attach file
-                        </button>
-                        {attachmentFile && (
-                          <div className="flex items-center gap-2">
-                            <span>{attachmentFile.name}</span>
-                            <button
-                              type="button"
-                              onClick={() => setAttachmentFile(null)}
-                              className="text-[var(--text-muted)] hover:text-[var(--error)]"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      {attachmentError && (
-                        <p className="text-xs text-[var(--error)]">{attachmentError}</p>
-                      )}
+                        className="text-[var(--text-muted)] hover:text-[var(--error)] transition-colors"
+                      >
+                        ✕
+                      </button>
                     </div>
-                    <button
-                      type="submit"
-                      disabled={!newMessage.trim() || sending}
-                      className="btn-primary px-6"
-                    >
-                      Send
-                    </button>
+                    {attachmentError && (
+                      <p className="text-xs text-[var(--error)] mt-1 px-3">{attachmentError}</p>
+                    )}
                   </div>
-                </form>
+                )}
+
+                {/* iMessage-style input */}
+                <MessageInput
+                  value={newMessage}
+                  onChange={setNewMessage}
+                  onSend={() => handleSend({ preventDefault: () => {} } as any)}
+                  onAttach={attachmentFile ? undefined : () => attachmentInputRef.current?.click()}
+                  disabled={sending}
+                  sending={sending}
+                  placeholder="Message..."
+                />
               </>
             ) : (
               <div className="flex-1 flex items-center justify-center">
