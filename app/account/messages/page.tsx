@@ -23,6 +23,13 @@ interface Message {
   sender_type: 'customer' | 'admin'
   created_at: string
   read: boolean
+  message_type?: 'text' | 'location'
+  location?: {
+    lat: number
+    lng: number
+    accuracy?: number
+    recordedAt: string
+  } | null
   encrypted?: boolean
   iv?: string
   sender_public_key?: string
@@ -75,6 +82,8 @@ export default function MessagesPage() {
   const [recoveryError, setRecoveryError] = useState<string | null>(null)
   const [showRecoveryModal, setShowRecoveryModal] = useState(false)
   const [showAdvancedActions, setShowAdvancedActions] = useState(false)
+  const [locationLoading, setLocationLoading] = useState(false)
+  const [locationError, setLocationError] = useState<string | null>(null)
 
   const eligibleOrderStatuses = ['pending', 'paid', 'fulfilled', 'shipped']
 
@@ -183,7 +192,24 @@ export default function MessagesPage() {
       (msg) => msg.sender_type === 'customer' ? userId : adminId || ''
     )
 
-    return [...deletedMessages, ...decrypted].sort((a, b) =>
+    // Parse location data for location messages
+    const processed = decrypted.map(msg => {
+      if (msg.message_type === 'location' && msg.decryptedContent && msg.decryptedContent !== 'Secure message') {
+        try {
+          const locationData = JSON.parse(msg.decryptedContent)
+          return {
+            ...msg,
+            location: locationData,
+            decryptedContent: `📍 Shared location${locationData.accuracy ? ` (±${Math.round(locationData.accuracy)}m)` : ''}`
+          }
+        } catch {
+          return msg
+        }
+      }
+      return msg
+    })
+
+    return [...deletedMessages, ...processed].sort((a, b) =>
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     )
   }, [isInitialized, decryptMessages, userId, adminId])
@@ -325,6 +351,149 @@ export default function MessagesPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  const handleShareLocation = async () => {
+    setLocationLoading(true)
+    setLocationError(null)
+    setSendError(null)
+    setSendNotice(null)
+
+    try {
+      if (!userId) {
+        setLocationError('User not authenticated')
+        setLocationLoading(false)
+        return
+      }
+
+      if (!canMessage) {
+        setLocationError('Messaging is available after you place an order.')
+        setLocationLoading(false)
+        return
+      }
+
+      if (!adminId || !isInitialized) {
+        setLocationError('Location sharing requires encrypted chat. Please wait for encryption to initialize.')
+        setLocationLoading(false)
+        return
+      }
+
+      const recipientPublicKey = await getRecipientPublicKey(adminId)
+      if (!recipientPublicKey) {
+        setLocationError('Location sharing requires support to have encryption enabled.')
+        setLocationLoading(false)
+        return
+      }
+
+      if (!('geolocation' in navigator)) {
+        setLocationError('Location services are not available on this device.')
+        setLocationLoading(false)
+        return
+      }
+
+      // Request current position
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const { latitude, longitude, accuracy } = position.coords
+            const locationData = {
+              lat: latitude,
+              lng: longitude,
+              accuracy,
+              recordedAt: new Date(position.timestamp).toISOString()
+            }
+
+            // Encrypt the location data
+            const locationPayload = JSON.stringify(locationData)
+            const encrypted = await encrypt(locationPayload, adminId)
+
+            if (!encrypted) {
+              setLocationError('Failed to encrypt location data')
+              setLocationLoading(false)
+              return
+            }
+
+            if (!tenantId) {
+              setLocationError('Tenant not resolved')
+              setLocationLoading(false)
+              return
+            }
+
+            const messageData: {
+              tenant_id: string
+              customer_id: string
+              content: string
+              sender_type: 'customer'
+              read: boolean
+              message_type: 'location'
+              encrypted: boolean
+              iv: string
+              sender_public_key: string
+              message_index: number
+              expires_at?: string | null
+            } = {
+              tenant_id: tenantId,
+              customer_id: userId,
+              content: encrypted.content,
+              sender_type: 'customer',
+              read: false,
+              message_type: 'location',
+              encrypted: true,
+              iv: encrypted.iv,
+              sender_public_key: encrypted.senderPublicKey,
+              message_index: encrypted.messageIndex,
+            }
+
+            if (retentionEnabled && retentionDays) {
+              messageData.expires_at = new Date(
+                Date.now() + retentionDays * 24 * 60 * 60 * 1000
+              ).toISOString()
+            }
+
+            const { data, error } = await supabase
+              .from('messages')
+              .insert(messageData)
+              .select()
+              .single()
+
+            if (!error && data) {
+              setMessages(prev => [...prev, { 
+                ...data, 
+                decryptedContent: `📍 Shared location (±${Math.round(accuracy)}m)`
+              }])
+            } else if (error) {
+              setLocationError(error.message || 'Unable to send location')
+            }
+            setLocationLoading(false)
+          } catch (err) {
+            console.error('Failed to send location:', err)
+            setLocationError('Unable to send location')
+            setLocationLoading(false)
+          }
+        },
+        (error) => {
+          if (error.code === error.PERMISSION_DENIED) {
+            setLocationError('Location permission denied. Please enable location access in your browser settings.')
+          } else if (error.code === error.POSITION_UNAVAILABLE) {
+            setLocationError('Location information is unavailable.')
+          } else if (error.code === error.TIMEOUT) {
+            setLocationError('Location request timed out.')
+          } else {
+            setLocationError('Unable to retrieve location.')
+          }
+          setLocationLoading(false)
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
+      )
+    } catch (err) {
+      console.error('Location sharing error:', err)
+      setLocationError('Unable to share location')
+      setLocationLoading(false)
+    }
+  }
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -838,6 +1007,21 @@ export default function MessagesPage() {
                           📎 {msg.attachment_name || 'Attachment'}
                         </button>
                       )}
+                      {msg.message_type === 'location' && msg.location && !msg.deleted_at && (
+                        <a
+                          href={`https://www.google.com/maps?q=${msg.location.lat},${msg.location.lng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`mt-2 block text-xs underline ${
+                            msg.sender_type === 'customer'
+                              ? 'text-white/80 hover:text-white'
+                              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                          }`}
+                        >
+                          📍 View on map ({msg.location.lat.toFixed(5)}, {msg.location.lng.toFixed(5)})
+                          {msg.location.accuracy && ` ±${Math.round(msg.location.accuracy)}m`}
+                        </a>
+                      )}
                       <div className={`flex items-center gap-1 text-[10px] mt-1 ${
                         msg.sender_type === 'customer' ? 'text-white/60' : 'text-[var(--text-muted)]'
                       }`}>
@@ -904,6 +1088,17 @@ export default function MessagesPage() {
                     >
                       Attach file
                     </button>
+                    <button
+                      type="button"
+                      onClick={handleShareLocation}
+                      className={`text-[var(--text-secondary)] hover:text-[var(--text-primary)] ${
+                        !canMessage || locationLoading ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                      disabled={!canMessage || locationLoading}
+                      title={!isInitialized ? 'Requires encrypted chat' : 'Share your current location'}
+                    >
+                      {locationLoading ? 'Getting location...' : 'Share location'}
+                    </button>
                     {attachmentFile && (
                       <div className="flex items-center gap-2">
                         <span>{attachmentFile.name}</span>
@@ -917,8 +1112,8 @@ export default function MessagesPage() {
                       </div>
                     )}
                   </div>
-                  {(attachmentError || sendError) && (
-                    <p className="text-xs text-[var(--error)]">{attachmentError || sendError}</p>
+                  {(attachmentError || sendError || locationError) && (
+                    <p className="text-xs text-[var(--error)]">{attachmentError || sendError || locationError}</p>
                   )}
                 </div>
                 <button

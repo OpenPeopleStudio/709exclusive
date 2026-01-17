@@ -26,7 +26,55 @@ export async function POST(req: Request) {
 
   const supabase = await createSupabaseServer()
 
-  if (event.type === 'payment_intent.succeeded') {
+  // Handle subscription lifecycle events
+  if (event.type === 'customer.subscription.created' ||
+      event.type === 'customer.subscription.updated') {
+    const subscription = event.data.object as any
+    const tenantId = subscription.metadata?.tenant_id
+
+    if (tenantId) {
+      const status = subscription.status === 'active' ? 'active' :
+                     subscription.status === 'trialing' ? 'trialing' :
+                     subscription.status === 'past_due' ? 'past_due' :
+                     subscription.status === 'canceled' ? 'canceled' : 'trialing'
+
+      await supabase
+        .from('tenant_billing')
+        .update({
+          stripe_customer_id: subscription.customer,
+          stripe_subscription_id: subscription.id,
+          status,
+          trial_ends_at: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
+        })
+        .eq('tenant_id', tenantId)
+
+      await supabase.from('activity_logs').insert({
+        tenant_id: tenantId,
+        action: 'subscription_updated',
+        entity_type: 'tenant_billing',
+        entity_id: tenantId,
+        details: { status, subscription_id: subscription.id },
+      })
+    }
+  } else if (event.type === 'customer.subscription.deleted') {
+    const subscription = event.data.object as any
+    const tenantId = subscription.metadata?.tenant_id
+
+    if (tenantId) {
+      await supabase
+        .from('tenant_billing')
+        .update({ status: 'canceled' })
+        .eq('tenant_id', tenantId)
+
+      await supabase.from('activity_logs').insert({
+        tenant_id: tenantId,
+        action: 'subscription_canceled',
+        entity_type: 'tenant_billing',
+        entity_id: tenantId,
+        details: { subscription_id: subscription.id },
+      })
+    }
+  } else if (event.type === 'payment_intent.succeeded') {
     const intent = event.data.object
 
     const { data: order } = await supabase

@@ -192,6 +192,14 @@ export async function sendAdminOrderNotification(orderId: string, customerEmail:
   await sendgrid.send(msg)
 }
 
+interface InviteEmailData {
+  inviteeEmail: string
+  inviteLink: string
+  tenantName: string
+  role: string
+  inviterEmail?: string | null
+}
+
 export async function sendInviteEmail(data: InviteEmailData): Promise<void> {
   const roleLabel = data.role.charAt(0).toUpperCase() + data.role.slice(1)
   const inviterLine = data.inviterEmail ? `<p>Invited by: ${data.inviterEmail}</p>` : ''
@@ -199,18 +207,17 @@ export async function sendInviteEmail(data: InviteEmailData): Promise<void> {
   const msg = {
     to: data.inviteeEmail,
     from: {
-      email: 'orders@709exclusive.com',
+      email: 'invites@709exclusive.com',
       name: '709exclusive'
     },
     subject: `You're invited to ${data.tenantName}`,
-    text: `You've been invited to join ${data.tenantName} as ${roleLabel}.\n${data.inviterEmail ? `Invited by: ${data.inviterEmail}\n` : ''}Accept invite: ${data.inviteLink}`,
     html: `
       <h1>You're invited to ${data.tenantName}</h1>
       <p>Role: ${roleLabel}</p>
       ${inviterLine}
-      <p><a href="${data.inviteLink}">Accept your invite</a></p>
-      <p>If you did not expect this invite, you can ignore this email.</p>
-    `
+      <p><a href="${data.inviteLink}" style="display: inline-block; background: #E10600; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Accept your invite</a></p>
+      <p style="margin-top: 20px; color: #8A8F98; font-size: 14px;">If you did not expect this invite, you can ignore this email.</p>
+    `,
   }
 
   await sendgrid.send(msg)

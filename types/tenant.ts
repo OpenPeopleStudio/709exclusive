@@ -87,4 +87,5 @@ export type TenantContextValue = {
   name: string
   primary_domain?: string | null
   settings: TenantSettings
+  status: 'active' | 'inactive' | 'suspended'
 }

@@ -350,7 +350,7 @@ export default function AccountSettingsPage() {
                 <p className="text-sm text-[var(--text-muted)] mb-4">
                   Opt in to share your delivery location with admins. You can disable anytime.
                 </p>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3 mb-4">
                   <button
                     type="button"
                     onClick={toggleLocationSharing}
@@ -367,6 +367,18 @@ export default function AccountSettingsPage() {
                     {locationOptIn ? 'Your location can be shared when tracked.' : 'Not sharing location.'}
                   </span>
                 </div>
+                {locationOptIn && (
+                  <Link
+                    href="/staff/location"
+                    className="inline-flex items-center gap-2 text-sm text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Start live location tracking →
+                  </Link>
+                )}
                 {locationError && (
                   <div className="mt-4 p-3 bg-[var(--error)]/10 border border-[var(--error)]/20 rounded-md">
                     <p className="text-sm text-[var(--error)]">{locationError}</p>

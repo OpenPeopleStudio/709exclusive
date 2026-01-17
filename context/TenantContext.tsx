@@ -78,6 +78,7 @@ export function TenantProvider({
       slug: tenant?.slug || 'default',
       name: tenant?.name || 'Company Store',
       primary_domain: tenant?.primary_domain,
+      status: tenant?.status || 'active',
       settings,
       featureFlags: settings.features || {},
     }

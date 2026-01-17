@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
-import { getTenantFromRequest } from '@/lib/tenant'
-import { isOwner } from '@/lib/roles'
+import { requireSuperAdmin as requireSuperAdminAuth } from '@/lib/tenantAuth'
+import { createStripeCustomer } from '@/lib/stripe'
+import { createClient } from '@supabase/supabase-js'
+import { sendInviteEmail } from '@/lib/email'
+import { resolveEmailProvider } from '@/lib/integrations'
 
 const TRIAL_DAYS = 14
 const TENANT_STATUSES = new Set(['active', 'inactive', 'suspended'])
@@ -21,48 +24,14 @@ const normalizeDomain = (value: string) => value.trim().toLowerCase()
 const isValidDomain = (value: string) =>
   /^[a-z0-9.-]+\.[a-z]{2,}$/.test(value)
 
-async function requireSuperAdmin(request: Request) {
-  const supabase = await createSupabaseServer()
-  const tenant = await getTenantFromRequest(request)
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
-  }
-
-  const { data: superTenant } = await supabase
-    .from('tenants')
-    .select('id, slug')
-    .eq('slug', '709exclusive')
-    .maybeSingle()
-
-  if (!superTenant?.id) {
-    return { error: NextResponse.json({ error: 'Tenant not resolved' }, { status: 400 }) }
-  }
-
-  const { data: profile } = await supabase
-    .from('709_profiles')
-    .select('role')
-    .eq('id', user.id)
-    .eq('tenant_id', superTenant.id)
-    .single()
-
-  if (!isOwner(profile?.role)) {
-    return { error: NextResponse.json({ error: 'Owner access required' }, { status: 403 }) }
-  }
-
-  if (tenant?.slug && tenant.slug !== superTenant.slug) {
-    return { error: NextResponse.json({ error: 'Internal access required' }, { status: 403 }) }
-  }
-
-  return { supabase, user }
-}
-
 export async function GET(request: Request) {
-  const auth = await requireSuperAdmin(request)
-  if ('error' in auth) return auth.error
+  try {
+    await requireSuperAdminAuth(request)
+  } catch (error) {
+    return NextResponse.json({ error: String(error) }, { status: 403 })
+  }
 
-  const { supabase } = auth
+  const supabase = await createSupabaseServer()
   const { data: tenants, error } = await supabase
     .from('tenants')
     .select(`
@@ -75,7 +44,7 @@ export async function GET(request: Request) {
       created_at,
       updated_at,
       tenant_domains(domain, is_primary, verified_at),
-      tenant_billing(plan, status, billing_email, trial_ends_at)
+      tenant_billing(plan, status, billing_email, trial_ends_at, stripe_customer_id, stripe_subscription_id)
     `)
     .order('created_at', { ascending: false })
 
@@ -88,10 +57,19 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireSuperAdmin(request)
-  if ('error' in auth) return auth.error
+  let auth
+  try {
+    auth = await requireSuperAdminAuth(request)
+  } catch (error) {
+    return NextResponse.json({ error: String(error) }, { status: 403 })
+  }
 
-  const { supabase, user } = auth
+  const supabase = await createSupabaseServer()
+  const user = auth.user
+  
+  if (!user) {
+    return NextResponse.json({ error: 'User not found' }, { status: 401 })
+  }
 
   let payload: {
     name?: string
@@ -192,6 +170,23 @@ export async function POST(request: Request) {
 
   const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString()
 
+  // Create Stripe customer
+  let stripeCustomerId: string | null = null
+  try {
+    const customer = await createStripeCustomer({
+      email: billingEmail || '',
+      name: name,
+      metadata: {
+        tenant_id: tenant.id,
+        tenant_slug: tenant.slug,
+      },
+    })
+    stripeCustomerId = customer.id
+  } catch (err) {
+    console.error('Stripe customer creation error:', err)
+    // Continue without Stripe - can be set up later
+  }
+
   const { error: billingError } = await supabase
     .from('tenant_billing')
     .insert({
@@ -200,6 +195,7 @@ export async function POST(request: Request) {
       plan,
       status: 'trialing',
       trial_ends_at: trialEndsAt,
+      stripe_customer_id: stripeCustomerId,
     })
 
   if (billingError) {
@@ -222,6 +218,63 @@ export async function POST(request: Request) {
     }
   }
 
+  // Send owner invite if billing email is provided
+  let inviteUrl: string | null = null
+  if (billingEmail) {
+    try {
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      
+      if (serviceRoleKey && supabaseUrl) {
+        const adminClient = createClient(
+          supabaseUrl,
+          serviceRoleKey,
+          { auth: { autoRefreshToken: false, persistSession: false } }
+        )
+
+        const origin = new URL(request.url).origin
+        const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
+          billingEmail,
+          {
+            redirectTo: `${origin}/auth/callback?type=invite`,
+            data: {
+              role: 'owner',
+              tenant_id: tenant.id,
+              tenant_slug: tenant.slug,
+            },
+          }
+        )
+
+        if (!inviteError && inviteData?.user) {
+          inviteUrl = `${origin}/auth/callback?type=invite`
+          
+          // Update profile with role and tenant
+          await adminClient
+            .from('709_profiles')
+            .upsert({
+              id: inviteData.user.id,
+              role: 'owner',
+              tenant_id: tenant.id,
+            })
+
+          // Send invite email
+          const emailProvider = resolveEmailProvider()
+          await sendInviteEmail({
+            inviteeEmail: billingEmail,
+            inviteLink: inviteUrl,
+            tenantName: name,
+            role: 'owner',
+            inviterEmail: user.email,
+            emailProvider,
+          })
+        }
+      }
+    } catch (err) {
+      console.error('Owner invite error:', err)
+      // Continue - invite can be sent manually later
+    }
+  }
+
   await supabase.from('activity_logs').insert({
     tenant_id: tenant.id,
     user_id: user.id,
@@ -235,6 +288,9 @@ export async function POST(request: Request) {
       primary_domain: primaryDomain || null,
       status,
       plan,
+      source: 'super_admin',
+      billing_email: billingEmail || null,
+      invite_sent: !!inviteUrl,
     },
   })
 
@@ -250,10 +306,10 @@ export async function POST(request: Request) {
       created_at,
       updated_at,
       tenant_domains(domain, is_primary, verified_at),
-      tenant_billing(plan, status, billing_email, trial_ends_at)
+      tenant_billing(plan, status, billing_email, trial_ends_at, stripe_customer_id)
     `)
     .eq('id', tenant.id)
     .single()
 
-  return NextResponse.json({ tenant: tenantWithBilling || tenant })
+  return NextResponse.json({ tenant: tenantWithBilling || tenant, inviteUrl })
 }

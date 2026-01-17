@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "smoke:checkout": "node scripts/smoke/checkout-reservation.mjs"
+    "smoke:checkout": "node scripts/smoke/checkout-reservation.mjs",
+    "migrate:privacy": "bash scripts/run-migrations.sh",
+    "verify:deployment": "bash scripts/verify-deployment.sh",
+    "audit:tenant-isolation": "npx tsx scripts/audit-tenant-isolation.ts"
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.6",

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { getTenantFromRequest } from '@/lib/tenant'
 import { isOwner } from '@/lib/roles'
+import { createBillingPortalSession } from '@/lib/stripe'
 
 async function requireOwner(request: Request) {
   const supabase = await createSupabaseServer()
@@ -82,4 +83,33 @@ export async function PATCH(request: Request) {
   }
 
   return NextResponse.json({ billing })
+}
+
+export async function POST(request: Request) {
+  const auth = await requireOwner(request)
+  if ('error' in auth) return auth.error
+
+  const { supabase, tenant } = auth
+  const { data: billing } = await supabase
+    .from('tenant_billing')
+    .select('stripe_customer_id')
+    .eq('tenant_id', tenant.id)
+    .single()
+
+  if (!billing?.stripe_customer_id) {
+    return NextResponse.json({ error: 'No Stripe customer found' }, { status: 400 })
+  }
+
+  try {
+    const origin = new URL(request.url).origin
+    const session = await createBillingPortalSession({
+      customerId: billing.stripe_customer_id,
+      returnUrl: `${origin}/admin/tenant-settings`,
+    })
+
+    return NextResponse.json({ url: session.url })
+  } catch (error) {
+    console.error('Billing portal error:', error)
+    return NextResponse.json({ error: 'Failed to create billing portal session' }, { status: 500 })
+  }
 }

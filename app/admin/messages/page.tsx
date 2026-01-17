@@ -29,6 +29,13 @@ interface Message {
   sender_type: 'customer' | 'admin'
   created_at: string
   read: boolean
+  message_type?: 'text' | 'location'
+  location?: {
+    lat: number
+    lng: number
+    accuracy?: number
+    recordedAt: string
+  } | null
   encrypted?: boolean
   iv?: string
   sender_public_key?: string
@@ -288,7 +295,25 @@ export default function AdminMessagesPage() {
         activeMessages,
         (msg) => msg.sender_type === 'customer' ? msg.customer_id : adminId!
       )
-      const combined = [...(deletedMessages as DecryptedMessage[]), ...(decrypted as DecryptedMessage[])]
+      
+      // Parse location data for location messages
+      const processed = decrypted.map(msg => {
+        if (msg.message_type === 'location' && msg.decryptedContent && msg.decryptedContent !== 'Secure message') {
+          try {
+            const locationData = JSON.parse(msg.decryptedContent)
+            return {
+              ...msg,
+              location: locationData,
+              decryptedContent: `📍 Shared location${locationData.accuracy ? ` (±${Math.round(locationData.accuracy)}m)` : ''}`
+            }
+          } catch {
+            return msg
+          }
+        }
+        return msg
+      })
+      
+      const combined = [...(deletedMessages as DecryptedMessage[]), ...(processed as DecryptedMessage[])]
       combined.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
       setMessages(combined)
     } else {
@@ -1119,6 +1144,21 @@ export default function AdminMessagesPage() {
                         }`}
                       >
                         <p className="text-sm">{msg.decryptedContent || msg.content}</p>
+                        {msg.message_type === 'location' && msg.location && !msg.deleted_at && (
+                          <a
+                            href={`https://www.google.com/maps?q=${msg.location.lat},${msg.location.lng}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`mt-2 block text-xs underline ${
+                              msg.sender_type === 'admin'
+                                ? 'text-white/80 hover:text-white'
+                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                            }`}
+                          >
+                            📍 View on map ({msg.location.lat.toFixed(5)}, {msg.location.lng.toFixed(5)})
+                            {msg.location.accuracy && ` ±${Math.round(msg.location.accuracy)}m`}
+                          </a>
+                        )}
                         {msg.attachment_path && !msg.deleted_at && (
                           <button
                             onClick={() => handleDownloadAttachment(msg)}

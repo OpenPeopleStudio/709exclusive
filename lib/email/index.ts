@@ -208,15 +208,28 @@ export async function sendOrderRefunded(orderId: string): Promise<void> {
   }
 }
 
-export { sendAdminOrderNotification }
-
-export async function sendInviteEmail(data: InviteEmailData): Promise<void> {
-  if (data.emailProvider === 'disabled') {
-    return
-  }
-  if (data.emailProvider === 'postmark') {
-    await sendInviteEmailPM(data)
-    return
-  }
-  await sendInviteEmailSG(data)
+interface InviteEmailParams {
+  inviteeEmail: string
+  inviteLink: string
+  tenantName: string
+  role: string
+  inviterEmail?: string | null
+  emailProvider: EmailProvider
 }
+
+export async function sendInviteEmail(data: InviteEmailParams): Promise<void> {
+  try {
+    if (data.emailProvider === 'disabled') {
+      return
+    }
+    if (data.emailProvider === 'postmark') {
+      await sendInviteEmailPM(data)
+      return
+    }
+    await sendInviteEmailSG(data)
+  } catch (error) {
+    console.error('Failed to send invite email:', error)
+  }
+}
+
+export { sendAdminOrderNotification }

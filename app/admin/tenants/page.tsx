@@ -9,6 +9,7 @@ type TenantBilling = {
   status: string
   billing_email: string | null
   trial_ends_at: string | null
+  stripe_customer_id?: string | null
 }
 
 type TenantDomain = {
@@ -64,6 +65,10 @@ export default function TenantsPage() {
   const [slugTouched, setSlugTouched] = useState(false)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [invitingId, setInvitingId] = useState<string | null>(null)
+  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -168,6 +173,9 @@ export default function TenantsPage() {
       if (data.tenant) {
         setTenants((prev) => [data.tenant, ...prev])
       }
+      if (data.inviteUrl && createForm.billingEmail) {
+        setCreateError(`Tenant created! Invite sent to ${createForm.billingEmail}`)
+      }
       setCreateForm({
         name: '',
         slug: '',
@@ -219,6 +227,54 @@ export default function TenantsPage() {
       setRowErrors((prev) => ({ ...prev, [tenant.id]: 'Save failed' }))
     } finally {
       setSavingIds((prev) => ({ ...prev, [tenant.id]: false }))
+    }
+  }
+
+  const openBillingPortal = async (tenantId: string) => {
+    setRowErrors((prev) => ({ ...prev, [tenantId]: '' }))
+    try {
+      const res = await fetch(`/api/admin/tenants/${tenantId}/billing-portal`, {
+        method: 'POST',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setRowErrors((prev) => ({ ...prev, [tenantId]: data.error || 'Failed to open portal' }))
+        return
+      }
+      if (data.url) {
+        window.open(data.url, '_blank', 'noopener,noreferrer')
+      }
+    } catch (e) {
+      console.error('Billing portal error:', e)
+      setRowErrors((prev) => ({ ...prev, [tenantId]: 'Failed to open portal' }))
+    }
+  }
+
+  const sendInvite = async () => {
+    if (!selectedTenantId || !inviteEmail.trim()) return
+    setInvitingId(selectedTenantId)
+    setRowErrors((prev) => ({ ...prev, [selectedTenantId]: '' }))
+    
+    try {
+      const res = await fetch(`/api/admin/tenants/${selectedTenantId}/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: inviteEmail.trim().toLowerCase() }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setRowErrors((prev) => ({ ...prev, [selectedTenantId]: data.error || 'Failed to send invite' }))
+        setInvitingId(null)
+        return
+      }
+      setShowInviteModal(false)
+      setInviteEmail('')
+      setSelectedTenantId(null)
+    } catch (e) {
+      console.error('Invite error:', e)
+      setRowErrors((prev) => ({ ...prev, [selectedTenantId]: 'Failed to send invite' }))
+    } finally {
+      setInvitingId(null)
     }
   }
 
@@ -424,7 +480,7 @@ export default function TenantsPage() {
                   <td className="px-4 py-3">
                     <div className="flex flex-col gap-2">
                       <button
-                        className="rounded-lg border border-[var(--border-primary)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)]"
+                        className="rounded-lg border border-[var(--border-primary)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
                         onClick={() => {
                           const url = getTenantUrl(tenant)
                           if (!url) {
@@ -434,10 +490,28 @@ export default function TenantsPage() {
                           window.open(url, '_blank', 'noopener,noreferrer')
                         }}
                       >
-                        Impersonate site
+                        Visit site
+                      </button>
+                      {billing?.stripe_customer_id && (
+                        <button
+                          className="rounded-lg border border-[var(--border-primary)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                          onClick={() => openBillingPortal(tenant.id)}
+                        >
+                          Billing portal
+                        </button>
+                      )}
+                      <button
+                        className="rounded-lg border border-[var(--border-primary)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                        onClick={() => {
+                          setSelectedTenantId(tenant.id)
+                          setInviteEmail(billing?.billing_email || '')
+                          setShowInviteModal(true)
+                        }}
+                      >
+                        Send invite
                       </button>
                       <button
-                        className="rounded-lg bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                        className="rounded-lg bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white disabled:opacity-60 hover:bg-[var(--accent-hover)]"
                         onClick={() => saveTenant(tenant)}
                         disabled={isSaving || !hasChanges}
                       >
@@ -454,6 +528,65 @@ export default function TenantsPage() {
           </tbody>
         </table>
       </div>
+
+      {showInviteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--text-primary)]">Send invite</h2>
+                <p className="text-sm text-[var(--text-muted)] mt-1">
+                  Invite a user to become the owner of this tenant.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowInviteModal(false)
+                  setInviteEmail('')
+                  setSelectedTenantId(null)
+                }}
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                Email address
+              </label>
+              <input
+                type="email"
+                className="w-full rounded-lg border border-[var(--border-primary)] bg-[var(--bg-elevated)] p-2 text-sm text-[var(--text-primary)]"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="owner@example.com"
+              />
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                className="rounded-lg border border-[var(--border-primary)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                onClick={() => {
+                  setShowInviteModal(false)
+                  setInviteEmail('')
+                  setSelectedTenantId(null)
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 hover:bg-[var(--accent-hover)]"
+                onClick={sendInvite}
+                disabled={!inviteEmail.trim() || !!invitingId}
+              >
+                {invitingId ? 'Sending...' : 'Send invite'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

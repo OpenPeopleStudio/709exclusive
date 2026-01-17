@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { createStripeCustomer } from '@/lib/stripe'
 
 const TRIAL_DAYS = 14
 
@@ -103,6 +104,23 @@ export async function POST(request: Request) {
 
   const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString()
 
+  // Create Stripe customer
+  let stripeCustomerId: string | null = null
+  try {
+    const customer = await createStripeCustomer({
+      email: billingEmail || user.email || '',
+      name: name,
+      metadata: {
+        tenant_id: tenant.id,
+        tenant_slug: tenant.slug,
+      },
+    })
+    stripeCustomerId = customer.id
+  } catch (err) {
+    console.error('Stripe customer creation error:', err)
+    // Continue without Stripe - can be set up later
+  }
+
   const { error: billingError } = await supabase
     .from('tenant_billing')
     .insert({
@@ -111,6 +129,7 @@ export async function POST(request: Request) {
       plan: 'starter',
       status: 'trialing',
       trial_ends_at: trialEndsAt,
+      stripe_customer_id: stripeCustomerId,
     })
 
   if (billingError) {
@@ -145,6 +164,21 @@ export async function POST(request: Request) {
     console.error('Profile update error:', profileError)
     return NextResponse.json({ error: 'Failed to assign tenant owner' }, { status: 500 })
   }
+
+  // Log tenant creation
+  await supabase.from('activity_logs').insert({
+    tenant_id: tenant.id,
+    user_id: user.id,
+    user_email: user.email,
+    action: 'tenant_created',
+    entity_type: 'tenant',
+    entity_id: tenant.id,
+    details: {
+      name: tenant.name,
+      slug: tenant.slug,
+      source: 'self_serve_signup',
+    },
+  })
 
   return NextResponse.json({ tenant })
 }

@@ -1,4 +1,4 @@
-export type UserRole = 'customer' | 'staff' | 'admin' | 'owner'
+export type UserRole = 'customer' | 'staff' | 'admin' | 'owner' | 'super_admin'
 
 export type TenantStatus = 'active' | 'inactive' | 'suspended'
 
@@ -140,4 +140,41 @@ export interface StaffLocation {
   task_id: string | null
   source: string | null
   expires_at: string
+}
+
+export type MessageType = 'text' | 'location'
+
+export interface MessageLocation {
+  lat: number
+  lng: number
+  accuracy?: number
+  recordedAt: string
+}
+
+export interface Message {
+  id: string
+  tenant_id: string
+  customer_id: string
+  content: string
+  sender_type: 'customer' | 'admin'
+  read: boolean
+  created_at: string
+  message_type: MessageType
+  location: MessageLocation | null
+  encrypted?: boolean
+  iv?: string
+  sender_public_key?: string
+  message_index?: number
+  deleted_at?: string | null
+  deleted_by?: string | null
+  deleted_for_both?: boolean
+  expires_at?: string | null
+  attachment_path?: string | null
+  attachment_name?: string | null
+  attachment_type?: string | null
+  attachment_size?: number | null
+  attachment_key?: string | null
+  attachment_key_iv?: string | null
+  attachment_key_sender_public_key?: string | null
+  attachment_key_message_index?: number | null
 }
