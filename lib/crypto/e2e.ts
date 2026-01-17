@@ -318,13 +318,67 @@ export async function decryptMessage(
   }
 }
 
+export async function generateFileKey(): Promise<string> {
+  const key = crypto.getRandomValues(new Uint8Array(32))
+  return bufferToBase64(key.buffer)
+}
+
+export async function encryptFileWithKey(
+  fileBuffer: ArrayBuffer,
+  keyBase64: string
+): Promise<{ ciphertext: ArrayBuffer; iv: string }> {
+  const keyBuffer = base64ToBuffer(keyBase64)
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    keyBuffer,
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt']
+  )
+
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    cryptoKey,
+    fileBuffer
+  )
+
+  return { ciphertext: encrypted, iv: bufferToBase64(iv.buffer) }
+}
+
+export async function decryptFileWithKey(
+  encryptedBuffer: ArrayBuffer,
+  keyBase64: string,
+  ivBase64: string
+): Promise<ArrayBuffer> {
+  const keyBuffer = base64ToBuffer(keyBase64)
+  const iv = new Uint8Array(base64ToBuffer(ivBase64))
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    keyBuffer,
+    { name: 'AES-GCM' },
+    false,
+    ['decrypt']
+  )
+
+  return crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    cryptoKey,
+    encryptedBuffer
+  )
+}
+
 // Key Backup/Recovery
 export async function exportKeysForBackup(
-  password: string
+  password: string,
+  keyPairOverride?: StoredKeyPair
 ): Promise<string> {
-  const keyPair = await getActiveKeyPair()
+  const keyPair = keyPairOverride || await getActiveKeyPair()
   if (!keyPair) {
     throw new Error('No keys to export')
+  }
+  if (!keyPair.privateKey) {
+    throw new Error('Key is locked. Unlock to create a backup.')
   }
 
   // Derive encryption key from password
@@ -419,6 +473,86 @@ export async function importKeysFromBackup(
   
   await storeKeyPair(keyPair)
   return keyPair
+}
+
+// Passphrase lock/unlock helpers for local key storage
+export async function encryptPrivateKeyWithPassphrase(
+  privateKey: string,
+  password: string
+): Promise<{
+  encryptedPrivateKey: string
+  iv: string
+  salt: string
+  iterations: number
+}> {
+  const encoder = new TextEncoder()
+  const passwordKey = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  )
+
+  const salt = crypto.getRandomValues(new Uint8Array(16))
+  const iterations = 150000
+  const encryptionKey = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+    passwordKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt']
+  )
+
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    encryptionKey,
+    encoder.encode(privateKey)
+  )
+
+  return {
+    encryptedPrivateKey: bufferToBase64(encrypted),
+    iv: bufferToBase64(iv.buffer),
+    salt: bufferToBase64(salt.buffer),
+    iterations,
+  }
+}
+
+export async function decryptPrivateKeyWithPassphrase(
+  encryptedPrivateKey: string,
+  password: string,
+  ivBase64: string,
+  saltBase64: string,
+  iterations = 150000
+): Promise<string> {
+  const encoder = new TextEncoder()
+  const passwordKey = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  )
+
+  const salt = new Uint8Array(base64ToBuffer(saltBase64))
+  const iv = new Uint8Array(base64ToBuffer(ivBase64))
+  const decryptionKey = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+    passwordKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['decrypt']
+  )
+
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    decryptionKey,
+    base64ToBuffer(encryptedPrivateKey)
+  )
+
+  const decoder = new TextDecoder()
+  return decoder.decode(decrypted)
 }
 
 // Generate verification data (for QR code)

@@ -11,8 +11,15 @@ import {
   generateVerificationData,
   exportKeysForBackup,
   importKeysFromBackup,
+  encryptPrivateKeyWithPassphrase,
+  decryptPrivateKeyWithPassphrase,
   type StoredKeyPair,
 } from '@/lib/crypto/e2e'
+import {
+  getAllKeyPairs,
+  updateKeyPair,
+  clearSessions,
+} from '@/lib/crypto/indexedDB'
 
 interface EncryptedMessage {
   id: string
@@ -33,9 +40,17 @@ interface DecryptedMessage extends EncryptedMessage {
 export function useE2EEncryption(userId: string | null) {
   const [isInitialized, setIsInitialized] = useState(false)
   const [keyPair, setKeyPair] = useState<StoredKeyPair | null>(null)
+  const [keyPairs, setKeyPairs] = useState<StoredKeyPair[]>([])
+  const [isLocked, setIsLocked] = useState(false)
   const [fingerprint, setFingerprint] = useState<string | null>(null)
   const [shortFingerprint, setShortFingerprint] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const refreshKeyPairs = useCallback(async () => {
+    const allKeys = await getAllKeyPairs()
+    setKeyPairs(allKeys)
+    return allKeys
+  }, [])
 
   // Initialize keys and sync public key to server
   useEffect(() => {
@@ -44,7 +59,16 @@ export function useE2EEncryption(userId: string | null) {
     const init = async () => {
       try {
         const keys = await initializeIdentityKeys()
-        setKeyPair(keys)
+        const hydratedKeys = keys.deviceLabel
+          ? keys
+          : { ...keys, deviceLabel: 'This device' }
+        if (!keys.deviceLabel) {
+          await updateKeyPair(keys.id, { deviceLabel: 'This device' })
+        }
+        setKeyPair(hydratedKeys)
+        const locked = !keys.privateKey && !!keys.encryptedPrivateKey
+        setIsLocked(locked)
+        await refreshKeyPairs()
         
         // Generate fingerprints
         const fp = await generateFingerprint(keys.publicKey)
@@ -77,7 +101,7 @@ export function useE2EEncryption(userId: string | null) {
     }
 
     init()
-  }, [userId])
+  }, [userId, refreshKeyPairs])
 
   // Get recipient's public key
   const getRecipientPublicKey = useCallback(async (
@@ -106,6 +130,10 @@ export function useE2EEncryption(userId: string | null) {
       setError('Encryption keys not initialized')
       return null
     }
+    if (!keyPair.privateKey) {
+      setError('Keys are locked. Unlock to send encrypted messages.')
+      return null
+    }
 
     const recipientPublicKey = await getRecipientPublicKey(recipientId)
     if (!recipientPublicKey) {
@@ -125,13 +153,20 @@ export function useE2EEncryption(userId: string | null) {
       return null
     }
 
+    await updateKeyPair(keyPair.id, { lastUsedAt: Date.now() })
+    const updatedPairs = await refreshKeyPairs()
+    const updatedActive = updatedPairs.find(pair => pair.id === keyPair.id)
+    if (updatedActive) {
+      setKeyPair(prev => prev ? { ...prev, lastUsedAt: updatedActive.lastUsedAt } : prev)
+    }
+
     return {
       content: encrypted.ciphertext,
       iv: encrypted.iv,
       senderPublicKey: encrypted.senderPublicKey,
       messageIndex: encrypted.messageIndex,
     }
-  }, [keyPair, getRecipientPublicKey])
+  }, [keyPair, getRecipientPublicKey, refreshKeyPairs])
 
   // Decrypt a single message
   const decrypt = useCallback(async (
@@ -142,25 +177,39 @@ export function useE2EEncryption(userId: string | null) {
       return message.content // Not encrypted, return as-is
     }
 
-    if (!keyPair) {
-      throw new Error('Decryption keys not initialized')
+    const allKeys = keyPair ? [keyPair, ...keyPairs.filter(k => k.id !== keyPair.id)] : keyPairs
+    const usableKeys = allKeys.filter(k => !!k.privateKey)
+
+    if (usableKeys.length === 0) {
+      throw new Error('Decryption keys not initialized or locked')
     }
 
-    return decryptMessage(
-      message.content,
-      message.iv,
-      message.sender_public_key,
-      message.message_index || 0,
-      keyPair.privateKey,
-      senderId
-    )
-  }, [keyPair])
+    let lastError: Error | null = null
+    for (const candidate of usableKeys) {
+      try {
+        const decrypted = await decryptMessage(
+          message.content,
+          message.iv,
+          message.sender_public_key,
+          message.message_index || 0,
+          candidate.privateKey as string,
+          senderId
+        )
+        await updateKeyPair(candidate.id, { lastUsedAt: Date.now() })
+        return decrypted
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error('Decryption failed')
+      }
+    }
+
+    throw lastError || new Error('Unable to decrypt message')
+  }, [keyPair, keyPairs])
 
   // Decrypt multiple messages
-  const decryptMessages = useCallback(async (
-    messages: EncryptedMessage[],
-    getSenderId: (msg: EncryptedMessage) => string
-  ): Promise<DecryptedMessage[]> => {
+  const decryptMessages = useCallback(async <T extends EncryptedMessage>(
+    messages: T[],
+    getSenderId: (msg: T) => string
+  ): Promise<Array<T & DecryptedMessage>> => {
     return Promise.all(
       messages.map(async (msg) => {
         if (!msg.encrypted) {
@@ -184,10 +233,12 @@ export function useE2EEncryption(userId: string | null) {
 
   // Backup keys (encrypted with password)
   const backupKeys = useCallback(async (password: string): Promise<string> => {
-    if (!keyPair) {
+    if (!keyPair || !keyPair.privateKey) {
       throw new Error('No keys to backup')
     }
-    return exportKeysForBackup(password)
+    const backup = await exportKeysForBackup(password, keyPair)
+    localStorage.setItem('709e2e:lastBackupAt', new Date().toISOString())
+    return backup
   }, [keyPair])
 
   // Restore keys from backup
@@ -197,6 +248,8 @@ export function useE2EEncryption(userId: string | null) {
   ): Promise<void> => {
     const restored = await importKeysFromBackup(backupData, password)
     setKeyPair(restored)
+    setIsLocked(false)
+    await refreshKeyPairs()
     
     // Update fingerprints
     const fp = await generateFingerprint(restored.publicKey)
@@ -214,7 +267,85 @@ export function useE2EEncryption(userId: string | null) {
         })
         .eq('id', userId)
     }
-  }, [userId])
+  }, [userId, refreshKeyPairs])
+
+  const lockKeys = useCallback(async (password: string) => {
+    if (!keyPair?.privateKey) {
+      throw new Error('No unlocked keys to lock')
+    }
+    const encrypted = await encryptPrivateKeyWithPassphrase(keyPair.privateKey, password)
+    await updateKeyPair(keyPair.id, {
+      encryptedPrivateKey: encrypted.encryptedPrivateKey,
+      encryptedPrivateKeyIv: encrypted.iv,
+      encryptedPrivateKeySalt: encrypted.salt,
+      encryptedPrivateKeyIterations: encrypted.iterations,
+      privateKey: undefined,
+    })
+    setKeyPair({ ...keyPair, ...encrypted, privateKey: undefined })
+    setIsLocked(true)
+    await refreshKeyPairs()
+  }, [keyPair, refreshKeyPairs])
+
+  const unlockKeys = useCallback(async (password: string) => {
+    if (!keyPair?.encryptedPrivateKey || !keyPair.encryptedPrivateKeyIv || !keyPair.encryptedPrivateKeySalt) {
+      throw new Error('No locked keys found')
+    }
+    const privateKey = await decryptPrivateKeyWithPassphrase(
+      keyPair.encryptedPrivateKey,
+      password,
+      keyPair.encryptedPrivateKeyIv,
+      keyPair.encryptedPrivateKeySalt,
+      keyPair.encryptedPrivateKeyIterations
+    )
+    setKeyPair({ ...keyPair, privateKey })
+    setIsLocked(false)
+    await updateKeyPair(keyPair.id, { lastUsedAt: Date.now() })
+  }, [keyPair])
+
+  const rotateKeys = useCallback(async (deviceLabel?: string) => {
+    if (!userId) {
+      throw new Error('User not available')
+    }
+    const newKeys = await initializeIdentityKeys()
+    const updated = {
+      ...newKeys,
+      deviceLabel: deviceLabel || keyPair?.deviceLabel || 'This device',
+      lastUsedAt: Date.now(),
+    }
+    await updateKeyPair(updated.id, {
+      deviceLabel: updated.deviceLabel,
+      lastUsedAt: updated.lastUsedAt,
+    })
+
+    setKeyPair(updated)
+    setIsLocked(false)
+    await clearSessions()
+    await refreshKeyPairs()
+
+    const fp = await generateFingerprint(updated.publicKey)
+    const sfp = await generateShortFingerprint(updated.publicKey)
+    setFingerprint(fp)
+    setShortFingerprint(sfp)
+
+    await supabase
+      .from('709_profiles')
+      .update({
+        public_key: updated.publicKey,
+        public_key_updated_at: new Date().toISOString(),
+      })
+      .eq('id', userId)
+  }, [keyPair?.deviceLabel, refreshKeyPairs, userId])
+
+  const updateDeviceLabel = useCallback(async (label: string) => {
+    if (!keyPair) return
+    await updateKeyPair(keyPair.id, { deviceLabel: label })
+    setKeyPair({ ...keyPair, deviceLabel: label })
+    await refreshKeyPairs()
+  }, [keyPair, refreshKeyPairs])
+
+  const resetSessions = useCallback(async () => {
+    await clearSessions()
+  }, [])
 
   // Get verification data for QR code
   const getVerificationData = useCallback(async () => {
@@ -239,6 +370,8 @@ export function useE2EEncryption(userId: string | null) {
   return {
     isInitialized,
     publicKey: keyPair?.publicKey || null,
+    keyPairs,
+    isLocked,
     fingerprint,
     shortFingerprint,
     error,
@@ -248,6 +381,12 @@ export function useE2EEncryption(userId: string | null) {
     getRecipientPublicKey,
     backupKeys,
     restoreKeys,
+    lockKeys,
+    unlockKeys,
+    rotateKeys,
+    resetSessions,
+    updateDeviceLabel,
+    refreshKeyPairs,
     getVerificationData,
     verifyUserKey,
   }

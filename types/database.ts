@@ -87,3 +87,15 @@ export interface OrderItem {
   qty: number
   price_cents: number
 }
+
+export interface StaffLocation {
+  id: string
+  user_id: string
+  recorded_at: string
+  latitude: number
+  longitude: number
+  accuracy_m: number | null
+  task_id: string | null
+  source: string | null
+  expires_at: string
+}

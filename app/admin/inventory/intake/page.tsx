@@ -20,6 +20,8 @@ interface CSVRow {
   condition: string
   price: string
   stock: string
+  source?: string
+  confidence?: number
   errors: string[]
   status: 'valid' | 'error' | 'imported'
 }
@@ -31,6 +33,8 @@ interface GeneratedVariant {
   price: number
   stock: number
 }
+
+type ImportResult = { success: number; errors: number }
 
 const CONDITION_PRESETS = [
   { code: 'DS', label: 'Deadstock (New)', multiplier: 1.0 },
@@ -48,8 +52,30 @@ const SIZE_RUNS = {
   oneSize: ['OS'],
 }
 
+const validateRow = (row: Pick<CSVRow, 'brand' | 'model' | 'size' | 'condition' | 'price' | 'stock'>): string[] => {
+  const errors: string[] = []
+
+  if (!row.brand?.trim()) errors.push('Brand required')
+  if (!row.model?.trim()) errors.push('Model required')
+  if (!row.size?.trim()) errors.push('Size required')
+  if (!row.condition?.trim()) errors.push('Condition required')
+
+  const price = parseFloat(row.price)
+  if (Number.isNaN(price) || price <= 0) errors.push('Invalid price')
+
+  const stock = parseInt(row.stock, 10)
+  if (Number.isNaN(stock) || stock < 0) errors.push('Invalid stock')
+
+  const validConditions = CONDITION_PRESETS.map(c => c.code)
+  if (row.condition && !validConditions.includes(row.condition.toUpperCase())) {
+    errors.push(`Invalid condition. Use: ${validConditions.join(', ')}`)
+  }
+
+  return errors
+}
+
 export default function InventoryIntakePage() {
-  const [activeTab, setActiveTab] = useState<'csv' | 'generator' | 'photos'>('generator')
+  const [activeTab, setActiveTab] = useState<'csv' | 'generator' | 'screenshots' | 'photos'>('generator')
   const [models, setModels] = useState<ProductModel[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -99,7 +125,7 @@ export default function InventoryIntakePage() {
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">Step 2</p>
             <p className="text-[var(--text-primary)] font-medium mt-1">Add sizes and pricing</p>
-            <p className="text-[var(--text-muted)] mt-1">Use the generator or CSV import.</p>
+            <p className="text-[var(--text-muted)] mt-1">Use the generator, CSV import, or screenshots.</p>
           </div>
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">Step 3</p>
@@ -132,6 +158,16 @@ export default function InventoryIntakePage() {
           CSV import
         </button>
         <button
+          onClick={() => setActiveTab('screenshots')}
+          className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
+            activeTab === 'screenshots'
+              ? 'bg-[var(--accent)] text-white border-transparent'
+              : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--border-secondary)]'
+          }`}
+        >
+          Screenshot import
+        </button>
+        <button
           onClick={() => setActiveTab('photos')}
           className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
             activeTab === 'photos'
@@ -154,6 +190,9 @@ export default function InventoryIntakePage() {
           )}
           {activeTab === 'csv' && (
             <CSVImport models={models} onModelsUpdate={fetchModels} />
+          )}
+          {activeTab === 'screenshots' && (
+            <ScreenshotImport onModelsUpdate={fetchModels} />
           )}
           {activeTab === 'photos' && (
             <PhotoUpload models={models} />
@@ -580,31 +619,8 @@ function VariantGenerator({ models, onModelsUpdate }: { models: ProductModel[]; 
 function CSVImport({ onModelsUpdate }: { models: ProductModel[]; onModelsUpdate: () => void }) {
   const [rows, setRows] = useState<CSVRow[]>([])
   const [importing, setImporting] = useState(false)
-  const [importResult, setImportResult] = useState<{ success: number; errors: number } | null>(null)
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const validateRow = (row: Omit<CSVRow, 'id' | 'errors' | 'status'>): string[] => {
-    const errors: string[] = []
-    
-    if (!row.brand?.trim()) errors.push('Brand required')
-    if (!row.model?.trim()) errors.push('Model required')
-    if (!row.size?.trim()) errors.push('Size required')
-    if (!row.condition?.trim()) errors.push('Condition required')
-    
-    const price = parseFloat(row.price)
-    if (isNaN(price) || price <= 0) errors.push('Invalid price')
-    
-    const stock = parseInt(row.stock)
-    if (isNaN(stock) || stock < 0) errors.push('Invalid stock')
-
-    // Check if condition is valid
-    const validConditions = CONDITION_PRESETS.map(c => c.code)
-    if (row.condition && !validConditions.includes(row.condition.toUpperCase())) {
-      errors.push(`Invalid condition. Use: ${validConditions.join(', ')}`)
-    }
-
-    return errors
-  }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -643,19 +659,6 @@ function CSVImport({ onModelsUpdate }: { models: ProductModel[]; onModelsUpdate:
     reader.readAsText(file)
   }
 
-  const updateRow = (id: string, field: keyof CSVRow, value: string) => {
-    setRows(prev => prev.map(row => {
-      if (row.id !== id) return row
-      const updated = { ...row, [field]: value }
-      const errors = validateRow(updated)
-      return { ...updated, errors, status: errors.length > 0 ? 'error' as const : 'valid' as const }
-    }))
-  }
-
-  const removeRow = (id: string) => {
-    setRows(prev => prev.filter(row => row.id !== id))
-  }
-
   const importRows = async () => {
     const validRows = rows.filter(r => r.status === 'valid')
     if (validRows.length === 0) return
@@ -688,10 +691,6 @@ function CSVImport({ onModelsUpdate }: { models: ProductModel[]; onModelsUpdate:
       setImporting(false)
     }
   }
-
-  const validCount = rows.filter(r => r.status === 'valid').length
-  const errorCount = rows.filter(r => r.status === 'error').length
-  const importedCount = rows.filter(r => r.status === 'imported').length
 
   return (
     <div className="space-y-6">
@@ -728,147 +727,418 @@ function CSVImport({ onModelsUpdate }: { models: ProductModel[]; onModelsUpdate:
         </div>
       </div>
 
-      {/* Results */}
-      {rows.length > 0 && (
-        <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg overflow-hidden">
-          <div className="p-4 border-b border-[var(--border-primary)] flex justify-between items-center">
-            <div className="flex items-center gap-4">
-              <h2 className="font-semibold text-[var(--text-primary)]">Preview</h2>
-              <div className="flex gap-2 text-sm">
-                <span className="px-2 py-1 bg-[var(--success)]/20 text-[var(--success)] rounded">{validCount} valid</span>
-                {errorCount > 0 && (
-                  <span className="px-2 py-1 bg-[var(--error)]/20 text-[var(--error)] rounded">{errorCount} errors</span>
-                )}
-                {importedCount > 0 && (
-                  <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded">{importedCount} imported</span>
-                )}
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => setRows([])} className="btn-secondary text-sm">Clear</button>
-              <button
-                onClick={importRows}
-                disabled={importing || validCount === 0}
-                className="btn-primary text-sm"
-              >
-                {importing ? 'Importing...' : `Import ${validCount} Valid Rows`}
-              </button>
+      <ImportPreviewTable
+        rows={rows}
+        setRows={setRows}
+        importRows={importRows}
+        importing={importing}
+        importResult={importResult}
+      />
+    </div>
+  )
+}
+
+function ScreenshotImport({ onModelsUpdate }: { onModelsUpdate: () => void }) {
+  const [rows, setRows] = useState<CSVRow[]>([])
+  const [files, setFiles] = useState<File[]>([])
+  const [processing, setProcessing] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
+  const [sources, setSources] = useState<Array<{ name: string; text: string; error?: string }>>([])
+  const [error, setError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(event.target.files || []).filter(file =>
+      file.type.startsWith('image/')
+    )
+    setFiles(selected)
+    setRows([])
+    setSources([])
+    setImportResult(null)
+    setError(null)
+  }
+
+  const processScreenshots = async () => {
+    if (files.length === 0) return
+    setProcessing(true)
+    setError(null)
+    setRows([])
+    setSources([])
+    setImportResult(null)
+
+    try {
+      const formData = new FormData()
+      files.forEach((file) => {
+        formData.append('files', file, file.name)
+      })
+
+      const response = await fetch('/api/admin/inventory/intake/screenshots', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data?.error || 'Failed to process screenshots')
+        return
+      }
+
+      const parsedRows = (data.rows || []).map((row: Partial<CSVRow>, index: number) => {
+        const baseRow: Omit<CSVRow, 'errors' | 'status'> = {
+          id: `ocr-${Date.now()}-${index}`,
+          brand: row.brand || '',
+          model: row.model || '',
+          size: row.size || '',
+          condition: row.condition || '',
+          price: row.price || '',
+          stock: row.stock || '',
+          source: row.source,
+          confidence: row.confidence,
+        }
+        const errors = validateRow(baseRow)
+        return {
+          ...baseRow,
+          errors,
+          status: errors.length > 0 ? 'error' : 'valid',
+        }
+      })
+
+      setRows(parsedRows)
+      setSources(data.sources || [])
+    } catch (err) {
+      console.error('Screenshot OCR failed:', err)
+      setError('Failed to process screenshots')
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  const importRows = async () => {
+    const validRows = rows.filter(r => r.status === 'valid')
+    if (validRows.length === 0) return
+
+    setImporting(true)
+    setImportResult(null)
+
+    try {
+      const response = await fetch('/api/admin/inventory/intake/csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows: validRows })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setRows(prev => prev.map(row =>
+          row.status === 'valid' ? { ...row, status: 'imported' as const } : row
+        ))
+        setImportResult({ success: data.imported || validRows.length, errors: data.errors || 0 })
+        onModelsUpdate()
+      } else {
+        setImportResult({ success: 0, errors: validRows.length })
+      }
+    } catch {
+      setImportResult({ success: 0, errors: validRows.length })
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  const clearAll = () => {
+    setFiles([])
+    setRows([])
+    setSources([])
+    setImportResult(null)
+    setError(null)
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6 space-y-4">
+        <div>
+          <h2 className="font-semibold text-[var(--text-primary)]">Upload screenshots</h2>
+          <p className="text-sm text-[var(--text-muted)] mt-1">
+            OCR works best with clear tables. Review and edit rows before importing.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="btn-primary"
+          >
+            Choose screenshots
+          </button>
+          <span className="text-sm text-[var(--text-muted)]">
+            PNG or JPG, up to 12 images.
+          </span>
+        </div>
+
+        {files.length > 0 && (
+          <div className="bg-[var(--bg-tertiary)] rounded-lg p-3 text-sm text-[var(--text-secondary)]">
+            {files.length} screenshot(s) selected.
+            <div className="mt-2 flex flex-wrap gap-2">
+              {files.map((file) => (
+                <span key={file.name} className="px-2 py-1 bg-[var(--bg-secondary)] rounded">
+                  {file.name}
+                </span>
+              ))}
             </div>
           </div>
+        )}
 
-          {importResult && (
-            <div className={`p-4 ${importResult.errors > 0 ? 'bg-[var(--warning)]/10' : 'bg-[var(--success)]/10'}`}>
-              <p className={importResult.errors > 0 ? 'text-[var(--warning)]' : 'text-[var(--success)]'}>
-                ✓ Imported {importResult.success} rows
-                {importResult.errors > 0 && `, ${importResult.errors} failed`}
-              </p>
-            </div>
-          )}
+        <div className="flex flex-wrap gap-3">
+          <button onClick={clearAll} className="btn-secondary text-sm">
+            Clear
+          </button>
+          <button
+            onClick={processScreenshots}
+            disabled={processing || files.length === 0}
+            className="btn-primary text-sm"
+          >
+            {processing ? 'Processing...' : 'Extract rows'}
+          </button>
+        </div>
 
-          <div className="max-h-96 overflow-y-auto">
-            <table className="w-full">
-              <thead className="bg-[var(--bg-tertiary)] sticky top-0">
-                <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Status</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Brand</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Model</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Size</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Cond</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Price</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Stock</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-[var(--text-muted)] uppercase"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border-primary)]">
-                {rows.map(row => (
-                  <tr key={row.id} className={`${row.status === 'error' ? 'bg-[var(--error)]/5' : row.status === 'imported' ? 'bg-[var(--success)]/5' : ''}`}>
-                    <td className="px-3 py-2">
-                      {row.status === 'valid' && <span className="text-[var(--success)]">✓</span>}
-                      {row.status === 'error' && (
-                        <span className="text-[var(--error)]" title={row.errors.join(', ')}>✕</span>
-                      )}
-                      {row.status === 'imported' && <span className="text-blue-400">✓✓</span>}
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="text"
-                        value={row.brand}
-                        onChange={(e) => updateRow(row.id, 'brand', e.target.value)}
-                        className={`w-24 py-1 text-sm ${row.errors.some(e => e.includes('Brand')) ? 'border-[var(--error)]' : ''}`}
-                        disabled={row.status === 'imported'}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="text"
-                        value={row.model}
-                        onChange={(e) => updateRow(row.id, 'model', e.target.value)}
-                        className={`w-32 py-1 text-sm ${row.errors.some(e => e.includes('Model')) ? 'border-[var(--error)]' : ''}`}
-                        disabled={row.status === 'imported'}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="text"
-                        value={row.size}
-                        onChange={(e) => updateRow(row.id, 'size', e.target.value)}
-                        className={`w-16 py-1 text-sm ${row.errors.some(e => e.includes('Size')) ? 'border-[var(--error)]' : ''}`}
-                        disabled={row.status === 'imported'}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <select
-                        value={row.condition}
-                        onChange={(e) => updateRow(row.id, 'condition', e.target.value)}
-                        className={`w-20 py-1 text-sm ${row.errors.some(e => e.includes('condition')) ? 'border-[var(--error)]' : ''}`}
-                        disabled={row.status === 'imported'}
-                      >
-                        <option value="">--</option>
-                        {CONDITION_PRESETS.map(c => (
-                          <option key={c.code} value={c.code}>{c.code}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={row.price}
-                        onChange={(e) => updateRow(row.id, 'price', e.target.value)}
-                        className={`w-20 py-1 text-sm ${row.errors.some(e => e.includes('price')) ? 'border-[var(--error)]' : ''}`}
-                        disabled={row.status === 'imported'}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        min="0"
-                        value={row.stock}
-                        onChange={(e) => updateRow(row.id, 'stock', e.target.value)}
-                        className={`w-16 py-1 text-sm ${row.errors.some(e => e.includes('stock')) ? 'border-[var(--error)]' : ''}`}
-                        disabled={row.status === 'imported'}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      {row.status !== 'imported' && (
-                        <button onClick={() => removeRow(row.id)} className="text-[var(--text-muted)] hover:text-[var(--error)]">
-                          ✕
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {error && (
+          <div className="p-3 bg-[var(--error)]/10 border border-[var(--error)]/20 rounded-lg">
+            <p className="text-sm text-[var(--error)]">{error}</p>
           </div>
+        )}
+      </div>
 
-          {errorCount > 0 && (
-            <div className="p-4 border-t border-[var(--border-primary)] bg-[var(--bg-tertiary)]">
-              <p className="text-sm text-[var(--text-muted)]">
-                <strong>Fix errors inline</strong> by editing the fields above, or remove invalid rows.
-              </p>
-            </div>
-          )}
+      <ImportPreviewTable
+        rows={rows}
+        setRows={setRows}
+        importRows={importRows}
+        importing={importing}
+        importResult={importResult}
+        title="Preview extracted rows"
+      />
+
+      {sources.length > 0 && (
+        <Surface padding="md">
+          <p className="text-sm font-medium text-[var(--text-primary)] mb-3">OCR output</p>
+          <div className="space-y-2">
+            {sources.map((source) => (
+              <details key={source.name} className="border border-[var(--border-primary)] rounded-lg">
+                <summary className="cursor-pointer px-4 py-2 text-sm text-[var(--text-secondary)]">
+                  {source.name}
+                  {source.error ? ` - ${source.error}` : ''}
+                </summary>
+                <pre className="whitespace-pre-wrap text-xs text-[var(--text-muted)] p-4 border-t border-[var(--border-primary)]">
+                  {source.text || 'No text detected.'}
+                </pre>
+              </details>
+            ))}
+          </div>
+        </Surface>
+      )}
+    </div>
+  )
+}
+
+function ImportPreviewTable({
+  rows,
+  setRows,
+  importRows,
+  importing,
+  importResult,
+  title = 'Preview',
+}: {
+  rows: CSVRow[]
+  setRows: (value: CSVRow[] | ((prev: CSVRow[]) => CSVRow[])) => void
+  importRows: () => void
+  importing: boolean
+  importResult: ImportResult | null
+  title?: string
+}) {
+  if (rows.length === 0) return null
+
+  const validCount = rows.filter(r => r.status === 'valid').length
+  const errorCount = rows.filter(r => r.status === 'error').length
+  const importedCount = rows.filter(r => r.status === 'imported').length
+  const showSource = rows.some(row => row.source)
+  const showConfidence = rows.some(row => typeof row.confidence === 'number')
+
+  const updateRow = (id: string, field: keyof Pick<CSVRow, 'brand' | 'model' | 'size' | 'condition' | 'price' | 'stock'>, value: string) => {
+    setRows(prev => prev.map(row => {
+      if (row.id !== id) return row
+      const updated = { ...row, [field]: value }
+      const errors = validateRow(updated)
+      return { ...updated, errors, status: errors.length > 0 ? 'error' as const : 'valid' as const }
+    }))
+  }
+
+  const removeRow = (id: string) => {
+    setRows(prev => prev.filter(row => row.id !== id))
+  }
+
+  return (
+    <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg overflow-hidden">
+      <div className="p-4 border-b border-[var(--border-primary)] flex flex-wrap gap-4 items-center justify-between">
+        <div className="flex items-center gap-4">
+          <h2 className="font-semibold text-[var(--text-primary)]">{title}</h2>
+          <div className="flex gap-2 text-sm">
+            <span className="px-2 py-1 bg-[var(--success)]/20 text-[var(--success)] rounded">{validCount} valid</span>
+            {errorCount > 0 && (
+              <span className="px-2 py-1 bg-[var(--error)]/20 text-[var(--error)] rounded">{errorCount} errors</span>
+            )}
+            {importedCount > 0 && (
+              <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded">{importedCount} imported</span>
+            )}
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={() => setRows([])} className="btn-secondary text-sm">Clear</button>
+          <button
+            onClick={importRows}
+            disabled={importing || validCount === 0}
+            className="btn-primary text-sm"
+          >
+            {importing ? 'Importing...' : `Import ${validCount} Valid Rows`}
+          </button>
+        </div>
+      </div>
+
+      {importResult && (
+        <div className={`p-4 ${importResult.errors > 0 ? 'bg-[var(--warning)]/10' : 'bg-[var(--success)]/10'}`}>
+          <p className={importResult.errors > 0 ? 'text-[var(--warning)]' : 'text-[var(--success)]'}>
+            ✓ Imported {importResult.success} rows
+            {importResult.errors > 0 && `, ${importResult.errors} failed`}
+          </p>
+        </div>
+      )}
+
+      <div className="max-h-96 overflow-y-auto">
+        <table className="w-full">
+          <thead className="bg-[var(--bg-tertiary)] sticky top-0">
+            <tr>
+              <th className="px-3 py-2 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Status</th>
+              {showSource && (
+                <th className="px-3 py-2 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Source</th>
+              )}
+              {showConfidence && (
+                <th className="px-3 py-2 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Conf</th>
+              )}
+              <th className="px-3 py-2 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Brand</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Model</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Size</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Cond</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Price</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Stock</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-[var(--text-muted)] uppercase"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--border-primary)]">
+            {rows.map(row => (
+              <tr key={row.id} className={`${row.status === 'error' ? 'bg-[var(--error)]/5' : row.status === 'imported' ? 'bg-[var(--success)]/5' : ''}`}>
+                <td className="px-3 py-2">
+                  {row.status === 'valid' && <span className="text-[var(--success)]">✓</span>}
+                  {row.status === 'error' && (
+                    <span className="text-[var(--error)]" title={row.errors.join(', ')}>✕</span>
+                  )}
+                  {row.status === 'imported' && <span className="text-blue-400">✓✓</span>}
+                </td>
+                {showSource && (
+                  <td className="px-3 py-2 text-xs text-[var(--text-muted)]">
+                    {row.source || '—'}
+                  </td>
+                )}
+                {showConfidence && (
+                  <td className="px-3 py-2 text-xs text-[var(--text-muted)]">
+                    {typeof row.confidence === 'number' ? `${Math.round(row.confidence * 100)}%` : '—'}
+                  </td>
+                )}
+                <td className="px-3 py-2">
+                  <input
+                    type="text"
+                    value={row.brand}
+                    onChange={(e) => updateRow(row.id, 'brand', e.target.value)}
+                    className={`w-24 py-1 text-sm ${row.errors.some(e => e.includes('Brand')) ? 'border-[var(--error)]' : ''}`}
+                    disabled={row.status === 'imported'}
+                  />
+                </td>
+                <td className="px-3 py-2">
+                  <input
+                    type="text"
+                    value={row.model}
+                    onChange={(e) => updateRow(row.id, 'model', e.target.value)}
+                    className={`w-32 py-1 text-sm ${row.errors.some(e => e.includes('Model')) ? 'border-[var(--error)]' : ''}`}
+                    disabled={row.status === 'imported'}
+                  />
+                </td>
+                <td className="px-3 py-2">
+                  <input
+                    type="text"
+                    value={row.size}
+                    onChange={(e) => updateRow(row.id, 'size', e.target.value)}
+                    className={`w-16 py-1 text-sm ${row.errors.some(e => e.includes('Size')) ? 'border-[var(--error)]' : ''}`}
+                    disabled={row.status === 'imported'}
+                  />
+                </td>
+                <td className="px-3 py-2">
+                  <select
+                    value={row.condition}
+                    onChange={(e) => updateRow(row.id, 'condition', e.target.value)}
+                    className={`w-20 py-1 text-sm ${row.errors.some(e => e.includes('condition')) ? 'border-[var(--error)]' : ''}`}
+                    disabled={row.status === 'imported'}
+                  >
+                    <option value="">--</option>
+                    {CONDITION_PRESETS.map(c => (
+                      <option key={c.code} value={c.code}>{c.code}</option>
+                    ))}
+                  </select>
+                </td>
+                <td className="px-3 py-2">
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={row.price}
+                    onChange={(e) => updateRow(row.id, 'price', e.target.value)}
+                    className={`w-20 py-1 text-sm ${row.errors.some(e => e.includes('price')) ? 'border-[var(--error)]' : ''}`}
+                    disabled={row.status === 'imported'}
+                  />
+                </td>
+                <td className="px-3 py-2">
+                  <input
+                    type="number"
+                    min="0"
+                    value={row.stock}
+                    onChange={(e) => updateRow(row.id, 'stock', e.target.value)}
+                    className={`w-16 py-1 text-sm ${row.errors.some(e => e.includes('stock')) ? 'border-[var(--error)]' : ''}`}
+                    disabled={row.status === 'imported'}
+                  />
+                </td>
+                <td className="px-3 py-2">
+                  {row.status !== 'imported' && (
+                    <button onClick={() => removeRow(row.id)} className="text-[var(--text-muted)] hover:text-[var(--error)]">
+                      ✕
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {errorCount > 0 && (
+        <div className="p-4 border-t border-[var(--border-primary)] bg-[var(--bg-tertiary)]">
+          <p className="text-sm text-[var(--text-muted)]">
+            <strong>Fix errors inline</strong> by editing the fields above, or remove invalid rows.
+          </p>
         </div>
       )}
     </div>

@@ -5,8 +5,10 @@ import { supabase } from '@/lib/supabaseClient'
 import { useE2EEncryption } from '@/hooks/useE2EEncryption'
 import KeyVerification from '@/components/KeyVerification'
 import KeyBackup from '@/components/KeyBackup'
+import EncryptionSettings from '@/components/EncryptionSettings'
 import Button from '@/components/ui/Button'
 import Surface from '@/components/ui/Surface'
+import { generateFileKey, encryptFileWithKey, decryptFileWithKey } from '@/lib/crypto/e2e'
 
 interface Conversation {
   customer_id: string
@@ -29,6 +31,17 @@ interface Message {
   iv?: string
   sender_public_key?: string
   message_index?: number
+  deleted_at?: string | null
+  deleted_for_both?: boolean
+  expires_at?: string | null
+  attachment_path?: string | null
+  attachment_name?: string | null
+  attachment_type?: string | null
+  attachment_size?: number | null
+  attachment_key?: string | null
+  attachment_key_iv?: string | null
+  attachment_key_sender_public_key?: string | null
+  attachment_key_message_index?: number | null
 }
 
 interface DecryptedMessage extends Message {
@@ -45,8 +58,15 @@ export default function AdminMessagesPage() {
   const [search, setSearch] = useState('')
   const [showUnreadOnly, setShowUnreadOnly] = useState(false)
   const [adminId, setAdminId] = useState<string | null>(null)
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null)
+  const [attachmentError, setAttachmentError] = useState<string | null>(null)
+  const [retentionEnabled, setRetentionEnabled] = useState(false)
+  const [retentionDays, setRetentionDays] = useState(90)
+  const [showRetentionSettings, setShowRetentionSettings] = useState(false)
   const [showKeyVerification, setShowKeyVerification] = useState(false)
   const [showKeyBackup, setShowKeyBackup] = useState(false)
+  const [showEncryptionSettings, setShowEncryptionSettings] = useState(false)
+  const [lastBackupAt, setLastBackupAt] = useState<string | null>(null)
   const [verifyCustomer, setVerifyCustomer] = useState<{
     id: string
     name: string
@@ -54,6 +74,8 @@ export default function AdminMessagesPage() {
     shortFingerprint: string
   } | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [selectedCustomerVerified, setSelectedCustomerVerified] = useState(false)
+  const attachmentInputRef = useRef<HTMLInputElement>(null)
 
   const {
     isInitialized,
@@ -62,12 +84,32 @@ export default function AdminMessagesPage() {
     publicKey,
     error: e2eError,
     encrypt,
+    decrypt,
     decryptMessages,
     backupKeys,
     restoreKeys,
     verifyUserKey,
     error: encryptionError,
+    keyPairs,
+    isLocked,
+    lockKeys,
+    unlockKeys,
+    rotateKeys,
+    resetSessions,
+    updateDeviceLabel,
   } = useE2EEncryption(adminId)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setLastBackupAt(localStorage.getItem('709e2e:lastBackupAt'))
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!showKeyBackup && typeof window !== 'undefined') {
+      setLastBackupAt(localStorage.getItem('709e2e:lastBackupAt'))
+    }
+  }, [showKeyBackup])
 
   // Get admin user ID
   useEffect(() => {
@@ -84,7 +126,7 @@ export default function AdminMessagesPage() {
     // Get all unique customer conversations with their latest message
     const { data: messagesData } = await supabase
       .from('messages')
-      .select('customer_id, content, created_at, read, sender_type, encrypted')
+      .select('customer_id, content, created_at, read, sender_type, encrypted, deleted_at')
       .order('created_at', { ascending: false })
 
     if (!messagesData) {
@@ -137,7 +179,11 @@ export default function AdminMessagesPage() {
         customer_id: customerId,
         customer_email: user?.email || 'Unknown',
         customer_name: user?.full_name || null,
-        last_message: lastMsg.encrypted ? '🔐 Encrypted message' : lastMsg.content,
+        last_message: lastMsg.deleted_at
+          ? '[Message deleted]'
+          : lastMsg.encrypted
+            ? '🔐 Encrypted message'
+            : lastMsg.content,
         last_message_at: lastMsg.created_at,
         unread_count: data.unread,
         has_encryption: !!profile?.public_key,
@@ -163,19 +209,28 @@ export default function AdminMessagesPage() {
       return
     }
 
-    // Decrypt messages
+    const deletedMessages = data
+      .filter(msg => msg.deleted_at)
+      .map(msg => ({ ...msg, decryptedContent: '[Message deleted]' }))
+
     if (isInitialized) {
+      const activeMessages = data.filter(msg => !msg.deleted_at)
       const decrypted = await decryptMessages(
-        data,
+        activeMessages,
         (msg) => msg.sender_type === 'customer' ? msg.customer_id : adminId!
       )
-      setMessages(decrypted as DecryptedMessage[])
+      const combined = [...(deletedMessages as DecryptedMessage[]), ...(decrypted as DecryptedMessage[])]
+      combined.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      setMessages(combined)
     } else {
       // Not initialized yet, show encrypted indicator
-      setMessages(data.map(msg => ({
+      const unencrypted = data.filter(msg => !msg.deleted_at).map(msg => ({
         ...msg,
         decryptedContent: msg.encrypted ? '🔐 Encrypted message' : msg.content
-      })))
+      }))
+      const combined = [...(deletedMessages as DecryptedMessage[]), ...(unencrypted as DecryptedMessage[])]
+      combined.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      setMessages(combined)
     }
 
     // Mark as read
@@ -191,6 +246,25 @@ export default function AdminMessagesPage() {
       c.customer_id === customerId ? { ...c, unread_count: 0 } : c
     ))
   }, [isInitialized, decryptMessages, adminId])
+
+  const loadRetentionSettings = useCallback(async (customerId: string) => {
+    const response = await fetch(`/api/messages/retention?customerId=${customerId}`)
+    if (response.ok) {
+      const data = await response.json()
+      setRetentionEnabled(Boolean(data.retention_enabled))
+      setRetentionDays(data.retention_days || 90)
+      if (data.retention_enabled && data.retention_days) {
+        await fetch('/api/messages/purge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customerId, days: data.retention_days })
+        })
+      }
+    } else {
+      setRetentionEnabled(false)
+      setRetentionDays(90)
+    }
+  }, [])
 
   // Re-decrypt when encryption is initialized
   useEffect(() => {
@@ -210,8 +284,17 @@ export default function AdminMessagesPage() {
     if (selectedCustomer) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       loadMessages(selectedCustomer)
+      loadRetentionSettings(selectedCustomer)
     }
-  }, [selectedCustomer, loadMessages])
+  }, [selectedCustomer, loadMessages, loadRetentionSettings])
+
+  useEffect(() => {
+    if (selectedCustomer && typeof window !== 'undefined') {
+      setSelectedCustomerVerified(
+        localStorage.getItem(`709e2e:verified:${selectedCustomer}`) === 'true'
+      )
+    }
+  }, [selectedCustomer])
 
   // Realtime updates for usability: new messages appear without refresh.
   useEffect(() => {
@@ -244,9 +327,16 @@ export default function AdminMessagesPage() {
     if (!newMessage.trim() || !selectedCustomer) return
 
     setSending(true)
+    setAttachmentError(null)
     const plaintext = newMessage.trim()
 
     try {
+      if (attachmentFile && !(selectedConvo?.has_encryption && isInitialized)) {
+        setAttachmentError('Attachments require encrypted chat setup.')
+        setSending(false)
+        return
+      }
+
       // Try to encrypt the message
       let messageData: {
         customer_id: string
@@ -257,11 +347,26 @@ export default function AdminMessagesPage() {
         iv?: string
         sender_public_key?: string
         message_index?: number
+        expires_at?: string | null
+        attachment_path?: string | null
+        attachment_name?: string | null
+        attachment_type?: string | null
+        attachment_size?: number | null
+        attachment_key?: string | null
+        attachment_key_iv?: string | null
+        attachment_key_sender_public_key?: string | null
+        attachment_key_message_index?: number | null
       } = {
         customer_id: selectedCustomer,
         content: plaintext,
         sender_type: 'admin',
         read: false,
+      }
+
+      if (retentionEnabled && retentionDays) {
+        messageData.expires_at = new Date(
+          Date.now() + retentionDays * 24 * 60 * 60 * 1000
+        ).toISOString()
       }
 
       // Attempt encryption if E2EE is initialized
@@ -279,6 +384,11 @@ export default function AdminMessagesPage() {
         }
       }
 
+      if (attachmentFile) {
+        const attachmentData = await uploadEncryptedAttachment(attachmentFile)
+        messageData = { ...messageData, ...attachmentData }
+      }
+
       const { data, error } = await supabase
         .from('messages')
         .insert(messageData)
@@ -292,6 +402,7 @@ export default function AdminMessagesPage() {
           decryptedContent: plaintext 
         }])
         setNewMessage('')
+        setAttachmentFile(null)
         
         // Update conversation
         setConversations(prev => prev.map(c => 
@@ -302,9 +413,170 @@ export default function AdminMessagesPage() {
       }
     } catch (err) {
       console.error('Failed to send message:', err)
+      if (attachmentFile) {
+        setAttachmentError('Failed to send attachment.')
+      }
     }
 
     setSending(false)
+  }
+
+  const sanitizeFilename = (name: string) =>
+    name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
+
+  const uploadEncryptedAttachment = async (file: File) => {
+    if (!selectedCustomer || !adminId) {
+      throw new Error('Missing recipient')
+    }
+
+    const fileKey = await generateFileKey()
+    const fileBuffer = await file.arrayBuffer()
+    const encrypted = await encryptFileWithKey(fileBuffer, fileKey)
+    const keyPayload = JSON.stringify({ key: fileKey, iv: encrypted.iv })
+
+    const encryptedKey = await encrypt(keyPayload, selectedCustomer)
+    if (!encryptedKey) {
+      throw new Error('Unable to encrypt attachment key')
+    }
+
+    const blob = new Blob([encrypted.ciphertext], { type: 'application/octet-stream' })
+    const formData = new FormData()
+    formData.append('file', blob, `encrypted-${sanitizeFilename(file.name)}`)
+    formData.append('filename', file.name)
+    formData.append('customerId', selectedCustomer)
+
+    const response = await fetch('/api/messages/attachment-upload', {
+      method: 'POST',
+      body: formData,
+    })
+
+    const uploadPayload = await response.json()
+    if (!response.ok) {
+      throw new Error(uploadPayload?.error || 'Failed to upload attachment')
+    }
+
+    const path = uploadPayload.path as string
+
+    return {
+      attachment_path: path,
+      attachment_name: file.name,
+      attachment_type: file.type,
+      attachment_size: file.size,
+      attachment_key: encryptedKey.content,
+      attachment_key_iv: encryptedKey.iv,
+      attachment_key_sender_public_key: encryptedKey.senderPublicKey,
+      attachment_key_message_index: encryptedKey.messageIndex,
+    }
+  }
+
+  const handleDownloadAttachment = async (msg: DecryptedMessage) => {
+    if (!msg.attachment_path || !msg.attachment_key || !msg.attachment_key_iv || !msg.attachment_key_sender_public_key) {
+      return
+    }
+    if (!selectedCustomer || !adminId) return
+    try {
+      const keyPayload = await decrypt(
+        {
+          id: msg.id,
+          content: msg.attachment_key,
+          iv: msg.attachment_key_iv,
+          sender_public_key: msg.attachment_key_sender_public_key,
+          message_index: msg.attachment_key_message_index || 0,
+          encrypted: true,
+          sender_type: msg.sender_type,
+          customer_id: msg.customer_id,
+        },
+        msg.sender_type === 'customer' ? msg.customer_id : adminId
+      )
+
+      const { key, iv } = JSON.parse(keyPayload) as { key: string; iv: string }
+
+      const urlResponse = await fetch('/api/messages/attachment-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId: msg.id })
+      })
+
+      if (!urlResponse.ok) return
+      const { signedUrl } = await urlResponse.json()
+      const fileResponse = await fetch(signedUrl)
+      const encryptedBuffer = await fileResponse.arrayBuffer()
+      const decryptedBuffer = await decryptFileWithKey(encryptedBuffer, key, iv)
+
+      const blob = new Blob([decryptedBuffer], { type: msg.attachment_type || 'application/octet-stream' })
+      const downloadUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = msg.attachment_name || 'attachment'
+      link.click()
+      URL.revokeObjectURL(downloadUrl)
+    } catch {
+      setAttachmentError('Unable to decrypt attachment.')
+    }
+  }
+
+  const updateRetention = async (enabled: boolean, days: number) => {
+    if (!selectedCustomer) return
+    const response = await fetch('/api/messages/retention', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customerId: selectedCustomer, enabled, days })
+    })
+
+    if (response.ok) {
+      setRetentionEnabled(enabled)
+      setRetentionDays(days)
+      if (enabled) {
+        await fetch('/api/messages/purge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customerId: selectedCustomer, days })
+        })
+      }
+    }
+  }
+
+  const purgeOldMessages = async () => {
+    if (!selectedCustomer || !retentionEnabled) return
+    await fetch('/api/messages/purge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customerId: selectedCustomer, days: retentionDays })
+    })
+  }
+
+  const handleDeleteMessage = async (messageId: string) => {
+    const response = await fetch('/api/messages/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messageId })
+    })
+
+    if (response.ok) {
+      const now = new Date().toISOString()
+      setMessages(prev => prev.map(msg =>
+        msg.id === messageId
+          ? { ...msg, deleted_at: now, decryptedContent: '[Message deleted]' }
+          : msg
+      ))
+      setConversations(prev => prev.map(c =>
+        c.customer_id === selectedCustomer
+          ? { ...c, last_message: '[Message deleted]' }
+          : c
+      ))
+    }
+  }
+
+  const markCustomerVerified = () => {
+    if (!selectedCustomer || typeof window === 'undefined') return
+    localStorage.setItem(`709e2e:verified:${selectedCustomer}`, 'true')
+    setSelectedCustomerVerified(true)
+  }
+
+  const resetCustomerVerified = () => {
+    if (!selectedCustomer || typeof window === 'undefined') return
+    localStorage.removeItem(`709e2e:verified:${selectedCustomer}`)
+    setSelectedCustomerVerified(false)
   }
 
   const handleVerifyCustomer = async (customerId: string, customerName: string) => {
@@ -366,6 +638,14 @@ export default function AdminMessagesPage() {
           >
             Backup
           </Button>
+
+          <Button
+            onClick={() => setShowEncryptionSettings(true)}
+            variant="ghost"
+            size="sm"
+          >
+            Security
+          </Button>
         </div>
       </div>
 
@@ -375,6 +655,54 @@ export default function AdminMessagesPage() {
           Messages are end-to-end encrypted on this device. Verify customer keys and back up your keys to avoid lockouts.
         </p>
       </Surface>
+
+      {selectedCustomer && (
+        <Surface padding="md" className="mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-[var(--text-primary)]">Message retention</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">
+                {retentionEnabled
+                  ? `Messages expire after ${retentionDays} days for this customer.`
+                  : 'Retention is off for this customer.'}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {retentionEnabled && (
+                <Button variant="ghost" size="sm" onClick={purgeOldMessages}>
+                  Purge now
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={() => setShowRetentionSettings(v => !v)}>
+                {showRetentionSettings ? 'Close' : 'Configure'}
+              </Button>
+            </div>
+          </div>
+
+          {showRetentionSettings && (
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={retentionEnabled}
+                  onChange={(e) => updateRetention(e.target.checked, retentionDays)}
+                />
+                <span>Enable retention</span>
+              </label>
+              <select
+                value={retentionDays}
+                onChange={(e) => updateRetention(retentionEnabled, parseInt(e.target.value, 10))}
+                disabled={!retentionEnabled}
+                className="min-w-[120px]"
+              >
+                {[30, 90, 180].map((days) => (
+                  <option key={days} value={days}>{days} days</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </Surface>
+      )}
 
       {encryptionError && (
         <div className="mb-4 p-3 bg-[var(--warning)]/10 border border-[var(--warning)]/20 rounded-lg text-sm text-[var(--text-secondary)]">
@@ -490,18 +818,25 @@ export default function AdminMessagesPage() {
                     </div>
                   </div>
                   {selectedConvo?.has_encryption && (
-                    <button
-                      onClick={() => handleVerifyCustomer(
-                        selectedCustomer,
-                        selectedConvo?.customer_name || selectedConvo?.customer_email || 'Customer'
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleVerifyCustomer(
+                          selectedCustomer,
+                          selectedConvo?.customer_name || selectedConvo?.customer_email || 'Customer'
+                        )}
+                        className="text-sm text-[var(--success)] hover:underline flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                        </svg>
+                        Verify key
+                      </button>
+                      {selectedCustomerVerified && (
+                        <span className="inline-flex items-center px-2 py-1 text-[10px] font-medium rounded-full bg-[var(--success)]/20 text-[var(--success)]">
+                          Verified
+                        </span>
                       )}
-                      className="text-sm text-[var(--success)] hover:underline flex items-center gap-2"
-                    >
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                      </svg>
-                      Verify key
-                    </button>
+                    </div>
                   )}
                 </div>
 
@@ -513,13 +848,25 @@ export default function AdminMessagesPage() {
                       className={`flex ${msg.sender_type === 'admin' ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
-                        className={`max-w-[70%] px-4 py-3 rounded-2xl ${
+                        className={`group relative max-w-[70%] px-4 py-3 rounded-2xl ${
                           msg.sender_type === 'admin'
                             ? 'bg-[var(--accent)] text-white rounded-br-md'
                             : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-bl-md'
                         }`}
                       >
                         <p className="text-sm">{msg.decryptedContent || msg.content}</p>
+                        {msg.attachment_path && !msg.deleted_at && (
+                          <button
+                            onClick={() => handleDownloadAttachment(msg)}
+                            className={`mt-2 text-xs underline ${
+                              msg.sender_type === 'admin'
+                                ? 'text-white/80 hover:text-white'
+                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                            }`}
+                          >
+                            📎 {msg.attachment_name || 'Attachment'}
+                          </button>
+                        )}
                         <div className={`flex items-center gap-1 text-[10px] mt-1 ${
                           msg.sender_type === 'admin' ? 'text-white/60' : 'text-[var(--text-muted)]'
                         }`}>
@@ -530,6 +877,15 @@ export default function AdminMessagesPage() {
                           )}
                           {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
+                        {!msg.deleted_at && (
+                          <button
+                            onClick={() => handleDeleteMessage(msg.id)}
+                            className="absolute -top-2 -right-2 bg-[var(--bg-secondary)] text-[var(--text-muted)] border border-[var(--border-primary)] rounded-full w-6 h-6 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Delete message"
+                          >
+                            ✕
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -538,25 +894,61 @@ export default function AdminMessagesPage() {
 
                 {/* Input */}
                 <form onSubmit={handleSend} className="p-4 border-t border-[var(--border-primary)]">
+                  <input
+                    ref={attachmentInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      setAttachmentFile(file || null)
+                      setAttachmentError(null)
+                    }}
+                  />
                   <div className="flex gap-3 items-end">
-                    <textarea
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      placeholder={
-                        selectedConvo?.has_encryption && isInitialized
-                          ? "Type an encrypted message..."
-                          : "Type a message..."
-                      }
-                      className="flex-1 resize-none"
-                      rows={2}
-                      disabled={sending}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault()
-                          ;(e.currentTarget.form as HTMLFormElement | null)?.requestSubmit()
+                    <div className="flex-1 space-y-2">
+                      <textarea
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        placeholder={
+                          selectedConvo?.has_encryption && isInitialized
+                            ? "Type an encrypted message..."
+                            : "Type a message..."
                         }
-                      }}
-                    />
+                        className="flex-1 resize-none w-full"
+                        rows={2}
+                        disabled={sending}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault()
+                            ;(e.currentTarget.form as HTMLFormElement | null)?.requestSubmit()
+                          }
+                        }}
+                      />
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
+                        <button
+                          type="button"
+                          onClick={() => attachmentInputRef.current?.click()}
+                          className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                        >
+                          Attach file
+                        </button>
+                        {attachmentFile && (
+                          <div className="flex items-center gap-2">
+                            <span>{attachmentFile.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => setAttachmentFile(null)}
+                              className="text-[var(--text-muted)] hover:text-[var(--error)]"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      {attachmentError && (
+                        <p className="text-xs text-[var(--error)]">{attachmentError}</p>
+                      )}
+                    </div>
                     <button
                       type="submit"
                       disabled={!newMessage.trim() || sending}
@@ -585,6 +977,9 @@ export default function AdminMessagesPage() {
           theirFingerprint={verifyCustomer?.fingerprint}
           theirShortFingerprint={verifyCustomer?.shortFingerprint}
           theirName={verifyCustomer?.name}
+          isVerified={selectedCustomerVerified}
+          onVerify={markCustomerVerified}
+          onResetVerification={resetCustomerVerified}
           isInitialized={isInitialized}
           error={e2eError}
           onClose={() => {
@@ -599,7 +994,23 @@ export default function AdminMessagesPage() {
         <KeyBackup
           onBackup={backupKeys}
           onRestore={restoreKeys}
+          lastBackupAt={lastBackupAt}
           onClose={() => setShowKeyBackup(false)}
+        />
+      )}
+
+      {showEncryptionSettings && (
+        <EncryptionSettings
+          isOpen={showEncryptionSettings}
+          onClose={() => setShowEncryptionSettings(false)}
+          keyPairs={keyPairs}
+          isLocked={isLocked}
+          onLock={lockKeys}
+          onUnlock={unlockKeys}
+          onRotate={rotateKeys}
+          onResetSessions={resetSessions}
+          onUpdateDeviceLabel={updateDeviceLabel}
+          lastBackupAt={lastBackupAt}
         />
       )}
     </div>

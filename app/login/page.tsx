@@ -37,10 +37,14 @@ export default function LoginPage() {
           .eq('id', data.user.id)
           .single()
         
-        const isStaff = ['owner', 'admin', 'staff'].includes(profile?.role || '')
+        const role = profile?.role || ''
+        const isAdmin = ['owner', 'admin'].includes(role)
+        const isStaff = role === 'staff'
         
-        if (isStaff) {
+        if (isAdmin) {
           router.push('/admin/products')
+        } else if (isStaff) {
+          router.push('/staff/location')
         } else {
           // Customers should use the customer login
           router.push('/account')

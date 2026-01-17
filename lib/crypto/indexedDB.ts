@@ -4,16 +4,22 @@
  */
 
 const DB_NAME = '709exclusive_e2e'
-const DB_VERSION = 1
+const DB_VERSION = 2
 const KEYS_STORE = 'keys'
 const SESSIONS_STORE = 'sessions'
 
 export interface StoredKeyPair {
   id: string
   publicKey: string
-  privateKey: string
+  privateKey?: string
+  encryptedPrivateKey?: string
+  encryptedPrivateKeyIv?: string
+  encryptedPrivateKeySalt?: string
+  encryptedPrivateKeyIterations?: number
   createdAt: number
   isActive: boolean
+  deviceLabel?: string
+  lastUsedAt?: number
 }
 
 interface SessionKey {
@@ -39,11 +45,18 @@ function openDB(): Promise<IDBDatabase> {
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result
+      const transaction = (event.target as IDBOpenDBRequest).transaction
 
       // Keys store - for long-term identity keys
       if (!db.objectStoreNames.contains(KEYS_STORE)) {
         const keysStore = db.createObjectStore(KEYS_STORE, { keyPath: 'id' })
         keysStore.createIndex('isActive', 'isActive', { unique: false })
+        keysStore.createIndex('lastUsedAt', 'lastUsedAt', { unique: false })
+      } else if (transaction) {
+        const keysStore = transaction.objectStore(KEYS_STORE)
+        if (!keysStore.indexNames.contains('lastUsedAt')) {
+          keysStore.createIndex('lastUsedAt', 'lastUsedAt', { unique: false })
+        }
       }
 
       // Sessions store - for ephemeral session keys (forward secrecy)
@@ -110,6 +123,42 @@ export async function deactivateAllKeys(): Promise<void> {
     }
     
     if (keys.length === 0) resolve()
+  })
+}
+
+export async function updateKeyPair(
+  id: string,
+  updates: Partial<StoredKeyPair>
+): Promise<void> {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([KEYS_STORE], 'readwrite')
+    const store = transaction.objectStore(KEYS_STORE)
+    const getRequest = store.get(id)
+
+    getRequest.onsuccess = () => {
+      const existing = getRequest.result
+      if (!existing) {
+        resolve()
+        return
+      }
+      const updated = { ...existing, ...updates }
+      const putRequest = store.put(updated)
+      putRequest.onerror = () => reject(putRequest.error)
+      putRequest.onsuccess = () => resolve()
+    }
+    getRequest.onerror = () => reject(getRequest.error)
+  })
+}
+
+export async function deleteKeyPair(id: string): Promise<void> {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([KEYS_STORE], 'readwrite')
+    const store = transaction.objectStore(KEYS_STORE)
+    const request = store.delete(id)
+    request.onerror = () => reject(request.error)
+    request.onsuccess = () => resolve()
   })
 }
 
@@ -188,6 +237,17 @@ export async function deleteExpiredSessions(): Promise<void> {
       }
     }
     request.onerror = () => reject(request.error)
+  })
+}
+
+export async function clearSessions(): Promise<void> {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([SESSIONS_STORE], 'readwrite')
+    const store = transaction.objectStore(SESSIONS_STORE)
+    const request = store.clear()
+    request.onerror = () => reject(request.error)
+    request.onsuccess = () => resolve()
   })
 }
 

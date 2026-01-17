@@ -6,9 +6,10 @@ interface KeyBackupProps {
   onBackup: (password: string) => Promise<string>
   onRestore: (backupData: string, password: string) => Promise<void>
   onClose: () => void
+  lastBackupAt?: string | null
 }
 
-export default function KeyBackup({ onBackup, onRestore, onClose }: KeyBackupProps) {
+export default function KeyBackup({ onBackup, onRestore, onClose, lastBackupAt }: KeyBackupProps) {
   const [mode, setMode] = useState<'backup' | 'restore'>('backup')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -20,8 +21,10 @@ export default function KeyBackup({ onBackup, onRestore, onClose }: KeyBackupPro
   const [copied, setCopied] = useState(false)
 
   const handleBackup = async () => {
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters')
+    const hasLetter = /[A-Za-z]/.test(password)
+    const hasNumber = /\d/.test(password)
+    if (password.length < 10 || !hasLetter || !hasNumber) {
+      setError('Use at least 10 characters with letters and numbers')
       return
     }
     if (password !== confirmPassword) {
@@ -126,6 +129,13 @@ export default function KeyBackup({ onBackup, onRestore, onClose }: KeyBackupPro
         </div>
 
         <div className="p-6">
+          {lastBackupAt && (
+            <div className="mb-4 p-3 bg-[var(--bg-tertiary)] rounded-lg">
+              <p className="text-xs text-[var(--text-muted)]">
+                Last backup: {new Date(lastBackupAt).toLocaleString()}
+              </p>
+            </div>
+          )}
           {error && (
             <div className="mb-4 p-3 bg-[var(--error)]/10 border border-[var(--error)]/20 rounded-lg">
               <p className="text-sm text-[var(--error)]">{error}</p>
@@ -160,7 +170,7 @@ export default function KeyBackup({ onBackup, onRestore, onClose }: KeyBackupPro
                         className="w-full"
                       />
                       <p className="text-xs text-[var(--text-muted)] mt-1">
-                        Minimum 8 characters. Use a unique password.
+                        Use 10+ characters with letters and numbers.
                       </p>
                     </div>
 

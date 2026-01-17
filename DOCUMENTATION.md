@@ -106,9 +106,15 @@ GOOGLE_IMAGE_API_KEY=your_google_api_key
 GOOGLE_SEARCH_ENGINE_ID=your_search_engine_id
 
 # =============================================================================
+# GOOGLE VISION OCR (Optional) - Enable the Vision API in Google Cloud
+# =============================================================================
+GOOGLE_VISION_API_KEY=your_google_vision_api_key
+
+# =============================================================================
 # APPLICATION
 # =============================================================================
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+PRIVACY_STRICT_LOGGING=true
 ```
 
 ### Security Notes
@@ -116,6 +122,8 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 - **Never commit `.env.local` to git** (it's in `.gitignore`)
 - Use test keys for development
 - Rotate keys regularly in production
+- Screenshot OCR requires the Google Vision API to be enabled for the API key.
+- `PRIVACY_STRICT_LOGGING=true` reduces error detail returned by message APIs.
 
 ---
 
@@ -156,6 +164,7 @@ Execute these SQL files in order via Supabase SQL Editor:
 1. Go to Storage in Supabase dashboard
 2. Create bucket named `product-images` (public)
 3. Create bucket named `model-images` (public)
+4. Create bucket named `message-attachments` (private)
 
 ### 4. Create Admin User
 
@@ -319,6 +328,7 @@ Handles Stripe webhook events:
 - Adjust inventory with audit trail
 - Release stuck reservations
 - Analytics: sell-through rate, days-to-first-sale
+- Import inventory from CSVs or screenshots (OCR)
 
 ### Order Management
 

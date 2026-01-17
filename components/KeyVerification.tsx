@@ -10,6 +10,9 @@ interface KeyVerificationProps {
   theirFingerprint?: string | null
   theirShortFingerprint?: string | null
   theirName?: string
+  isVerified?: boolean
+  onVerify?: () => void
+  onResetVerification?: () => void
   onClose: () => void
   isInitialized?: boolean
   error?: string | null
@@ -22,6 +25,9 @@ export default function KeyVerification({
   theirFingerprint,
   theirShortFingerprint,
   theirName,
+  isVerified = false,
+  onVerify,
+  onResetVerification,
   onClose,
   isInitialized = true,
   error = null,
@@ -220,6 +226,35 @@ export default function KeyVerification({
                   a trusted channel (phone call, video). If it matches what you see here, your conversation is secure.
                 </p>
               </div>
+
+              {(onVerify || onResetVerification) && (
+                <div className="mt-4 flex gap-2">
+                  {isVerified ? (
+                    <>
+                      <span className="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-[var(--success)]/20 text-[var(--success)]">
+                        Verified
+                      </span>
+                      {onResetVerification && (
+                        <button
+                          onClick={onResetVerification}
+                          className="text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    onVerify && (
+                      <button
+                        onClick={onVerify}
+                        className="btn-primary text-sm"
+                      >
+                        Mark as verified
+                      </button>
+                    )
+                  )}
+                </div>
+              )}
             </>
           ) : null}
         </div>
