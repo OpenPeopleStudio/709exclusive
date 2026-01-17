@@ -227,14 +227,15 @@ export async function POST(request: Request) {
         options: inviteOptions,
       })
 
-      if (linkError || !linkData?.action_link) {
+      const actionLink = linkData?.properties?.action_link
+      if (linkError || !actionLink) {
         console.error('Invite link generation error:', linkError)
         return NextResponse.json({ error: linkError?.message || 'Failed to generate invite link' }, { status: 500 })
       }
 
       await sendInviteEmail({
         inviteeEmail: normalizedEmail,
-        inviteLink: linkData.action_link,
+        inviteLink: actionLink,
         tenantName: tenant?.name || '709exclusive',
         role,
         inviterEmail: user.email,
