@@ -66,7 +66,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     : navItems.filter((item) => staffNavHrefs.has(item.href))
 
   return (
-    <AdminShell userEmail={user.email} navItems={scopedNavItems} isSuperAdmin={false}>
+    <AdminShell 
+      userEmail={user.email} 
+      navItems={scopedNavItems} 
+      isSuperAdmin={false}
+      userRole={profile?.role || 'customer'}
+    >
       {children}
     </AdminShell>
   )

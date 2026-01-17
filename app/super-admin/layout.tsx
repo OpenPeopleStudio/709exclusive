@@ -44,7 +44,12 @@ export default async function SuperAdminLayout({ children }: { children: React.R
   }
 
   return (
-    <AdminShell userEmail={user.email} navItems={navItems} isSuperAdmin={true}>
+    <AdminShell 
+      userEmail={user.email} 
+      navItems={navItems} 
+      isSuperAdmin={true}
+      userRole="owner"
+    >
       {children}
     </AdminShell>
   )

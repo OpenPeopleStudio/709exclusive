@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import PWAInstallButton from './PWAInstallButton'
+import HelpModal from './HelpModal'
 import { useTenant } from '@/context/TenantContext'
 
 interface NavItem {
@@ -18,11 +19,13 @@ interface AdminShellProps {
   userEmail?: string | null
   navItems: NavItem[]
   isSuperAdmin?: boolean
+  userRole?: string
 }
 
-export default function AdminShell({ children, userEmail, navItems, isSuperAdmin = false }: AdminShellProps) {
+export default function AdminShell({ children, userEmail, navItems, isSuperAdmin = false, userRole = 'admin' }: AdminShellProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
+  const [isHelpOpen, setIsHelpOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const { settings } = useTenant()
@@ -69,8 +72,18 @@ export default function AdminShell({ children, userEmail, navItems, isSuperAdmin
         </div>
 
         <div className="flex items-center gap-4">
+          <button
+            onClick={() => setIsHelpOpen(true)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-all"
+            title="Help & Documentation"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="hidden md:inline">Help</span>
+          </button>
           <PWAInstallButton />
-          <span className="text-sm text-[var(--text-muted)]">{userEmail}</span>
+          <span className="text-sm text-[var(--text-muted)] hidden md:inline">{userEmail}</span>
           <button
             type="button"
             onClick={handleSignOut}
@@ -84,7 +97,7 @@ export default function AdminShell({ children, userEmail, navItems, isSuperAdmin
           {!isSuperAdmin && (
             <Link 
               href="/" 
-              className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+              className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors hidden md:inline"
             >
               View Store →
             </Link>
@@ -189,6 +202,13 @@ export default function AdminShell({ children, userEmail, navItems, isSuperAdmin
           {children}
         </div>
       </main>
+
+      {/* Help Modal */}
+      <HelpModal 
+        isOpen={isHelpOpen} 
+        onClose={() => setIsHelpOpen(false)}
+        userRole={isSuperAdmin ? 'owner' : userRole}
+      />
     </div>
   )
 }

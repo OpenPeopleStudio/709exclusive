@@ -8,9 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "smoke:checkout": "node scripts/smoke/checkout-reservation.mjs",
-    "migrate:privacy": "bash scripts/run-migrations.sh",
+    "migrate:privacy": "supabase db push --include-all",
+    "migrate:privacy:local": "supabase db reset",
     "verify:deployment": "bash scripts/verify-deployment.sh",
-    "audit:tenant-isolation": "npx tsx scripts/audit-tenant-isolation.ts"
+    "audit:tenant-isolation": "npx tsx scripts/audit-tenant-isolation.ts",
+    "db:types": "supabase gen types typescript --local > types/supabase.ts"
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.6",
@@ -26,6 +28,7 @@
     "qrcode.react": "^4.2.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "react-markdown": "^10.1.0",
     "resend": "^6.7.0",
     "stripe": "^20.1.2"
   },
