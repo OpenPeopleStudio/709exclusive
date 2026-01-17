@@ -59,7 +59,7 @@ export default function ProductCard({
   return (
     <Link href={`/product/${product.slug}`} className="group block">
       {/* Image Container */}
-      <div className="relative aspect-square bg-[var(--bg-secondary)] rounded-2xl overflow-hidden mb-4 border border-[var(--glass-border)] group-hover:border-[var(--border-glow)] transition-all duration-300">
+      <div className="relative aspect-square bg-[var(--bg-secondary)] rounded-2xl overflow-hidden mb-3 border border-[var(--glass-border)] group-hover:border-[var(--border-glow)] transition-all duration-300">
         {product.primary_image ? (
           <Image
             src={product.primary_image}
@@ -81,7 +81,7 @@ export default function ProductCard({
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
         {/* Badges - Top Left */}
-        <div className="absolute top-2 left-2 flex flex-col gap-1">
+        <div className="absolute top-1.5 left-1.5 flex flex-col gap-1">
           {product.is_drop && (
             isDropEnding 
               ? <Badge variant="time">Ending Soon</Badge>
@@ -95,7 +95,7 @@ export default function ProductCard({
         {showWishlist && (
           <button
             onClick={handleWishlistClick}
-            className={`absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 backdrop-blur-xl ${
+            className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 backdrop-blur-xl ${
               isWishlisted 
                 ? 'bg-gradient-to-r from-[var(--neon-magenta)] to-[var(--neon-cyan)] opacity-100 shadow-[0_0_20px_rgba(255,0,255,0.5)]' 
                 : 'bg-black/30 border border-white/20 opacity-0 group-hover:opacity-100'
@@ -103,7 +103,7 @@ export default function ProductCard({
             aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
           >
             <svg 
-              className="w-4 h-4 text-white" 
+              className="w-3.5 h-3.5 text-white" 
               fill={isWishlisted ? 'currentColor' : 'none'} 
               stroke="currentColor" 
               viewBox="0 0 24 24"
@@ -120,28 +120,28 @@ export default function ProductCard({
       </div>
 
       {/* Product Info */}
-      <div className={`flex flex-col ${size === 'small' ? 'gap-1' : 'gap-2'}`}>
+      <div className="flex flex-col gap-1.5">
         {/* Brand */}
-        <p className={`font-bold uppercase tracking-wider text-[var(--text-muted)] ${size === 'small' ? 'text-[10px] leading-tight' : 'text-xs leading-tight'}`}>
+        <p className={`font-semibold uppercase tracking-wide text-[var(--text-muted)] ${size === 'small' ? 'text-[9px] leading-tight' : 'text-[10px] leading-tight'}`}>
           {product.brand}
         </p>
         
         {/* Name - Fixed height container */}
-        <div className={size === 'small' ? 'h-8' : 'h-10'}>
-          <h3 className={`font-semibold text-[var(--text-primary)] group-hover:text-gradient transition-all duration-300 line-clamp-2 ${
-            size === 'small' ? 'text-sm leading-4' : 'text-base leading-5'
+        <div className={size === 'small' ? 'h-7' : 'h-8'}>
+          <h3 className={`font-medium text-[var(--text-primary)] group-hover:text-gradient transition-all duration-300 line-clamp-2 ${
+            size === 'small' ? 'text-xs leading-[14px]' : 'text-sm leading-4'
           }`}>
             {product.name}
           </h3>
         </div>
         
         {/* Price - Fixed height to ensure alignment */}
-        <div className={`flex items-center gap-2 ${size === 'small' ? 'h-6' : 'h-7'}`}>
-          <span className={`font-bold bg-gradient-to-r from-[var(--neon-magenta)] to-[var(--neon-cyan)] bg-clip-text text-transparent ${size === 'small' ? 'text-base' : 'text-lg'}`}>
+        <div className="flex items-center gap-1.5 h-5 mt-0.5">
+          <span className={`font-bold bg-gradient-to-r from-[var(--neon-magenta)] to-[var(--neon-cyan)] bg-clip-text text-transparent ${size === 'small' ? 'text-sm' : 'text-base'}`}>
             ${(product.lowest_price_cents / 100).toFixed(0)}
           </span>
           {product.last_sold_cents && product.last_sold_cents !== product.lowest_price_cents && (
-            <span className="text-sm text-[var(--text-muted)] line-through">
+            <span className="text-xs text-[var(--text-muted)] line-through">
               ${(product.last_sold_cents / 100).toFixed(0)}
             </span>
           )}
@@ -149,11 +149,11 @@ export default function ProductCard({
 
         {/* Secondary info (sizes, conditions) - hidden in compact mode and on mobile */}
         {!compact && product.sizes_available && product.sizes_available.length > 0 ? (
-          <p className="text-xs text-[var(--text-muted)] hidden md:block h-4">
+          <p className="text-[10px] text-[var(--text-muted)] hidden md:block h-3.5 leading-tight">
             {product.sizes_available.length} sizes available
           </p>
         ) : (
-          !compact && <div className="h-4 hidden md:block" />
+          !compact && <div className="h-3.5 hidden md:block" />
         )}
       </div>
     </Link>
@@ -164,10 +164,12 @@ export default function ProductCard({
 export function ProductCardSkeleton({ size = 'default' }: { size?: 'default' | 'small' }) {
   return (
     <div className="animate-pulse">
-      <div className="aspect-square bg-[var(--bg-secondary)] rounded-2xl mb-4 border border-[var(--glass-border)]" />
-      <div className={`bg-gradient-to-r from-[var(--bg-secondary)] via-[var(--bg-tertiary)] to-[var(--bg-secondary)] bg-[length:200%_100%] animate-[skeleton-pulse_1.5s_ease-in-out_infinite] rounded w-1/3 mb-2 ${size === 'small' ? 'h-3' : 'h-4'}`} />
-      <div className={`bg-gradient-to-r from-[var(--bg-secondary)] via-[var(--bg-tertiary)] to-[var(--bg-secondary)] bg-[length:200%_100%] animate-[skeleton-pulse_1.5s_ease-in-out_infinite] rounded w-2/3 mb-2 ${size === 'small' ? 'h-4' : 'h-5'}`} />
-      <div className={`bg-gradient-to-r from-[var(--bg-secondary)] via-[var(--bg-tertiary)] to-[var(--bg-secondary)] bg-[length:200%_100%] animate-[skeleton-pulse_1.5s_ease-in-out_infinite] rounded w-1/4 ${size === 'small' ? 'h-3' : 'h-4'}`} />
+      <div className="aspect-square bg-[var(--bg-secondary)] rounded-2xl mb-3 border border-[var(--glass-border)]" />
+      <div className="space-y-1.5">
+        <div className={`bg-gradient-to-r from-[var(--bg-secondary)] via-[var(--bg-tertiary)] to-[var(--bg-secondary)] bg-[length:200%_100%] animate-[skeleton-pulse_1.5s_ease-in-out_infinite] rounded w-1/3 ${size === 'small' ? 'h-2.5' : 'h-3'}`} />
+        <div className={`bg-gradient-to-r from-[var(--bg-secondary)] via-[var(--bg-tertiary)] to-[var(--bg-secondary)] bg-[length:200%_100%] animate-[skeleton-pulse_1.5s_ease-in-out_infinite] rounded w-2/3 ${size === 'small' ? 'h-3.5' : 'h-4'}`} />
+        <div className={`bg-gradient-to-r from-[var(--bg-secondary)] via-[var(--bg-tertiary)] to-[var(--bg-secondary)] bg-[length:200%_100%] animate-[skeleton-pulse_1.5s_ease-in-out_infinite] rounded w-1/4 ${size === 'small' ? 'h-3' : 'h-4'}`} />
+      </div>
     </div>
   )
 }
