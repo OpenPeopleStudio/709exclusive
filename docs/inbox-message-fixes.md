@@ -1,71 +1,90 @@
-# Inbox Message Fixes
+# Inbox & Operations Consolidation
 
-## Issues Fixed
+## Changes Made
 
-### 1. ✅ Invalid Date Error in Production
-**Problem**: Messages were failing to decrypt with "Invalid date" error.
+### 1. Customer Profile Modal (NEW)
+**File:** `/components/inbox/CustomerProfileModal.tsx`
 
-**Root Cause**: Multiple locations were calling `new Date(timestamp)` without checking if the timestamp was null, undefined, or invalid.
+Created a comprehensive customer profile modal with 4 tabs:
+- **Info Tab**: Customer details, delete user functionality
+- **Encryption Tab**: E2E encryption status and toggle
+- **Activity Tab**: Recent login activity with IP, location, timestamps
+- **Payment Tab**: Send payment requests to customers
 
-**Files Fixed**:
-- `app/admin/inbox/page.tsx` - Line 263: Conversation sorting
-- `components/admin/MessageBubble.tsx` - Line 20: Timestamp formatting  
-- `components/inbox/ConversationCard.tsx` - Line 36: Timestamp display
+Features:
+- Modern glassmorphism UI with purple gradient theme
+- Delete user confirmation with data warning
+- Encryption status visualization with toggle
+- Login activity timeline with device info
+- Payment request form with amount and description
 
-**Solution**: Added validation checks before creating Date objects:
-```typescript
-// Before
-new Date(timestamp).getTime()
+### 2. Thread View Improvements
+**File:** `/components/inbox/ThreadView.tsx`
 
-// After  
-const isValid = timestamp && !isNaN(new Date(timestamp).getTime())
-const time = isValid ? new Date(timestamp) : null
+Added scroll direction detection:
+- Header hides when scrolling down (past 100px)
+- Header reappears instantly when scrolling up
+- Smooth slide animation with `translate-y` transform
+- Maintains sticky positioning and backdrop blur
+
+### 3. Operations Page Consolidation
+**File:** `/app/admin/operations/page.tsx`
+
+Consolidated live tracking features into operations:
+- Added status filtering (All, Live, Recent, Stale)
+- Floating drawer interface for staff list
+- Detailed staff cards with avatars, badges, and coordinates
+- Status indicators in header
+- E2E encryption indicators on staff cards
+- Accuracy and coordinate display
+- Improved map layout (full width with collapsible drawer)
+
+**Removed duplicate features:**
+- Staff Locations nav item removed from admin layout
+- `/admin/staff-location` page deleted
+
+### 4. Admin Navigation Update
+**File:** `/app/admin/layout.tsx`
+
+- Removed "Staff Locations" nav item (consolidated into Operations)
+- Updated staff access list to exclude `/admin/staff-location`
+- Operations now includes all live tracking functionality
+
+## Benefits
+
+1. **Reduced Duplication**: Single source for all staff tracking features
+2. **Better UX**: Unified operations center with all metrics and tracking
+3. **Cleaner Navigation**: One less menu item, more focused interface
+4. **Feature Parity**: All live tracking features preserved in operations
+5. **Improved Layout**: Full-width map with collapsible drawer
+
+## Technical Details
+
+### Consolidated Features
+- Real-time staff location tracking
+- Status filtering (live/recent/stale)
+- Staff details with avatars
+- Encryption indicators
+- Accuracy and coordinates display
+- Auto-refresh every 15 seconds
+- Floating drawer UI
+- Performance metrics placeholders
+
+### Operations Page Structure
+```
+Operations Center
+├── Header with status indicators
+├── Filter buttons (All, Live, Recent, Stale)
+├── Metrics cards (Total Staff, Active Now, Live Tracking, Coverage)
+├── Full-width map with floating drawer
+│   ├── Staff list in collapsible drawer
+│   └── Detailed staff cards
+└── Performance metrics (Distance, Delivery Time, Deliveries)
 ```
 
-### 2. ✅ Message Bubble Symmetry Improvements
-**Problem**: Message bubbles were not symmetrical and inconsistent between mobile/desktop.
+## Migration Notes
 
-**Changes Made** (`components/admin/MessageBubble.tsx`):
-
-#### Visual Improvements
-- ✅ **Consistent avatar display** - Now shows on both mobile and desktop
-- ✅ **Better spacing** - Increased gap from `gap-2` to `gap-3`, margin from `mb-3` to `mb-4`
-- ✅ **Narrower max-width** - Reduced from `max-w-[85%]` to `max-w-[75%]` on mobile
-- ✅ **Gradient background** - Added gradient to own messages for depth
-- ✅ **Subtle shadow** - Added `shadow-sm` to all bubbles
-- ✅ **Consistent corner rounding** - Fixed corner radius (rounded-br-md / rounded-bl-md)
-- ✅ **Better timestamp placement** - Now consistently inside bubble for both mobile/desktop
-
-#### Design Details
-```css
-/* Own messages (sent) */
-- Gradient: from-[var(--accent)] to-[var(--accent-blue)]
-- Corner: rounded-br-md (slight square on bottom-right)
-- Avatar: Gradient background with accent colors
-
-/* Received messages */
-- Background: bg-[var(--bg-secondary)]
-- Border: border-[var(--border-primary)]
-- Corner: rounded-bl-md (slight square on bottom-left)
-- Avatar: Tertiary background with border
-```
-
-## Testing Checklist
-
-- [ ] Send a message in inbox - verify bubble appears correctly
-- [ ] Receive a message - verify received bubble is symmetric
-- [ ] Check on mobile - avatars and spacing should be consistent
-- [ ] Check encryption indicator - should appear properly in both types
-- [ ] Verify timestamps display correctly without "Invalid date" errors
-- [ ] Check conversation list - timestamps should format properly
-
-## Build Status
-
-✅ Production build: PASSING  
-✅ All TypeScript errors: RESOLVED  
-✅ Date validation: ADDED  
-✅ Message bubbles: IMPROVED
-
----
-
-*Fixed: 2026-01-17*
+- All URLs pointing to `/admin/staff-location` should be redirected to `/admin/operations`
+- Staff role access maintained (operations included in staff nav)
+- No database changes required
+- All existing hooks and components reused

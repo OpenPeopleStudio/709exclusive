@@ -158,7 +158,7 @@ export default function AdminShell({ children, userEmail, navItems, isSuperAdmin
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="h-16 flex items-center justify-between px-6 border-b border-[var(--border-primary)] lg:hidden">
-           <span className="text-xl font-black tracking-tighter text-[var(--text-primary)]">{brandName} {adminTitle}</span>
+           <span className="text-xl font-black tracking-tighter text-[var(--accent)]">{brandName} {adminTitle}</span>
            <button 
              onClick={() => setIsSidebarOpen(false)}
              className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"

@@ -3,9 +3,25 @@
 import { useState, useMemo } from 'react'
 import Surface from '@/components/ui/Surface'
 import Button from '@/components/ui/Button'
-import Badge from '@/components/ui/Badge'
+import Badge, { type BadgeVariant } from '@/components/ui/Badge'
 import StaffLocationMap from '@/components/admin/StaffLocationMap'
-import { useStaffLocations } from '@/hooks/useStaffLocations'
+import { useStaffLocations, type StaffLocationStatus } from '@/hooks/useStaffLocations'
+
+const STATUS_LABELS: Record<StaffLocationStatus, string> = {
+  live: 'Live',
+  recent: 'Recent',
+  stale: 'Stale',
+  unknown: 'Unknown',
+}
+
+const STATUS_VARIANTS: Record<StaffLocationStatus, BadgeVariant> = {
+  live: 'success',
+  recent: 'info',
+  stale: 'neutral',
+  unknown: 'neutral',
+}
+
+type StatusFilter = 'all' | StaffLocationStatus
 
 const formatRelative = (timestamp?: string | null) => {
   if (!timestamp) return 'Unknown'
@@ -19,6 +35,9 @@ const formatRelative = (timestamp?: string | null) => {
   return `${days}d ago`
 }
 
+const formatTimestamp = (timestamp?: string | null) =>
+  timestamp ? new Date(timestamp).toLocaleString() : '—'
+
 export default function OperationsPage() {
   const { 
     locations, 
@@ -30,6 +49,20 @@ export default function OperationsPage() {
   } = useStaffLocations({ autoRefresh: true, refreshInterval: 15000 })
 
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [drawerOpen, setDrawerOpen] = useState(true)
+
+  const filteredLocations = useMemo(() => {
+    if (statusFilter === 'all') return locations
+    return locations.filter(l => l.status === statusFilter)
+  }, [locations, statusFilter])
+
+  const selectedLocation = useMemo(() => {
+    if (selectedUserId) {
+      return filteredLocations.find(l => l.user_id === selectedUserId) || filteredLocations[0] || null
+    }
+    return filteredLocations[0] || null
+  }, [filteredLocations, selectedUserId])
 
   // Calculate metrics
   const metrics = useMemo(() => {
@@ -48,29 +81,86 @@ export default function OperationsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-2">
-            Operations Center
-          </h1>
-          <p className="text-sm text-[var(--text-secondary)]">
-            Advanced dispatch and routing dashboard with real-time tracking.
-            {lastUpdated && (
-              <span className="ml-2 text-[var(--text-muted)]">
-                Last updated {formatRelative(lastUpdated.toISOString())}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-2">
+              Operations Center
+            </h1>
+            <p className="text-sm text-[var(--text-secondary)]">
+              Advanced dispatch and routing dashboard with real-time tracking.
+            </p>
+          </div>
+          
+          {/* Status Indicators */}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-[var(--success)] shadow-[0_0_8px_var(--success)]" />
+              <span className="text-xs text-[var(--text-secondary)]">
+                {statusCounts.live}
               </span>
-            )}
-          </p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-[var(--accent-blue)]" />
+              <span className="text-xs text-[var(--text-secondary)]">
+                {statusCounts.recent}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-[var(--accent-purple)]" />
+              <span className="text-xs text-[var(--text-secondary)]">
+                {statusCounts.stale}
+              </span>
+            </div>
+          </div>
+
+          {lastUpdated && (
+            <span className="text-xs text-[var(--text-muted)]">
+              Updated {formatRelative(lastUpdated.toISOString())}
+            </span>
+          )}
         </div>
 
-        <Button 
-          variant="secondary" 
-          size="sm" 
-          onClick={() => refetch()}
-          disabled={loading}
-        >
-          {loading ? 'Refreshing...' : 'Refresh'}
-        </Button>
+        <div className="flex gap-2">
+          {/* Filter Buttons */}
+          <Button
+            size="sm"
+            variant={statusFilter === 'all' ? 'primary' : 'ghost'}
+            onClick={() => setStatusFilter('all')}
+          >
+            All
+          </Button>
+          <Button
+            size="sm"
+            variant={statusFilter === 'live' ? 'primary' : 'ghost'}
+            onClick={() => setStatusFilter('live')}
+          >
+            Live
+          </Button>
+          <Button
+            size="sm"
+            variant={statusFilter === 'recent' ? 'primary' : 'ghost'}
+            onClick={() => setStatusFilter('recent')}
+          >
+            Recent
+          </Button>
+          <Button
+            size="sm"
+            variant={statusFilter === 'stale' ? 'primary' : 'ghost'}
+            onClick={() => setStatusFilter('stale')}
+          >
+            Stale
+          </Button>
+          
+          <Button 
+            variant="secondary" 
+            size="sm" 
+            onClick={() => refetch()}
+            disabled={loading}
+          >
+            {loading ? 'Refreshing...' : 'Refresh'}
+          </Button>
+        </div>
       </div>
 
       {/* Metrics Cards */}
@@ -137,71 +227,148 @@ export default function OperationsPage() {
         </Surface>
       )}
 
-      {/* Main Map View */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Compact Staff List */}
-        <div className="lg:col-span-1 space-y-3 max-h-[calc(100vh-450px)] overflow-y-auto pr-2">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-              Staff List
-            </h3>
-            <Badge variant="neutral">{locations.length}</Badge>
-          </div>
+      {/* Full Width Map with Floating Drawer */}
+      <div className="relative" style={{ isolation: 'isolate' }}>
+        <Surface padding="none" className="h-[calc(100vh-340px)] relative" style={{ zIndex: 1 }}>
+          <StaffLocationMap
+            locations={filteredLocations}
+            selectedUserId={selectedLocation?.user_id}
+            onSelectLocation={setSelectedUserId}
+            className="w-full h-full"
+          />
+        </Surface>
 
-          {locations.length === 0 ? (
-            <Surface padding="md" variant="outline">
-              <p className="text-xs text-[var(--text-muted)] text-center">
-                No staff available
-              </p>
-            </Surface>
-          ) : (
-            locations.map((location) => (
-              <button
-                key={location.user_id}
-                onClick={() => setSelectedUserId(location.user_id)}
-                className={`w-full text-left transition-all duration-200 ${
-                  selectedUserId === location.user_id ? 'scale-[1.02]' : 'hover:scale-[1.01]'
-                }`}
-              >
-                <Surface
-                  padding="sm"
-                  variant={selectedUserId === location.user_id ? 'elevated' : 'outline'}
-                  className={selectedUserId === location.user_id ? 'border-[var(--accent)]' : ''}
+        {/* Floating Drawer Toggle Button */}
+        {!drawerOpen && (
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="absolute top-4 right-4 z-[1001] px-4 py-2 bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] border border-[var(--glass-border)] rounded-xl text-sm font-medium text-[var(--text-primary)] hover:border-[var(--accent)] transition-all shadow-lg flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+            Show Staff List ({filteredLocations.length})
+          </button>
+        )}
+
+        {/* Collapsible Staff Drawer */}
+        {drawerOpen && (
+          <div className="absolute top-4 right-4 z-[1001] w-80 max-h-[calc(100vh-420px)]">
+            <Surface 
+              padding="none" 
+              className="backdrop-blur-xl bg-[var(--bg-secondary)]/95 border-[var(--glass-border)] shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
+              style={{ position: 'relative', zIndex: 1001 }}
+            >
+              {/* Drawer Header */}
+              <div className="flex items-center justify-between p-4 border-b border-[var(--border-primary)]">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-[var(--text-primary)]">
+                    Staff Locations
+                  </h3>
+                  <Badge variant="neutral">
+                    {filteredLocations.length}
+                  </Badge>
+                </div>
+                <button
+                  onClick={() => setDrawerOpen(false)}
+                  className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
                 >
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${
-                      location.status === 'live' 
-                        ? 'bg-[var(--success)] shadow-[0_0_8px_var(--success)] animate-pulse'
-                        : location.status === 'recent'
-                        ? 'bg-[var(--accent-blue)]'
-                        : 'bg-[var(--accent-purple)]'
-                    }`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-[var(--text-primary)] truncate">
-                        {location.name || `Staff ${location.user_id.slice(-6)}`}
-                      </p>
-                      <p className="text-[10px] text-[var(--text-muted)]">
-                        {formatRelative(location.recorded_at)}
-                      </p>
-                    </div>
-                  </div>
-                </Surface>
-              </button>
-            ))
-          )}
-        </div>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
 
-        {/* Large Map */}
-        <div className="lg:col-span-3">
-          <Surface padding="none" className="h-[calc(100vh-450px)]">
-            <StaffLocationMap
-              locations={locations}
-              selectedUserId={selectedUserId}
-              onSelectLocation={setSelectedUserId}
-              className="w-full h-full"
-            />
-          </Surface>
-        </div>
+              {/* Staff List */}
+              <div className="overflow-y-auto max-h-[calc(100vh-520px)] p-3 space-y-2">
+                {filteredLocations.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <p className="text-sm text-[var(--text-muted)]">
+                      {statusFilter === 'all'
+                        ? 'No staff locations available yet.'
+                        : `No ${statusFilter} staff locations.`}
+                    </p>
+                  </div>
+                ) : (
+                  filteredLocations.map((location) => (
+                    <button
+                      key={location.user_id}
+                      onClick={() => setSelectedUserId(location.user_id)}
+                      className={`w-full text-left transition-all duration-200 ${
+                        selectedLocation?.user_id === location.user_id
+                          ? 'scale-[1.02]'
+                          : 'hover:scale-[1.01]'
+                      }`}
+                    >
+                      <Surface
+                        padding="sm"
+                        variant={selectedLocation?.user_id === location.user_id ? 'elevated' : 'default'}
+                        className={`${
+                          selectedLocation?.user_id === location.user_id
+                            ? 'border-[var(--accent)] shadow-[0_0_20px_rgba(168,85,247,0.3)]'
+                            : ''
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 mb-2">
+                          {/* Avatar */}
+                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--accent-purple)] flex items-center justify-center text-white font-bold text-xs shadow-[0_0_12px_rgba(168,85,247,0.4)] flex-shrink-0">
+                            {location.name
+                              ? location.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+                              : 'S'}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-[var(--text-primary)] truncate">
+                              {location.name || `Staff ${location.user_id.slice(-6)}`}
+                            </p>
+                            <p className="text-xs text-[var(--text-muted)]">
+                              {formatRelative(location.recorded_at)}
+                            </p>
+                          </div>
+                          <Badge variant={STATUS_VARIANTS[location.status]} className="flex-shrink-0">
+                            {STATUS_LABELS[location.status]}
+                          </Badge>
+                        </div>
+
+                        <div className="space-y-1 text-xs pl-12">
+                          {location.accuracy_m && (
+                            <div className="flex items-center justify-between text-[var(--text-muted)]">
+                              <span>Accuracy:</span>
+                              <span className="text-[var(--text-secondary)]">
+                                ±{Math.round(location.accuracy_m)}m
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between text-[var(--text-muted)]">
+                            <span>Coordinates:</span>
+                            <span className="text-[var(--text-secondary)] font-mono text-[10px]">
+                              {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
+                            </span>
+                          </div>
+                          {location.encrypted && (
+                            <div className="flex items-center gap-1 text-[var(--success)] pt-1">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                              </svg>
+                              <span className="text-[10px] font-medium">E2E Encrypted</span>
+                            </div>
+                          )}
+                        </div>
+                      </Surface>
+                    </button>
+                  ))
+                )}
+              </div>
+
+              {/* Drawer Footer */}
+              <div className="p-3 border-t border-[var(--border-primary)] bg-[var(--bg-tertiary)]/50">
+                <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-muted)]">
+                  <div className="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse" />
+                  <span>Auto-refreshing every 15s</span>
+                </div>
+              </div>
+            </Surface>
+          </div>
+        )}
       </div>
 
       {/* Performance Metrics (Placeholder) */}
@@ -241,12 +408,6 @@ export default function OperationsPage() {
             Coming soon
           </p>
         </Surface>
-      </div>
-
-      {/* Auto-refresh indicator */}
-      <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-muted)]">
-        <div className="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse" />
-        <span>Auto-refreshing every 15 seconds</span>
       </div>
     </div>
   )

@@ -992,161 +992,193 @@ export default function TenantSettingsPage() {
             </section>
 
             {/* Available Plans */}
-            <section className="space-y-4">
-              <div>
-                <h3 className="text-lg font-semibold text-[var(--text-primary)]">Available Plans</h3>
-                <p className="text-sm text-[var(--text-muted)] mt-1">Choose the plan that fits your needs</p>
+            <section className="space-y-6">
+              <div className="text-center max-w-2xl mx-auto">
+                <h3 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">Choose Your Plan</h3>
+                <p className="text-[var(--text-muted)] mt-2">Scale your business with the right tools</p>
               </div>
               
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-6 md:grid-cols-3 max-w-6xl mx-auto">
                 {/* Starter */}
-                <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-6 space-y-4">
-                  <div>
-                    <h4 className="text-lg font-bold text-[var(--text-primary)]">Starter</h4>
-                    <p className="text-sm text-[var(--text-muted)] mt-1">Perfect for getting started</p>
+                <div className="group relative rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] hover:border-[var(--border-secondary)] transition-all duration-300 overflow-hidden">
+                  <div className="p-8 space-y-6">
+                    <div className="space-y-2">
+                      <h4 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">Starter</h4>
+                      <p className="text-sm text-[var(--text-muted)]">Perfect for getting started</p>
+                    </div>
+                    
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-5xl font-bold text-[var(--text-primary)] tracking-tight">$99</span>
+                      <span className="text-[var(--text-muted)] font-medium">/mo</span>
+                    </div>
+                    
+                    <div className="h-px bg-[var(--border-primary)]"></div>
+                    
+                    <ul className="space-y-3">
+                      <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
+                        <svg className="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Up to 100 products</span>
+                      </li>
+                      <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
+                        <svg className="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Essential inventory tools</span>
+                      </li>
+                      <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
+                        <svg className="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Customer messaging</span>
+                      </li>
+                      <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
+                        <svg className="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Secure payments</span>
+                      </li>
+                    </ul>
                   </div>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-bold text-[var(--text-primary)]">$29</span>
-                    <span className="text-sm text-[var(--text-muted)]">/month</span>
+                  
+                  <div className="p-8 pt-0">
+                    <button
+                      type="button"
+                      disabled={billing?.tier === 'starter'}
+                      className="w-full py-3 rounded-xl font-semibold text-sm transition-all duration-200 border border-[var(--border-primary)] text-[var(--text-primary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-[var(--border-primary)] disabled:hover:text-[var(--text-primary)]"
+                    >
+                      {billing?.tier === 'starter' ? 'Active Plan' : 'Select Plan'}
+                    </button>
                   </div>
-                  <ul className="space-y-2">
-                    <li className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                      <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                      Up to 100 products
-                    </li>
-                    <li className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                      <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                      Basic inventory management
-                    </li>
-                    <li className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                      <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                      Customer messaging
-                    </li>
-                    <li className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                      <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                      Stripe payments
-                    </li>
-                  </ul>
-                  <button
-                    type="button"
-                    disabled={billing?.tier === 'starter'}
-                    className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] text-sm font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {billing?.tier === 'starter' ? 'Current Plan' : 'Downgrade'}
-                  </button>
                 </div>
 
                 {/* Professional */}
-                <div className="rounded-xl border-2 border-[var(--accent)] bg-[var(--bg-secondary)] p-6 space-y-4 relative">
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-[var(--accent)] text-white text-xs font-bold">
-                    POPULAR
+                <div className="group relative rounded-2xl bg-gradient-to-b from-[var(--accent)] to-[var(--accent-muted)] p-[2px] overflow-visible transform md:scale-105 shadow-xl shadow-[var(--accent)]/20 mt-6">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
+                    <div className="px-4 py-1.5 rounded-full bg-[var(--accent)] text-white text-xs font-bold tracking-wide shadow-lg">
+                      RECOMMENDED
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-lg font-bold text-[var(--text-primary)]">Professional</h4>
-                    <p className="text-sm text-[var(--text-muted)] mt-1">For growing businesses</p>
+                  
+                  <div className="rounded-2xl bg-[var(--bg-secondary)] h-full">
+                    <div className="p-8 pt-12 space-y-6">
+                      <div className="space-y-2">
+                        <h4 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">Professional</h4>
+                        <p className="text-sm text-[var(--text-muted)]">Built for growth</p>
+                      </div>
+                      
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-5xl font-bold text-[var(--text-primary)] tracking-tight">$199</span>
+                        <span className="text-[var(--text-muted)] font-medium">/mo</span>
+                      </div>
+                      
+                      <div className="h-px bg-gradient-to-r from-transparent via-[var(--border-primary)] to-transparent"></div>
+                      
+                      <ul className="space-y-3">
+                        <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
+                          <svg className="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className="font-medium">Unlimited products</span>
+                        </li>
+                        <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
+                          <svg className="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className="font-medium">Product drops & alerts</span>
+                        </li>
+                        <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
+                          <svg className="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className="font-medium">End-to-end encryption</span>
+                        </li>
+                        <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
+                          <svg className="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className="font-medium">Local delivery & pickup</span>
+                        </li>
+                        <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
+                          <svg className="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className="font-medium">Advanced analytics</span>
+                        </li>
+                      </ul>
+                    </div>
+                    
+                    <div className="p-8 pt-0">
+                      <button
+                        type="button"
+                        disabled={billing?.tier === 'professional'}
+                        className="w-full py-3 rounded-xl font-bold text-sm transition-all duration-200 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white shadow-lg shadow-[var(--accent)]/30 hover:shadow-xl hover:shadow-[var(--accent)]/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                      >
+                        {billing?.tier === 'professional' ? 'Active Plan' : 'Get Started'}
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-bold text-[var(--text-primary)]">$99</span>
-                    <span className="text-sm text-[var(--text-muted)]">/month</span>
-                  </div>
-                  <ul className="space-y-2">
-                    <li className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                      <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                      Unlimited products
-                    </li>
-                    <li className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                      <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                      Product drops & wishlists
-                    </li>
-                    <li className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                      <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                      E2E encrypted messaging
-                    </li>
-                    <li className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                      <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                      Local delivery & pickup
-                    </li>
-                    <li className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                      <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                      Advanced analytics
-                    </li>
-                  </ul>
-                  <button
-                    type="button"
-                    disabled={billing?.tier === 'professional'}
-                    className="w-full px-4 py-2.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-semibold text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {billing?.tier === 'professional' ? 'Current Plan' : 'Upgrade'}
-                  </button>
                 </div>
 
                 {/* Enterprise */}
-                <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-6 space-y-4">
-                  <div>
-                    <h4 className="text-lg font-bold text-[var(--text-primary)]">Enterprise</h4>
-                    <p className="text-sm text-[var(--text-muted)] mt-1">For large operations</p>
+                <div className="group relative rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] hover:border-[var(--border-secondary)] transition-all duration-300 overflow-hidden">
+                  <div className="p-8 space-y-6">
+                    <div className="space-y-2">
+                      <h4 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">Enterprise</h4>
+                      <p className="text-sm text-[var(--text-muted)]">Maximum performance</p>
+                    </div>
+                    
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-5xl font-bold text-[var(--text-primary)] tracking-tight">$499</span>
+                      <span className="text-[var(--text-muted)] font-medium">/mo</span>
+                    </div>
+                    
+                    <div className="h-px bg-[var(--border-primary)]"></div>
+                    
+                    <ul className="space-y-3">
+                      <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
+                        <svg className="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>All Professional features</span>
+                      </li>
+                      <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
+                        <svg className="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Cryptocurrency payments</span>
+                      </li>
+                      <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
+                        <svg className="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Consignment management</span>
+                      </li>
+                      <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
+                        <svg className="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Priority support</span>
+                      </li>
+                      <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
+                        <svg className="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Custom integrations</span>
+                      </li>
+                    </ul>
                   </div>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-bold text-[var(--text-primary)]">$299</span>
-                    <span className="text-sm text-[var(--text-muted)]">/month</span>
+                  
+                  <div className="p-8 pt-0">
+                    <button
+                      type="button"
+                      disabled={billing?.tier === 'enterprise'}
+                      className="w-full py-3 rounded-xl font-semibold text-sm transition-all duration-200 border border-[var(--border-primary)] text-[var(--text-primary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-[var(--border-primary)] disabled:hover:text-[var(--text-primary)]"
+                    >
+                      {billing?.tier === 'enterprise' ? 'Active Plan' : 'Contact Sales'}
+                    </button>
                   </div>
-                  <ul className="space-y-2">
-                    <li className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                      <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                      Everything in Professional
-                    </li>
-                    <li className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                      <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                      Crypto payments
-                    </li>
-                    <li className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                      <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                      Consignment management
-                    </li>
-                    <li className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                      <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                      Priority support
-                    </li>
-                    <li className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                      <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                      Custom integrations
-                    </li>
-                  </ul>
-                  <button
-                    type="button"
-                    disabled={billing?.tier === 'enterprise'}
-                    className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-primary)] text-sm font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {billing?.tier === 'enterprise' ? 'Current Plan' : 'Upgrade'}
-                  </button>
                 </div>
               </div>
             </section>

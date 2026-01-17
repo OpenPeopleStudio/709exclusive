@@ -1,5 +1,7 @@
 'use client'
 
+import { useState } from 'react'
+
 interface MessageBubbleProps {
   content: string
   isOwn: boolean
@@ -7,6 +9,9 @@ interface MessageBubbleProps {
   isEncrypted?: boolean
   senderName?: string
   showAvatar?: boolean
+  messageId?: string
+  onLike?: (messageId: string) => void
+  isLiked?: boolean
 }
 
 export default function MessageBubble({
@@ -16,7 +21,13 @@ export default function MessageBubble({
   isEncrypted,
   senderName,
   showAvatar = true,
+  messageId,
+  onLike,
+  isLiked = false,
 }: MessageBubbleProps) {
+  const [showReaction, setShowReaction] = useState(false)
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null)
+
   // Safely handle invalid timestamps
   const time = timestamp && !isNaN(new Date(timestamp).getTime())
     ? new Date(timestamp).toLocaleTimeString([], { 
@@ -25,13 +36,48 @@ export default function MessageBubble({
       })
     : ''
 
+  const handleTouchStart = () => {
+    const timer = setTimeout(() => {
+      setShowReaction(true)
+    }, 500) // 500ms long press
+    setLongPressTimer(timer)
+  }
+
+  const handleTouchEnd = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer)
+      setLongPressTimer(null)
+    }
+  }
+
+  const handleMouseDown = () => {
+    const timer = setTimeout(() => {
+      setShowReaction(true)
+    }, 500)
+    setLongPressTimer(timer)
+  }
+
+  const handleMouseUp = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer)
+      setLongPressTimer(null)
+    }
+  }
+
+  const handleLike = () => {
+    if (messageId && onLike) {
+      onLike(messageId)
+    }
+    setShowReaction(false)
+  }
+
   return (
     <div className={`flex gap-3 mb-4 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
       {/* Avatar */}
       {showAvatar && (
         <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${
           isOwn 
-            ? 'bg-gradient-to-br from-[var(--accent)] to-[var(--accent-blue)] text-white' 
+            ? 'bg-[#007AFF] text-white' 
             : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-primary)]'
         }`}>
           {senderName?.[0]?.toUpperCase() || (isOwn ? 'Y' : 'T')}
@@ -48,11 +94,54 @@ export default function MessageBubble({
         )}
 
         {/* Bubble */}
-        <div className={`relative px-4 py-2.5 rounded-2xl shadow-sm ${
-          isOwn
-            ? 'bg-gradient-to-br from-[var(--accent)] to-[var(--accent-blue)] text-white rounded-br-md'
-            : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] rounded-bl-md border border-[var(--border-primary)]'
-        }`}>
+        <div 
+          className={`relative px-4 py-2.5 rounded-2xl shadow-sm ${
+            isOwn
+              ? 'bg-[#007AFF] text-white rounded-br-md'
+              : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] rounded-bl-md border border-[var(--border-primary)]'
+          }`}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onMouseDown={handleMouseDown}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        >
+          {/* Reaction popup */}
+          {showReaction && (
+            <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-[var(--bg-elevated)] border border-[var(--border-primary)] rounded-full px-4 py-2 shadow-lg flex items-center gap-3 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <button
+                onClick={handleLike}
+                className="text-2xl hover:scale-125 transition-transform"
+              >
+                ❤️
+              </button>
+              <button
+                onClick={handleLike}
+                className="text-2xl hover:scale-125 transition-transform"
+              >
+                👍
+              </button>
+              <button
+                onClick={handleLike}
+                className="text-2xl hover:scale-125 transition-transform"
+              >
+                😂
+              </button>
+              <button
+                onClick={() => setShowReaction(false)}
+                className="text-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] ml-2"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Like indicator */}
+          {isLiked && (
+            <div className="absolute -bottom-2 -right-2 w-5 h-5 bg-white rounded-full flex items-center justify-center shadow-md">
+              <span className="text-xs">❤️</span>
+            </div>
+          )}
           {/* Encryption indicator */}
           {isEncrypted && (
             <div className="flex items-center gap-1.5 mb-1.5 text-xs opacity-70">
@@ -64,7 +153,7 @@ export default function MessageBubble({
           )}
 
           {/* Content */}
-          <div className={`text-sm leading-relaxed whitespace-pre-wrap break-words ${
+          <div className={`text-sm font-medium leading-relaxed whitespace-pre-wrap break-words ${
             content.startsWith('[') ? 'italic opacity-70' : ''
           }`}>
             {content}

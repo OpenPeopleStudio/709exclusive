@@ -108,8 +108,11 @@ export default function AdminInventoryPage() {
     <div>
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">Inventory Management</h1>
-        <Link href="/admin/inventory/intake" className="btn-primary">
-          + Add Inventory
+        <Link href="/admin/inventory/intake" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-semibold text-sm transition-colors">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          Add Inventory
         </Link>
       </div>
 

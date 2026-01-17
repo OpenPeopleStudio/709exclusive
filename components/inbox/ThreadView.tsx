@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import MessageBubble from '@/components/admin/MessageBubble'
 import MessageInput from '@/components/admin/MessageInput'
 import Button from '@/components/ui/Button'
@@ -65,10 +65,39 @@ export default function ThreadView({
   onBack
 }: ThreadViewProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const [showHeader, setShowHeader] = useState(true)
+  const lastScrollTop = useRef(0)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Scroll direction detection
+  useEffect(() => {
+    const container = messagesContainerRef.current
+    if (!container) return
+
+    const handleScroll = () => {
+      const scrollTop = container.scrollTop
+      const scrollingDown = scrollTop > lastScrollTop.current
+      const scrollingUp = scrollTop < lastScrollTop.current
+
+      // Show header when scrolling up or at the top
+      if (scrollingUp || scrollTop < 50) {
+        setShowHeader(true)
+      } 
+      // Hide header when scrolling down
+      else if (scrollingDown && scrollTop > 100) {
+        setShowHeader(false)
+      }
+
+      lastScrollTop.current = scrollTop
+    }
+
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [])
 
   const getParticipant = (senderId: string | null) => {
     return participants.find(p => p.id === senderId)
@@ -87,7 +116,9 @@ export default function ThreadView({
   return (
     <div className="flex-1 flex flex-col h-full">
       {/* Thread Header */}
-      <div className="px-4 md:px-6 py-4 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]">
+      <div className={`sticky top-0 z-10 px-4 md:px-6 py-4 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)] rounded-t-2xl md:rounded-t-3xl backdrop-blur-sm bg-[var(--bg-secondary)]/95 transition-transform duration-300 ${
+        showHeader ? 'translate-y-0' : '-translate-y-full'
+      }`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             {/* Mobile back button */}
@@ -159,7 +190,7 @@ export default function ThreadView({
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3 bg-[var(--bg-primary)]">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3 bg-[var(--bg-primary)]">
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center space-y-2">
