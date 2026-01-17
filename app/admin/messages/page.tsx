@@ -9,6 +9,7 @@ import EncryptionSettings from '@/components/EncryptionSettings'
 import Button from '@/components/ui/Button'
 import Surface from '@/components/ui/Surface'
 import { generateFileKey, encryptFileWithKey, decryptFileWithKey } from '@/lib/crypto/e2e'
+import { useTenant } from '@/context/TenantContext'
 
 interface Conversation {
   customer_id: string
@@ -50,6 +51,7 @@ interface DecryptedMessage extends Message {
 }
 
 export default function AdminMessagesPage() {
+  const { id: tenantId, featureFlags } = useTenant()
   const eligibleOrderStatuses = ['pending', 'paid', 'fulfilled', 'shipped']
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null)
@@ -128,10 +130,16 @@ export default function AdminMessagesPage() {
 
   const loadConversations = useCallback(async () => {
     // Get all unique customer conversations with their latest message
-    const { data: messagesData } = await supabase
+    let messagesQuery = supabase
       .from('messages')
       .select('customer_id, content, created_at, read, sender_type, encrypted, deleted_at')
       .order('created_at', { ascending: false })
+
+    if (tenantId) {
+      messagesQuery = messagesQuery.eq('tenant_id', tenantId)
+    }
+
+    const { data: messagesData } = await messagesQuery
 
     if (!messagesData) {
       setLoading(false)
@@ -168,10 +176,16 @@ export default function AdminMessagesPage() {
       console.error('Failed to fetch users:', error)
     }
 
-    const { data: orders } = await supabase
+    let ordersQuery = supabase
       .from('orders')
       .select('customer_id, status')
       .in('customer_id', customerIds)
+
+    if (tenantId) {
+      ordersQuery = ordersQuery.eq('tenant_id', tenantId)
+    }
+
+    const { data: orders } = await ordersQuery
 
     const buyersByCustomer = new Map<string, boolean>()
     for (const order of orders || []) {
@@ -181,10 +195,16 @@ export default function AdminMessagesPage() {
     }
 
     // Get encryption status from profiles
-    const { data: profiles } = await supabase
+    let profilesQuery = supabase
       .from('709_profiles')
       .select('id, public_key')
       .in('id', customerIds)
+
+    if (tenantId) {
+      profilesQuery = profilesQuery.eq('tenant_id', tenantId)
+    }
+
+    const { data: profiles } = await profilesQuery
     
     const convos: Conversation[] = []
     customerMap.forEach((data, customerId) => {
@@ -212,14 +232,20 @@ export default function AdminMessagesPage() {
     
     setConversations(convos)
     setLoading(false)
-  }, [])
+  }, [tenantId])
 
   const loadMessages = useCallback(async (customerId: string) => {
-    const { data } = await supabase
+    let messagesQuery = supabase
       .from('messages')
       .select('*')
       .eq('customer_id', customerId)
       .order('created_at', { ascending: true })
+
+    if (tenantId) {
+      messagesQuery = messagesQuery.eq('tenant_id', tenantId)
+    }
+
+    const { data } = await messagesQuery
 
     if (!data) {
       setMessages([])
@@ -251,18 +277,24 @@ export default function AdminMessagesPage() {
     }
 
     // Mark as read
-    await supabase
+    let markReadQuery = supabase
       .from('messages')
       .update({ read: true })
       .eq('customer_id', customerId)
       .eq('sender_type', 'customer')
       .eq('read', false)
 
+    if (tenantId) {
+      markReadQuery = markReadQuery.eq('tenant_id', tenantId)
+    }
+
+    await markReadQuery
+
     // Update conversation unread count
     setConversations(prev => prev.map(c => 
       c.customer_id === customerId ? { ...c, unread_count: 0 } : c
     ))
-  }, [isInitialized, decryptMessages, adminId])
+  }, [isInitialized, decryptMessages, adminId, tenantId])
 
   const loadRetentionSettings = useCallback(async (customerId: string) => {
     const response = await fetch(`/api/messages/retention?customerId=${customerId}`)
@@ -349,6 +381,11 @@ export default function AdminMessagesPage() {
     const plaintext = newMessage.trim()
 
     try {
+      if (!tenantId) {
+        setSending(false)
+        setAttachmentError('Tenant not resolved')
+        return
+      }
       if (attachmentFile && !(selectedConvo?.has_encryption && isInitialized)) {
         setAttachmentError('Attachments require encrypted chat setup.')
         setSending(false)
@@ -357,6 +394,7 @@ export default function AdminMessagesPage() {
 
       // Try to encrypt the message
       let messageData: {
+        tenant_id: string
         customer_id: string
         content: string
         sender_type: 'admin'
@@ -375,6 +413,7 @@ export default function AdminMessagesPage() {
         attachment_key_sender_public_key?: string | null
         attachment_key_message_index?: number | null
       } = {
+        tenant_id: tenantId,
         customer_id: selectedCustomer,
         content: plaintext,
         sender_type: 'admin',

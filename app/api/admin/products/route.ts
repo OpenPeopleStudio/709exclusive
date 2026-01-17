@@ -2,24 +2,32 @@ import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { isAdmin } from '@/lib/roles'
 import { SupabaseClient } from '@supabase/supabase-js'
+import { getTenantFromRequest } from '@/lib/tenant'
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user || !user.id) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 
-  if (!isAdmin(await getUserRole(supabase, user.id!))) {
+  if (!isAdmin(await getUserRole(supabase, user.id!, tenant?.id))) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 
   try {
-    const { data: products, error: productsError } = await supabase
+    let productsQuery = supabase
       .from('products')
       .select('*')
       .order('created_at', { ascending: false })
+
+    if (tenant?.id) {
+      productsQuery = productsQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: products, error: productsError } = await productsQuery
 
     if (productsError) throw productsError
 
@@ -30,12 +38,17 @@ export async function GET() {
   }
 }
 
-async function getUserRole(supabase: SupabaseClient, userId: string): Promise<string | undefined> {
-  const { data: profile } = await supabase
+async function getUserRole(supabase: SupabaseClient, userId: string, tenantId?: string): Promise<string | undefined> {
+  let query = supabase
     .from('709_profiles')
     .select('role')
     .eq('id', userId)
-    .single()
+
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId)
+  }
+
+  const { data: profile } = await query.single()
 
   return profile?.role
 }

@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -10,7 +12,7 @@ export async function GET() {
   }
 
   try {
-    const { data: items, error } = await supabase
+    let itemsQuery = supabase
       .from('recently_viewed')
       .select(`
         id,
@@ -27,6 +29,12 @@ export async function GET() {
       .eq('user_id', user.id)
       .order('viewed_at', { ascending: false })
       .limit(12)
+
+    if (tenant?.id) {
+      itemsQuery = itemsQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: items, error } = await itemsQuery
 
     if (error) throw error
 
@@ -73,6 +81,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -90,6 +99,7 @@ export async function POST(request: Request) {
     const { error } = await supabase
       .from('recently_viewed')
       .upsert({
+        tenant_id: tenant?.id,
         user_id: user.id,
         product_id: productId,
         viewed_at: new Date().toISOString(),

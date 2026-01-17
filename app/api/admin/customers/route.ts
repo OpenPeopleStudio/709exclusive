@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { stripe } from '@/lib/stripe'
+import { getTenantFromRequest } from '@/lib/tenant'
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user || !user.id) {
@@ -15,6 +17,7 @@ export async function GET() {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || !['admin', 'owner'].includes(profile.role)) {
@@ -33,11 +36,17 @@ export async function GET() {
     const customerData = await Promise.all(
       customers.data.map(async (customer) => {
         // Try to find orders by customer email
-        const { data: orders } = await supabase
+        let ordersQuery = supabase
           .from('orders')
           .select('id, total_cents, status, created_at')
           .eq('customer_id', customer.metadata?.supabase_user_id || '')
           .order('created_at', { ascending: false })
+
+        if (tenant?.id) {
+          ordersQuery = ordersQuery.eq('tenant_id', tenant.id)
+        }
+
+        const { data: orders } = await ordersQuery
 
         const totalSpent = orders?.reduce((sum, order) => {
           if (order.status !== 'cancelled' && order.status !== 'refunded') {

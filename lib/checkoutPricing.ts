@@ -1,6 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import type { CartItem } from '@/types/cart'
 import { CANADIAN_TAX_RATES } from './taxes'
+import type { DeliveryProvider } from './integrations'
 
 interface ShippingOption {
   code: string
@@ -35,16 +36,23 @@ const FREE_LOCAL_THRESHOLD = 15000 // $150 CAD
 async function isInLocalDeliveryZone(
   supabase: SupabaseClient,
   postalCode: string,
-  city?: string
+  city?: string,
+  tenantId?: string
 ): Promise<boolean> {
   const fsa = postalCode?.replace(/\s/g, '').substring(0, 3).toUpperCase()
   
-  const { data: zones } = await supabase
+  let zonesQuery = supabase
     .from('local_delivery_zones')
     .select('city_names, postal_fsa_prefixes')
     .eq('active', true)
     .eq('country', 'CA')
     .eq('province', 'NL')
+
+  if (tenantId) {
+    zonesQuery = zonesQuery.eq('tenant_id', tenantId)
+  }
+
+  const { data: zones } = await zonesQuery
 
   if (!zones || zones.length === 0) return false
 
@@ -70,19 +78,29 @@ export async function getCheckoutQuote({
   items,
   shippingAddress,
   requestedShippingMethodCode,
+  tenantId,
+  deliveryProvider,
 }: {
   supabase: SupabaseClient
   items: CartItem[]
   shippingAddress: ShippingAddress
   requestedShippingMethodCode?: string
+  tenantId?: string
+  deliveryProvider?: DeliveryProvider
 }): Promise<CheckoutQuote> {
   // Fetch variants
   const variantIds = items.map(i => i.variant_id)
   
-  const { data: variants, error } = await supabase
+  let variantsQuery = supabase
     .from('product_variants')
     .select('id, price_cents, stock, reserved')
     .in('id', variantIds)
+
+  if (tenantId) {
+    variantsQuery = variantsQuery.eq('tenant_id', tenantId)
+  }
+
+  const { data: variants, error } = await variantsQuery
 
   if (error || !variants) {
     throw new Error('Inventory fetch failed')
@@ -111,16 +129,23 @@ export async function getCheckoutQuote({
   const country = shippingAddress.country || 'CA'
   const province = shippingAddress.province?.toUpperCase() || ''
   
-  const { data: shippingMethods } = await supabase
+  let methodsQuery = supabase
     .from('shipping_methods')
     .select('*')
     .eq('active', true)
     .contains('countries', [country])
     .order('sort_order')
 
+  if (tenantId) {
+    methodsQuery = methodsQuery.eq('tenant_id', tenantId)
+  }
+
+  const { data: shippingMethods } = await methodsQuery
+
   const shippingOptions: ShippingOption[] = []
-  const isLocal = shippingAddress.postal_code 
-    ? await isInLocalDeliveryZone(supabase, shippingAddress.postal_code, shippingAddress.city)
+  const localDeliveryEnabled = (deliveryProvider ?? 'internal') === 'internal'
+  const isLocal = localDeliveryEnabled && shippingAddress.postal_code
+    ? await isInLocalDeliveryZone(supabase, shippingAddress.postal_code, shippingAddress.city, tenantId)
     : false
 
   for (const method of shippingMethods || []) {
@@ -131,6 +156,9 @@ export async function getCheckoutQuote({
 
     // Check local zone requirement
     if (method.requires_local_zone && !isLocal) {
+      continue
+    }
+    if (!localDeliveryEnabled && method.code?.startsWith('local_delivery')) {
       continue
     }
 

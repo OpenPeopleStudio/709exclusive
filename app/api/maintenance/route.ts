@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 type MaintenanceValue = { enabled?: boolean; message?: string | null }
 
@@ -10,15 +11,21 @@ function getClient() {
   return createClient(url, anonKey, { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = getClient()
   if (!supabase) return NextResponse.json({ enabled: false, message: null })
+  const tenant = await getTenantFromRequest(request)
 
-  const { data } = await supabase
+  let flagsQuery = supabase
     .from('site_flags')
     .select('value')
     .eq('key', 'maintenance_mode')
-    .maybeSingle()
+
+  if (tenant?.id) {
+    flagsQuery = flagsQuery.eq('tenant_id', tenant.id)
+  }
+
+  const { data } = await flagsQuery.maybeSingle()
 
   const value = (data?.value || {}) as MaintenanceValue
   const enabled = Boolean(value.enabled)

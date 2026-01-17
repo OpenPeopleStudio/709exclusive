@@ -1,25 +1,39 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
 
   try {
     // Simple query first
-    const { data: products, error } = await supabase
+    let productsQuery = supabase
       .from('products')
       .select('id, name, brand, slug')
       .limit(5)
+
+    if (tenant?.id) {
+      productsQuery = productsQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: products, error } = await productsQuery
 
     if (error) {
       return NextResponse.json({ error: 'Products query failed', details: error.message })
     }
 
     // Check variants
-    const { data: variants, error: variantsError } = await supabase
+    let variantsQuery = supabase
       .from('product_variants')
       .select('id, product_id, stock, reserved')
       .limit(5)
+
+    if (tenant?.id) {
+      variantsQuery = variantsQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: variants, error: variantsError } = await variantsQuery
 
     if (variantsError) {
       return NextResponse.json({ error: 'Variants query failed', details: variantsError.message })

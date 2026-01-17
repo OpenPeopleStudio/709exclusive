@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
-async function checkAdminAuth(supabase: Awaited<ReturnType<typeof createSupabaseServer>>) {
+async function checkAdminAuth(
+  supabase: Awaited<ReturnType<typeof createSupabaseServer>>,
+  tenantId?: string
+) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user || !user.id) {
@@ -12,6 +16,7 @@ async function checkAdminAuth(supabase: Awaited<ReturnType<typeof createSupabase
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenantId)
     .single()
 
   if (!profile || !['admin', 'owner'].includes(profile.role)) {
@@ -23,7 +28,8 @@ async function checkAdminAuth(supabase: Awaited<ReturnType<typeof createSupabase
 
 export async function GET(request: Request) {
   const supabase = await createSupabaseServer()
-  const auth = await checkAdminAuth(supabase)
+  const tenant = await getTenantFromRequest(request)
+  const auth = await checkAdminAuth(supabase, tenant?.id)
   
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error }, { status: auth.status })
@@ -38,6 +44,10 @@ export async function GET(request: Request) {
       .select('*')
       .order('brand, model')
 
+    if (tenant?.id) {
+      query = query.eq('tenant_id', tenant.id)
+    }
+
     if (brand) {
       query = query.eq('brand', brand)
     }
@@ -47,9 +57,15 @@ export async function GET(request: Request) {
     if (error) throw error
 
     // Get unique brands
-    const { data: allModels } = await supabase
+    let brandsQuery = supabase
       .from('product_models')
       .select('brand')
+
+    if (tenant?.id) {
+      brandsQuery = brandsQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: allModels } = await brandsQuery
 
     const brands = [...new Set(allModels?.map(m => m.brand) || [])].sort()
 
@@ -62,7 +78,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServer()
-  const auth = await checkAdminAuth(supabase)
+  const tenant = await getTenantFromRequest(request)
+  const auth = await checkAdminAuth(supabase, tenant?.id)
   
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error }, { status: auth.status })
@@ -85,6 +102,7 @@ export async function POST(request: Request) {
     const { data: newModel, error } = await supabase
       .from('product_models')
       .insert({
+        tenant_id: tenant?.id,
         brand: brand.trim(),
         model: model.trim(),
         slug

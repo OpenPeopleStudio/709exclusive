@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 interface ShippingAddress {
   name?: string
@@ -13,6 +14,7 @@ interface ShippingAddress {
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -24,6 +26,7 @@ export async function POST(request: Request) {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || !['admin', 'owner'].includes(profile.role)) {
@@ -38,6 +41,7 @@ export async function POST(request: Request) {
       .from('orders')
       .select('*, order_items(*)')
       .eq('id', orderId)
+      .eq('tenant_id', tenant?.id)
       .single()
 
     if (orderError || !order) {
@@ -54,6 +58,7 @@ export async function POST(request: Request) {
       const { data, error: returnError } = await supabase
         .from('returns')
         .insert({
+          tenant_id: tenant?.id,
           order_id: orderId,
           return_type: returnType,
           status: 'pending',
@@ -95,6 +100,7 @@ export async function POST(request: Request) {
         .from('orders')
         .update({ status: 'refunded' }) // Use 'refunded' status instead of 'returned'
         .eq('id', orderId)
+        .eq('tenant_id', tenant?.id)
     }
 
     // Send email notification

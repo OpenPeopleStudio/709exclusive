@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useTenant } from '@/context/TenantContext'
 
 interface FooterSectionProps {
   title: string
@@ -46,6 +47,12 @@ function FooterSection({ title, children, defaultOpen = false }: FooterSectionPr
 }
 
 export default function Footer() {
+  const { settings, featureFlags } = useTenant()
+  const brandName = settings?.theme?.brand_name || 'Store'
+  const tagline =
+    settings?.content?.hero?.subhead ||
+    'Authentic sneakers and streetwear with local delivery and pickup.'
+
   return (
     <footer className="bg-[var(--bg-primary)]">
       <div className="container py-8 md:py-16">
@@ -53,11 +60,11 @@ export default function Footer() {
         <div className="mb-6 pb-6 border-b border-[var(--border-primary)] md:hidden">
           <Link href="/" className="inline-block">
             <span className="text-2xl font-black tracking-tighter text-[var(--text-primary)]">
-              709
+              {brandName}
             </span>
           </Link>
           <p className="mt-3 text-sm text-[var(--text-muted)]">
-            Authentic sneakers and streetwear with local delivery and pickup.
+            {tagline}
           </p>
           
           {/* Social links for mobile */}
@@ -81,11 +88,11 @@ export default function Footer() {
           <div className="hidden md:block md:col-span-1">
             <Link href="/" className="inline-block">
               <span className="text-2xl font-black tracking-tighter text-[var(--text-primary)]">
-                709
+                {brandName}
               </span>
             </Link>
             <p className="mt-4 text-sm text-[var(--text-muted)]">
-              Modern resale marketplace for verified sneakers and streetwear.
+              {settings?.content?.hero?.subhead || 'Modern resale marketplace for verified sneakers and streetwear.'}
             </p>
           </div>
 
@@ -102,11 +109,13 @@ export default function Footer() {
                   New arrivals
                 </Link>
               </li>
-              <li>
-                <Link href="/shop?drops=true" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
-                  Drops
-                </Link>
-              </li>
+              {featureFlags.drops !== false && (
+                <li>
+                  <Link href="/shop?drops=true" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+                    Drops
+                  </Link>
+                </li>
+              )}
             </ul>
           </FooterSection>
 

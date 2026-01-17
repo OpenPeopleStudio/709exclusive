@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user || !user.id) {
@@ -17,6 +19,7 @@ export async function DELETE(
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || !['owner', 'admin'].includes(profile.role)) {
@@ -37,6 +40,7 @@ export async function DELETE(
       .from('model_images')
       .select('model_id, url')
       .eq('id', imageId)
+      .eq('tenant_id', tenant?.id)
       .single()
 
     if (imageError || !image || image.model_id !== resolvedParams.id) {
@@ -48,6 +52,7 @@ export async function DELETE(
       .from('model_images')
       .delete()
       .eq('id', imageId)
+      .eq('tenant_id', tenant?.id)
 
     if (deleteError) throw deleteError
 

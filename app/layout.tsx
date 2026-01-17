@@ -3,6 +3,8 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
 import BottomNav from "@/components/BottomNav";
+import { getTenantFromRequest } from "@/lib/tenant";
+import { TenantProvider, getThemeStyleVars } from "@/context/TenantContext";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -18,36 +20,50 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
-export const metadata: Metadata = {
-  title: "709exclusive | Premium Sneakers & Streetwear",
-  description: "St. John's premier destination for authentic sneakers and streetwear. Shop the latest drops and exclusive releases.",
-  icons: {
-    icon: '/favicon.ico',
-  },
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'black-translucent',
-    title: '709exclusive',
-  },
-  formatDetection: {
-    telephone: false,
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const tenant = await getTenantFromRequest()
+  const theme = tenant?.settings?.theme
+  const hero = tenant?.settings?.content?.hero
+  const brandName = theme?.brand_name || tenant?.name || 'Storefront'
+  const description =
+    hero?.subhead || "A modern marketplace with local delivery and pickup."
 
-export default function RootLayout({
+  return {
+    title: `${brandName} | Marketplace`,
+    description,
+    icons: {
+      icon: theme?.logo_url || '/favicon.ico',
+    },
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: 'black-translucent',
+      title: brandName,
+    },
+    formatDetection: {
+      telephone: false,
+    },
+  }
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const tenant = await getTenantFromRequest()
+  const themeStyle = getThemeStyleVars(tenant?.settings?.theme?.colors)
+
   return (
-    <html lang="en" className="dark">
-      <body className={`${inter.variable} font-sans antialiased`}>
-        <CartProvider>
-          <div className="min-h-screen pb-16 md:pb-0">
-            {children}
-          </div>
-          <BottomNav />
-        </CartProvider>
+    <html lang="en" className="dark" data-tenant={tenant?.slug} style={themeStyle}>
+      <body className={`${inter.variable} font-sans antialiased`} data-tenant-id={tenant?.id}>
+        <TenantProvider tenant={tenant}>
+          <CartProvider tenantId={tenant?.id || 'default'}>
+            <div className="min-h-screen pb-16 md:pb-0">
+              {children}
+            </div>
+            <BottomNav />
+          </CartProvider>
+        </TenantProvider>
       </body>
     </html>
   );

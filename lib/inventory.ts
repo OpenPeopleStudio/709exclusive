@@ -20,13 +20,19 @@ export interface InventoryAuditLog {
 }
 
 // Get availability for multiple variants
-export async function getVariantAvailability(variantIds: string[]): Promise<VariantAvailability[]> {
+export async function getVariantAvailability(variantIds: string[], tenantId?: string): Promise<VariantAvailability[]> {
   const supabase = await createSupabaseServer()
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('variant_availability')
     .select('*')
     .in('id', variantIds)
+
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     throw error
@@ -36,8 +42,8 @@ export async function getVariantAvailability(variantIds: string[]): Promise<Vari
 }
 
 // Get single variant availability
-export async function getVariantAvailabilityById(variantId: string): Promise<VariantAvailability | null> {
-  const results = await getVariantAvailability([variantId])
+export async function getVariantAvailabilityById(variantId: string, tenantId?: string): Promise<VariantAvailability | null> {
+  const results = await getVariantAvailability([variantId], tenantId)
   return results[0] || null
 }
 
@@ -61,9 +67,23 @@ export async function adjustInventory(
   variantId: string,
   stockChange: number,
   reason: string,
-  adminId: string
+  adminId: string,
+  tenantId?: string
 ): Promise<void> {
   const supabase = await createSupabaseServer()
+
+  if (tenantId) {
+    const { data: variant } = await supabase
+      .from('product_variants')
+      .select('id')
+      .eq('id', variantId)
+      .eq('tenant_id', tenantId)
+      .single()
+
+    if (!variant) {
+      throw new Error('Variant not found for tenant')
+    }
+  }
 
   const { error } = await supabase.rpc('admin_adjust_inventory', {
     variant_id_input: variantId,
@@ -78,7 +98,7 @@ export async function adjustInventory(
 }
 
 // Get inventory audit history
-export async function getInventoryAuditHistory(variantId?: string): Promise<InventoryAuditLog[]> {
+export async function getInventoryAuditHistory(variantId?: string, tenantId?: string): Promise<InventoryAuditLog[]> {
   const supabase = await createSupabaseServer()
 
   let query = supabase
@@ -91,6 +111,10 @@ export async function getInventoryAuditHistory(variantId?: string): Promise<Inve
 
   if (variantId) {
     query = query.eq('variant_id', variantId)
+  }
+
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId)
   }
 
   const { data, error } = await query.limit(100)

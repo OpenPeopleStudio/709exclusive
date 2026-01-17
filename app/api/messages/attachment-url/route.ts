@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { hasAdminAccess } from '@/lib/roles'
 import { redactErrorMessage } from '@/lib/privacy'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -21,13 +23,19 @@ export async function POST(request: Request) {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
-  const { data: message } = await supabase
+  let messageQuery = supabase
     .from('messages')
     .select('id, customer_id, attachment_path')
     .eq('id', messageId)
-    .single()
+
+  if (tenant?.id) {
+    messageQuery = messageQuery.eq('tenant_id', tenant.id)
+  }
+
+  const { data: message } = await messageQuery.single()
 
   if (!message || !message.attachment_path) {
     return NextResponse.json({ error: 'Attachment not found' }, { status: 404 })

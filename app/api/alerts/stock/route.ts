@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -10,7 +12,7 @@ export async function GET() {
   }
 
   try {
-    const { data: alerts, error } = await supabase
+    let alertsQuery = supabase
       .from('stock_alerts')
       .select(`
         id,
@@ -24,6 +26,12 @@ export async function GET() {
       .is('notified_at', null)
       .order('created_at', { ascending: false })
 
+    if (tenant?.id) {
+      alertsQuery = alertsQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: alerts, error } = await alertsQuery
+
     if (error) throw error
 
     return NextResponse.json({ alerts })
@@ -36,6 +44,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -55,6 +64,7 @@ export async function POST(request: Request) {
     const { data: alert, error } = await supabase
       .from('stock_alerts')
       .upsert({
+        tenant_id: tenant?.id,
         user_id: user.id,
         product_id: productId,
         size,
@@ -78,6 +88,7 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -92,11 +103,17 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Alert ID required' }, { status: 400 })
     }
 
-    const { error } = await supabase
+    let deleteQuery = supabase
       .from('stock_alerts')
       .delete()
       .eq('id', alertId)
       .eq('user_id', user.id)
+
+    if (tenant?.id) {
+      deleteQuery = deleteQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { error } = await deleteQuery
 
     if (error) throw error
 

@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     // Find order by order_id (which we passed as order.id)
     const { data: order } = await supabase
       .from('orders')
-      .select('id, status')
+      .select('id, status, tenant_id')
       .eq('id', payload.order_id)
       .single()
 
@@ -41,13 +41,17 @@ export async function POST(request: Request) {
 
     switch (payload.payment_status) {
       case 'finished':
-      case 'confirmed':
+      case 'confirmed': {
         // Payment confirmed - update order status
         if (order.status === 'pending') {
-          const { data: orderItems } = await supabase
+          let itemsQuery = supabase
             .from('order_items')
             .select('variant_id, qty')
             .eq('order_id', order.id)
+          if (order.tenant_id) {
+            itemsQuery = itemsQuery.eq('tenant_id', order.tenant_id)
+          }
+          const { data: orderItems } = await itemsQuery
 
           if (orderItems) {
             for (const item of orderItems) {
@@ -58,7 +62,7 @@ export async function POST(request: Request) {
             }
           }
 
-          await supabase
+          let updateQuery = supabase
             .from('orders')
             .update({ 
               status: 'paid',
@@ -68,44 +72,63 @@ export async function POST(request: Request) {
               crypto_transaction_id: String(payload.payment_id),
             })
             .eq('id', order.id)
+          if (order.tenant_id) {
+            updateQuery = updateQuery.eq('tenant_id', order.tenant_id)
+          }
+          await updateQuery
 
           await sendOrderConfirmation(order.id)
         }
 
         console.log('Order paid via NOWPayments:', order.id)
         break
+      }
 
       case 'waiting':
       case 'confirming':
-      case 'sending':
+      case 'sending': {
         // Payment in progress
-        await supabase
+        let updateQuery = supabase
           .from('orders')
           .update({ 
             crypto_payment_status: payload.payment_status,
           })
           .eq('id', order.id)
+        if (order.tenant_id) {
+          updateQuery = updateQuery.eq('tenant_id', order.tenant_id)
+        }
+        await updateQuery
         break
+      }
 
-      case 'partially_paid':
+      case 'partially_paid': {
         // Partial payment received
-        await supabase
+        let updateQuery = supabase
           .from('orders')
           .update({ 
             crypto_payment_status: 'partially_paid',
           })
           .eq('id', order.id)
+        if (order.tenant_id) {
+          updateQuery = updateQuery.eq('tenant_id', order.tenant_id)
+        }
+        await updateQuery
         break
+      }
 
       case 'failed':
       case 'expired':
-      case 'refunded':
+      case 'refunded': {
         // Payment failed
         if (order.status === 'pending') {
-          const { data: orderItems } = await supabase
+          let itemsQuery = supabase
             .from('order_items')
             .select('variant_id, qty')
             .eq('order_id', order.id)
+          if (order.tenant_id) {
+            itemsQuery = itemsQuery.eq('tenant_id', order.tenant_id)
+          }
+          const { data: orderItems } = await itemsQuery
 
           if (orderItems) {
             for (const item of orderItems) {
@@ -116,7 +139,7 @@ export async function POST(request: Request) {
             }
           }
 
-          await supabase
+          let updateQuery = supabase
             .from('orders')
             .update({ 
               status: 'cancelled',
@@ -124,10 +147,15 @@ export async function POST(request: Request) {
               crypto_payment_status: payload.payment_status,
             })
             .eq('id', order.id)
+          if (order.tenant_id) {
+            updateQuery = updateQuery.eq('tenant_id', order.tenant_id)
+          }
+          await updateQuery
 
           console.log('Order cancelled due to failed NOWPayments:', order.id)
         }
         break
+      }
 
       default:
         console.log('Unhandled NOWPayments status:', payload.payment_status)

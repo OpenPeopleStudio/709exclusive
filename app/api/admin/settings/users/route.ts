@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { createClient } from '@supabase/supabase-js'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 // Delete user and all associated data
 export async function DELETE(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -16,6 +18,7 @@ export async function DELETE(request: Request) {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || !['owner', 'admin'].includes(profile.role)) {
@@ -34,6 +37,7 @@ export async function DELETE(request: Request) {
       .from('709_profiles')
       .select('role, full_name')
       .eq('id', userId)
+    .eq('tenant_id', tenant?.id)
       .single()
 
     if (!targetProfile) {
@@ -52,42 +56,44 @@ export async function DELETE(request: Request) {
     // Delete all associated data (order matters due to foreign keys)
     
     // 1. Delete wishlist items
-    await supabase.from('wishlist_items').delete().eq('user_id', userId)
+    await supabase.from('wishlist_items').delete().eq('user_id', userId).eq('tenant_id', tenant?.id)
     
     // 2. Delete stock alerts
-    await supabase.from('stock_alerts').delete().eq('user_id', userId)
+    await supabase.from('stock_alerts').delete().eq('user_id', userId).eq('tenant_id', tenant?.id)
     
     // 3. Delete drop alerts
-    await supabase.from('drop_alerts').delete().eq('user_id', userId)
+    await supabase.from('drop_alerts').delete().eq('user_id', userId).eq('tenant_id', tenant?.id)
     
     // 4. Delete recently viewed
-    await supabase.from('recently_viewed').delete().eq('user_id', userId)
+    await supabase.from('recently_viewed').delete().eq('user_id', userId).eq('tenant_id', tenant?.id)
     
     // 5. Delete messages
-    await supabase.from('messages').delete().eq('customer_id', userId)
+    await supabase.from('messages').delete().eq('customer_id', userId).eq('tenant_id', tenant?.id)
     
     // 6. Delete order items for user's orders
     const { data: orders } = await supabase
       .from('orders')
       .select('id')
       .eq('customer_id', userId)
+      .eq('tenant_id', tenant?.id)
     
     if (orders && orders.length > 0) {
       const orderIds = orders.map(o => o.id)
-      await supabase.from('order_items').delete().in('order_id', orderIds)
+      await supabase.from('order_items').delete().in('order_id', orderIds).eq('tenant_id', tenant?.id)
     }
     
     // 7. Delete orders
-    await supabase.from('orders').delete().eq('customer_id', userId)
+    await supabase.from('orders').delete().eq('customer_id', userId).eq('tenant_id', tenant?.id)
     
     // 8. Delete user preferences
-    await supabase.from('user_preferences').delete().eq('user_id', userId)
+    await supabase.from('user_preferences').delete().eq('user_id', userId).eq('tenant_id', tenant?.id)
     
     // 9. Delete the profile
     const { error: profileError } = await supabase
       .from('709_profiles')
       .delete()
       .eq('id', userId)
+      .eq('tenant_id', tenant?.id)
 
     if (profileError) {
       console.error('Error deleting profile:', profileError)
@@ -111,6 +117,7 @@ export async function DELETE(request: Request) {
 
     // Log the action
     await supabase.from('activity_logs').insert({
+      tenant_id: tenant?.id,
       user_id: user.id,
       user_email: user.email,
       action: 'delete_user',
@@ -137,6 +144,7 @@ export async function DELETE(request: Request) {
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -148,6 +156,7 @@ export async function POST(request: Request) {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || profile.role !== 'owner') {
@@ -156,24 +165,70 @@ export async function POST(request: Request) {
 
   try {
     const { email, role } = await request.json()
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : ''
 
-    // In production, you'd use Supabase Admin API to invite user
-    // For now, we'll create a placeholder profile
-    // The user would need to sign up with this email
+    if (!normalizedEmail) {
+      return NextResponse.json({ error: 'Email is required' }, { status: 400 })
+    }
+
+    if (!['admin', 'staff'].includes(role)) {
+      return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
+    }
+
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    if (!serviceRoleKey || !supabaseUrl) {
+      return NextResponse.json({ error: 'Service role key not configured' }, { status: 500 })
+    }
+
+    const adminClient = createClient(
+      supabaseUrl,
+      serviceRoleKey,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
+
+    const origin = new URL(request.url).origin
+    const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
+      normalizedEmail,
+      {
+        redirectTo: `${origin}/auth/callback?type=invite`,
+        data: {
+          role,
+          tenant_id: tenant?.id,
+          tenant_slug: tenant?.slug,
+        },
+      }
+    )
+
+    if (inviteError) {
+      console.error('Invite user error:', inviteError)
+      return NextResponse.json({ error: inviteError.message }, { status: 500 })
+    }
+
+    if (inviteData?.user?.id) {
+      const { error: updateError } = await adminClient
+        .from('709_profiles')
+        .update({ role, tenant_id: tenant?.id })
+        .eq('id', inviteData.user.id)
+      if (updateError) {
+        console.error('Error updating invited user role:', updateError)
+      }
+    }
 
     // Log the action
     await supabase.from('activity_logs').insert({
+      tenant_id: tenant?.id,
       user_id: user.id,
       user_email: user.email,
       action: 'invite_user',
       entity_type: 'user',
-      entity_id: email,
+      entity_id: normalizedEmail,
       details: { role }
     })
 
     return NextResponse.json({ 
       success: true, 
-      message: 'Invitation sent (user must sign up with this email)' 
+      message: 'Invitation email sent' 
     })
 
   } catch (error) {
@@ -186,6 +241,7 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -197,6 +253,7 @@ export async function PATCH(request: Request) {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || profile.role !== 'owner') {
@@ -211,6 +268,7 @@ export async function PATCH(request: Request) {
       .from('709_profiles')
       .select('role')
       .eq('id', userId)
+    .eq('tenant_id', tenant?.id)
       .single()
 
     if (targetProfile?.role === 'owner') {
@@ -222,11 +280,13 @@ export async function PATCH(request: Request) {
       .from('709_profiles')
       .update({ role })
       .eq('id', userId)
+      .eq('tenant_id', tenant?.id)
 
     if (error) throw error
 
     // Log the action
     await supabase.from('activity_logs').insert({
+      tenant_id: tenant?.id,
       user_id: user.id,
       user_email: user.email,
       action: 'update_user_role',

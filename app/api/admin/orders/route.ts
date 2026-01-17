@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 export async function GET(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -14,6 +16,7 @@ export async function GET(request: Request) {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || !['admin', 'owner', 'staff'].includes(profile.role)) {
@@ -59,6 +62,10 @@ export async function GET(request: Request) {
         )
       `)
       .order('created_at', { ascending: false })
+
+    if (tenant?.id) {
+      query = query.eq('tenant_id', tenant.id)
+    }
 
     if (status && status !== 'all') {
       query = query.eq('status', status)

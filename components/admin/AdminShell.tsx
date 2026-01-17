@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import PWAInstallButton from './PWAInstallButton'
+import { useTenant } from '@/context/TenantContext'
 
 interface NavItem {
   href: string
@@ -23,6 +24,8 @@ export default function AdminShell({ children, userEmail, navItems }: AdminShell
   const [isSigningOut, setIsSigningOut] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
+  const { settings } = useTenant()
+  const brandName = settings?.theme?.brand_name || 'Store'
 
   const handleSignOut = async () => {
     if (isSigningOut) return
@@ -50,7 +53,7 @@ export default function AdminShell({ children, userEmail, navItems }: AdminShell
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <span className="text-lg font-bold text-[var(--text-primary)]">Admin</span>
+        <span className="text-lg font-bold text-[var(--text-primary)]">{brandName} Admin</span>
         <div className="w-10" /> {/* Spacer */}
       </header>
 
@@ -58,7 +61,7 @@ export default function AdminShell({ children, userEmail, navItems }: AdminShell
       <header className="hidden lg:flex fixed top-0 left-0 right-0 z-50 h-16 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] items-center justify-between px-6">
         <div className="flex items-center gap-8">
           <Link href="/admin/products" className="flex items-center gap-2">
-            <span className="text-xl font-black tracking-tighter text-[var(--text-primary)]">709</span>
+            <span className="text-xl font-black tracking-tighter text-[var(--text-primary)]">{brandName}</span>
             <span className="text-sm font-medium text-[var(--text-muted)]">Admin</span>
           </Link>
         </div>
@@ -100,7 +103,7 @@ export default function AdminShell({ children, userEmail, navItems }: AdminShell
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="h-16 flex items-center justify-between px-6 border-b border-[var(--border-primary)] lg:hidden">
-           <span className="text-xl font-black tracking-tighter text-[var(--text-primary)]">709 Admin</span>
+           <span className="text-xl font-black tracking-tighter text-[var(--text-primary)]">{brandName} Admin</span>
            <button 
              onClick={() => setIsSidebarOpen(false)}
              className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"

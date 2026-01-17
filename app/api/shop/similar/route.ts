@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 export async function GET(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { searchParams } = new URL(request.url)
 
   const excludeId = searchParams.get('excludeId')
@@ -23,6 +25,10 @@ export async function GET(request: Request) {
         product_variants(price_cents, stock, reserved)
       `)
       .limit(limit + 1) // Fetch one extra in case we need to exclude
+
+    if (tenant?.id) {
+      query = query.eq('tenant_id', tenant.id)
+    }
 
     if (excludeId) {
       query = query.neq('id', excludeId)

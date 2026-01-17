@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
-async function requireAdmin() {
+async function requireAdmin(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -13,13 +15,14 @@ async function requireAdmin() {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || !['admin', 'owner'].includes(profile.role)) {
     return { supabase, error: 'Admin access required', status: 403 as const }
   }
 
-  return { supabase, user }
+  return { supabase, user, tenant }
 }
 
 function normalizeStringArray(value: unknown, opts?: { upper?: boolean; maxLen?: number; sliceLen?: number }) {
@@ -43,12 +46,12 @@ function normalizeStringArray(value: unknown, opts?: { upper?: boolean; maxLen?:
 }
 
 export async function PATCH(request: Request) {
-  const auth = await requireAdmin()
+  const auth = await requireAdmin(request)
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error }, { status: auth.status })
   }
 
-  const { supabase, user } = auth
+  const { supabase, user, tenant } = auth
 
   try {
     const body = await request.json()
@@ -85,10 +88,12 @@ export async function PATCH(request: Request) {
       .from('local_delivery_zones')
       .update(updateData)
       .eq('id', id)
+      .eq('tenant_id', tenant?.id)
 
     if (error) throw error
 
     await supabase.from('activity_logs').insert({
+      tenant_id: tenant?.id,
       user_id: user.id,
       user_email: user.email,
       action: 'update_local_delivery_zone',

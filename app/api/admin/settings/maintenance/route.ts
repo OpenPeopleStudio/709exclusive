@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 type MaintenanceValue = { enabled: boolean; message: string | null }
 
-async function requireAdmin() {
+async function requireAdmin(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
@@ -13,23 +15,25 @@ async function requireAdmin() {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || profile.role !== 'owner') {
     return { error: NextResponse.json({ error: 'Owner access required' }, { status: 403 }) }
   }
 
-  return { supabase }
+  return { supabase, tenant }
 }
 
-export async function GET() {
-  const { supabase, error } = await requireAdmin()
+export async function GET(request: Request) {
+  const { supabase, tenant, error } = await requireAdmin(request)
   if (error) return error
 
   const { data } = await supabase
     .from('site_flags')
     .select('value')
     .eq('key', 'maintenance_mode')
+    .eq('tenant_id', tenant?.id)
     .maybeSingle()
 
   const value = (data?.value || {}) as Partial<MaintenanceValue>
@@ -41,7 +45,7 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  const { supabase, error } = await requireAdmin()
+  const { supabase, tenant, error } = await requireAdmin(request)
   if (error) return error
 
   const body = (await request.json().catch(() => null)) as Partial<MaintenanceValue> | null
@@ -54,6 +58,7 @@ export async function PATCH(request: Request) {
   const { error: upsertError } = await supabase
     .from('site_flags')
     .upsert({
+      tenant_id: tenant?.id,
       key: 'maintenance_mode',
       value: { enabled: body.enabled, message: message || null },
       updated_at: new Date().toISOString(),

@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 type Role = 'owner' | 'admin' | 'staff' | 'customer'
 
-async function getAuthedRole() {
+async function getAuthedRole(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -15,14 +17,15 @@ async function getAuthedRole() {
     .from('709_profiles')
     .select('role, full_name')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   const role = (profile?.role || 'customer') as Role
-  return { supabase, user, role, full_name: profile?.full_name || null }
+  return { supabase, user, role, full_name: profile?.full_name || null, tenant }
 }
 
 export async function GET(request: Request) {
-  const auth = await getAuthedRole()
+  const auth = await getAuthedRole(request)
   if ('error' in auth) return auth.error
 
   if (!['admin', 'owner'].includes(auth.role)) {
@@ -46,6 +49,7 @@ export async function GET(request: Request) {
       const { data: profiles } = await auth.supabase
         .from('709_profiles')
         .select('id, role, full_name, created_at')
+        .eq('tenant_id', auth.tenant?.id)
         .order('created_at', { ascending: false })
 
       // Try to get user emails - this requires either:
@@ -97,6 +101,7 @@ export async function GET(request: Request) {
       const { data: logs } = await auth.supabase
         .from('activity_logs')
         .select('*')
+        .eq('tenant_id', auth.tenant?.id)
         .order('created_at', { ascending: false })
         .limit(100)
 
@@ -107,6 +112,7 @@ export async function GET(request: Request) {
       const { data: rules } = await auth.supabase
         .from('pricing_rules')
         .select('*')
+        .eq('tenant_id', auth.tenant?.id)
         .order('rule_type', { ascending: true })
 
       return NextResponse.json({ rules: rules || [] })
@@ -116,11 +122,13 @@ export async function GET(request: Request) {
       const { data: shippingMethods } = await auth.supabase
         .from('shipping_methods')
         .select('*')
+        .eq('tenant_id', auth.tenant?.id)
         .order('sort_order', { ascending: true })
 
       const { data: deliveryZones } = await auth.supabase
         .from('local_delivery_zones')
         .select('*')
+        .eq('tenant_id', auth.tenant?.id)
         .order('sort_order', { ascending: true })
 
       return NextResponse.json({
@@ -138,7 +146,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await getAuthedRole()
+  const auth = await getAuthedRole(request)
   if ('error' in auth) return auth.error
 
   if (auth.role !== 'owner') {
@@ -169,10 +177,16 @@ export async function POST(request: Request) {
   })
 
   // Clear all messages first.
-  const { error: messagesError, count: messagesDeleted } = await adminClient
+  let messagesQuery = adminClient
     .from('messages')
     .delete({ count: 'exact' })
     .neq('id', '00000000-0000-0000-0000-000000000000')
+
+  if (auth.tenant?.id) {
+    messagesQuery = messagesQuery.eq('tenant_id', auth.tenant.id)
+  }
+
+  const { error: messagesError, count: messagesDeleted } = await messagesQuery
 
   if (messagesError) {
     console.error('Purge messages error:', messagesError)
@@ -183,6 +197,7 @@ export async function POST(request: Request) {
     .from('709_profiles')
     .select('id')
     .eq('role', 'customer')
+    .eq('tenant_id', auth.tenant?.id)
 
   if (customersError) {
     console.error('Purge customers fetch error:', customersError)
@@ -193,9 +208,9 @@ export async function POST(request: Request) {
 
   // Unlink blocking foreign keys so auth.users deletion can proceed.
   for (const customerId of customerIds) {
-    await adminClient.from('orders').update({ customer_id: null }).eq('customer_id', customerId)
-    await adminClient.from('activity_logs').update({ user_id: null, user_email: null }).eq('user_id', customerId)
-    await adminClient.from('operations').update({ created_by: null }).eq('created_by', customerId)
+    await adminClient.from('orders').update({ customer_id: null }).eq('customer_id', customerId).eq('tenant_id', auth.tenant?.id)
+    await adminClient.from('activity_logs').update({ user_id: null, user_email: null }).eq('user_id', customerId).eq('tenant_id', auth.tenant?.id)
+    await adminClient.from('operations').update({ created_by: null }).eq('created_by', customerId).eq('tenant_id', auth.tenant?.id)
 
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(customerId)
     if (deleteError) {

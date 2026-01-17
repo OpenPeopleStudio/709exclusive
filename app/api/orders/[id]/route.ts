@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -15,7 +17,7 @@ export async function GET(
   const resolvedParams = await params
 
   try {
-    const { data: order, error } = await supabase
+    let orderQuery = supabase
       .from('orders')
       .select(`
         *,
@@ -36,7 +38,12 @@ export async function GET(
       `)
       .eq('id', resolvedParams.id)
       .eq('customer_id', user.id)
-      .single()
+
+    if (tenant?.id) {
+      orderQuery = orderQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: order, error } = await orderQuery.single()
 
     if (error || !order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })

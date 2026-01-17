@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -13,6 +15,7 @@ export async function POST(request: Request) {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || !['admin', 'owner', 'staff'].includes(profile.role)) {
@@ -31,6 +34,7 @@ export async function POST(request: Request) {
       .select('id')
       .eq('brand', brand)
       .eq('name', model)
+      .eq('tenant_id', tenant?.id)
       .single()
 
     if (existingProduct) {
@@ -46,6 +50,7 @@ export async function POST(request: Request) {
       const { data: newProduct, error: productError } = await supabase
         .from('products')
         .insert({
+          tenant_id: tenant?.id,
           name: model,
           brand,
           slug,
@@ -84,6 +89,7 @@ export async function POST(request: Request) {
           const { error: insertError } = await supabase
             .from('product_variants')
             .insert({
+              tenant_id: tenant?.id,
               product_id: productId,
               sku,
               brand,
@@ -106,6 +112,7 @@ export async function POST(request: Request) {
 
     // Log the action
     await supabase.from('activity_logs').insert({
+      tenant_id: tenant?.id,
       user_id: user.id,
       user_email: user.email,
       action: 'bulk_create_variants',

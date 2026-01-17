@@ -2,9 +2,12 @@ import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { getCheckoutQuote } from '@/lib/checkoutPricing'
 import type { CartItem } from '@/types/cart'
+import { getTenantFromRequest } from '@/lib/tenant'
+import { resolveDeliveryProvider } from '@/lib/integrations'
 
 export async function POST(req: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(req)
 
   try {
     const { items, shippingAddress, shippingMethodCode }: {
@@ -27,6 +30,8 @@ export async function POST(req: Request) {
       items,
       shippingAddress: shippingAddress || { country: 'CA' },
       requestedShippingMethodCode: shippingMethodCode,
+      tenantId: tenant?.id,
+      deliveryProvider: resolveDeliveryProvider(tenant?.settings),
     })
 
     return NextResponse.json(quote)

@@ -19,12 +19,18 @@ export interface ModelImage {
 }
 
 // Get model images for a specific model
-export async function getModelImages(modelId: string): Promise<ModelImage[]> {
-  const { data, error } = await supabase
+export async function getModelImages(modelId: string, tenantId?: string): Promise<ModelImage[]> {
+  let query = supabase
     .from('model_images')
     .select('*')
     .eq('model_id', modelId)
     .order('position')
+
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     console.error('Error fetching model images:', error)
@@ -35,23 +41,33 @@ export async function getModelImages(modelId: string): Promise<ModelImage[]> {
 }
 
 // Get primary image for a model
-export async function getPrimaryModelImage(modelId: string): Promise<ModelImage | null> {
-  const { data, error } = await supabase
+export async function getPrimaryModelImage(modelId: string, tenantId?: string): Promise<ModelImage | null> {
+  let query = supabase
     .from('model_images')
     .select('*')
     .eq('model_id', modelId)
     .eq('is_primary', true)
-    .single()
+
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId)
+  }
+
+  const { data, error } = await query.single()
 
   if (error) {
     // If no primary, get first image by position
-    const { data: fallback } = await supabase
+    let fallbackQuery = supabase
       .from('model_images')
       .select('*')
       .eq('model_id', modelId)
       .order('position')
       .limit(1)
-      .single()
+
+    if (tenantId) {
+      fallbackQuery = fallbackQuery.eq('tenant_id', tenantId)
+    }
+
+    const { data: fallback } = await fallbackQuery.single()
 
     return fallback || null
   }
@@ -60,12 +76,18 @@ export async function getPrimaryModelImage(modelId: string): Promise<ModelImage 
 }
 
 // Get all model images for a brand (useful for admin listing)
-export async function getModelsByBrand(brand: string): Promise<ProductModel[]> {
-  const { data, error } = await supabase
+export async function getModelsByBrand(brand: string, tenantId?: string): Promise<ProductModel[]> {
+  let query = supabase
     .from('product_models')
     .select('*')
     .eq('brand', brand)
     .order('model')
+
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     console.error('Error fetching models by brand:', error)
@@ -76,13 +98,18 @@ export async function getModelsByBrand(brand: string): Promise<ProductModel[]> {
 }
 
 // Get model by brand and model name
-export async function getModelByBrandAndName(brand: string, model: string): Promise<ProductModel | null> {
-  const { data, error } = await supabase
+export async function getModelByBrandAndName(brand: string, model: string, tenantId?: string): Promise<ProductModel | null> {
+  let query = supabase
     .from('product_models')
     .select('*')
     .eq('brand', brand)
     .eq('model', model)
-    .single()
+
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId)
+  }
+
+  const { data, error } = await query.single()
 
   if (error) {
     return null

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
+import { useTenant } from '@/context/TenantContext'
 
 interface OrderStatus {
   status: string
@@ -42,6 +43,7 @@ const STATUS_STEPS = [
 
 export default function OrderTrackingPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
+  const { id: tenantId } = useTenant()
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
   const [statusHistory, setStatusHistory] = useState<OrderStatus[]>([])
@@ -54,12 +56,17 @@ export default function OrderTrackingPage({ params }: { params: Promise<{ id: st
         return
       }
 
-      const { data } = await supabase
+      let orderQuery = supabase
         .from('orders')
         .select('*')
         .eq('id', resolvedParams.id)
         .eq('customer_id', user.id)
-        .single()
+
+      if (tenantId) {
+        orderQuery = orderQuery.eq('tenant_id', tenantId)
+      }
+
+      const { data } = await orderQuery.single()
 
       if (data) {
         setOrder(data)

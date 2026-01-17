@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user || !user.id) {
@@ -17,6 +19,7 @@ export async function GET(
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || !['owner', 'admin'].includes(profile.role)) {
@@ -31,6 +34,7 @@ export async function GET(
       .from('product_models')
       .select('*')
       .eq('id', resolvedParams.id)
+      .eq('tenant_id', tenant?.id)
       .single()
 
     if (modelError || !model) {
@@ -42,6 +46,7 @@ export async function GET(
       .from('model_images')
       .select('*')
       .eq('model_id', resolvedParams.id)
+      .eq('tenant_id', tenant?.id)
       .order('position')
 
     if (imagesError) throw imagesError

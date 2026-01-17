@@ -1,6 +1,12 @@
 import * as postmark from 'postmark'
 
-const client = new postmark.ServerClient(process.env.POSTMARK_API_KEY!)
+const getClient = () => {
+  const apiKey = process.env.POSTMARK_API_KEY
+  if (!apiKey) {
+    throw new Error('POSTMARK_API_KEY is not set')
+  }
+  return new postmark.ServerClient(apiKey)
+}
 
 interface EmailData {
   orderId: string
@@ -41,6 +47,7 @@ ${address.country}`
 }
 
 export async function sendOrderConfirmation(data: EmailData): Promise<void> {
+  const client = getClient()
   const itemsHtml = data.items.map(item =>
     `<tr>
       <td>${item.sku}</td>
@@ -89,6 +96,7 @@ export async function sendOrderConfirmation(data: EmailData): Promise<void> {
 }
 
 export async function sendOrderShipped(data: EmailData): Promise<void> {
+  const client = getClient()
   const trackingInfo = data.trackingNumber && data.carrier
     ? `<p>Tracking: ${data.trackingNumber} (${data.carrier})</p>`
     : ''
@@ -113,6 +121,7 @@ export async function sendOrderShipped(data: EmailData): Promise<void> {
 }
 
 export async function sendOrderCancelled(data: EmailData): Promise<void> {
+  const client = getClient()
   await client.sendEmail({
     From: 'orders@709exclusive.com',
     To: data.customerEmail,
@@ -128,6 +137,7 @@ export async function sendOrderCancelled(data: EmailData): Promise<void> {
 }
 
 export async function sendOrderRefunded(data: EmailData): Promise<void> {
+  const client = getClient()
   await client.sendEmail({
     From: 'orders@709exclusive.com',
     To: data.customerEmail,

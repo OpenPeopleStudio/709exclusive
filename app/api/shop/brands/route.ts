@@ -1,13 +1,21 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
 
   try {
-    const { data: products } = await supabase
+    let productsQuery = supabase
       .from('products')
       .select('brand')
+
+    if (tenant?.id) {
+      productsQuery = productsQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: products } = await productsQuery
 
     const brands = [...new Set(products?.map(p => p.brand).filter(Boolean))]
       .sort((a, b) => a.localeCompare(b))

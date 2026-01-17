@@ -8,6 +8,7 @@ import Footer from '@/components/Footer'
 import ProductCard, { ProductCardSkeleton, ProductCardData } from '@/components/ui/ProductCard'
 import Button from '@/components/ui/Button'
 import Surface from '@/components/ui/Surface'
+import { useTenant } from '@/context/TenantContext'
 
 interface Product {
   id: string
@@ -33,10 +34,14 @@ interface ProductVariant {
 
 export default function Home() {
   const router = useRouter()
+  const { id: tenantId, settings } = useTenant()
   const [isProcessingAuth, setIsProcessingAuth] = useState(false)
   const [products, setProducts] = useState<ProductCardData[]>([])
   const [loading, setLoading] = useState(true)
   const authCheckedRef = useRef(false)
+  const hero = settings?.content?.hero
+  const featureCards = settings?.content?.features
+  const brandName = settings?.theme?.brand_name || 'Shop'
 
   useEffect(() => {
     // Check for auth hash fragment (from Supabase redirect)
@@ -75,19 +80,31 @@ export default function Home() {
 
     // Fetch products
     const fetchProducts = async () => {
-      const { data: productsData } = await supabase
+      let productsQuery = supabase
         .from('products')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(12)
 
+      if (tenantId) {
+        productsQuery = productsQuery.eq('tenant_id', tenantId)
+      }
+
+      const { data: productsData } = await productsQuery
+
       if (productsData) {
         // Fetch primary images
-        const { data: imagesData } = await supabase
+        let imagesQuery = supabase
           .from('product_images')
           .select('product_id, url, position')
           .in('product_id', productsData.map(p => p.id))
           .order('position')
+
+        if (tenantId) {
+          imagesQuery = imagesQuery.eq('tenant_id', tenantId)
+        }
+
+        const { data: imagesData } = await imagesQuery
 
         const imageMap: Record<string, string> = {}
         if (imagesData) {
@@ -99,10 +116,16 @@ export default function Home() {
         }
 
         // Fetch lowest prices
-        const { data: variantsData } = await supabase
+        let variantsQuery = supabase
           .from('product_variants')
           .select('product_id, price_cents')
           .in('product_id', productsData.map(p => p.id))
+
+        if (tenantId) {
+          variantsQuery = variantsQuery.eq('tenant_id', tenantId)
+        }
+
+        const { data: variantsData } = await variantsQuery
 
         const priceMap: Record<string, number> = {}
         if (variantsData) {
@@ -133,7 +156,7 @@ export default function Home() {
     }
 
     fetchProducts()
-  }, [router])
+  }, [router, tenantId])
 
   if (isProcessingAuth) {
     return (
@@ -155,17 +178,22 @@ export default function Home() {
         <div className="container">
           <div className="max-w-3xl space-y-6">
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">
-              709exclusive
+              {hero?.eyebrow || brandName}
             </p>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-semibold text-[var(--text-primary)] leading-tight">
-              Authentic sneakers with local delivery and pickup.
+              {hero?.headline || 'Authentic sneakers with local delivery and pickup.'}
             </h1>
             <p className="text-base md:text-lg text-[var(--text-secondary)] max-w-xl">
-              A modern resale marketplace built for Newfoundland. Shop verified inventory, pay with card or crypto, and track every order in one place.
+              {hero?.subhead ||
+                "A modern resale marketplace built for Newfoundland. Shop verified inventory, pay with card or crypto, and track every order in one place."}
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
-              <Button href="/shop" variant="primary">Browse inventory</Button>
-              <Button href="/shop?sort=newest" variant="secondary">New arrivals</Button>
+              <Button href={hero?.primary_cta?.href || "/shop"} variant="primary">
+                {hero?.primary_cta?.label || "Browse inventory"}
+              </Button>
+              <Button href={hero?.secondary_cta?.href || "/shop?sort=newest"} variant="secondary">
+                {hero?.secondary_cta?.label || "New arrivals"}
+              </Button>
             </div>
           </div>
         </div>
@@ -214,18 +242,16 @@ export default function Home() {
       <section className="py-12 md:py-20 border-t border-[var(--border-primary)]">
         <div className="container">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-            <Surface padding="lg">
-              <h3 className="font-semibold text-[var(--text-primary)] mb-2">Local delivery</h3>
-              <p className="text-sm text-[var(--text-secondary)]">Same-day in St. John&apos;s with real-time order updates.</p>
-            </Surface>
-            <Surface padding="lg">
-              <h3 className="font-semibold text-[var(--text-primary)] mb-2">Pickup ready</h3>
-              <p className="text-sm text-[var(--text-secondary)]">Skip the wait and pick up in-store as soon as it&apos;s verified.</p>
-            </Surface>
-            <Surface padding="lg">
-              <h3 className="font-semibold text-[var(--text-primary)] mb-2">Card + crypto</h3>
-              <p className="text-sm text-[var(--text-secondary)]">Pay with Stripe cards or NOWPayments crypto at checkout.</p>
-            </Surface>
+            {(featureCards && featureCards.length > 0 ? featureCards : [
+              { title: 'Local delivery', description: "Same-day in St. John's with real-time order updates." },
+              { title: 'Pickup ready', description: "Skip the wait and pick up in-store as soon as it's verified." },
+              { title: 'Card + crypto', description: 'Pay with Stripe cards or NOWPayments crypto at checkout.' },
+            ]).map((feature) => (
+              <Surface key={feature.title} padding="lg">
+                <h3 className="font-semibold text-[var(--text-primary)] mb-2">{feature.title}</h3>
+                <p className="text-sm text-[var(--text-secondary)]">{feature.description}</p>
+              </Surface>
+            ))}
           </div>
         </div>
       </section>

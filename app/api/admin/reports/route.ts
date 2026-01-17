@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 export async function GET(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -13,6 +15,7 @@ export async function GET(request: Request) {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || !['admin', 'owner'].includes(profile.role)) {
@@ -25,7 +28,7 @@ export async function GET(request: Request) {
 
   try {
     // Get orders in date range
-    const { data: orders } = await supabase
+    let ordersQuery = supabase
       .from('orders')
       .select(`
         id,
@@ -43,6 +46,12 @@ export async function GET(request: Request) {
       `)
       .gte('created_at', startDate)
       .not('status', 'eq', 'cancelled')
+
+    if (tenant?.id) {
+      ordersQuery = ordersQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: orders } = await ordersQuery
 
     // Calculate KPIs
     const paidOrders = orders?.filter(o => ['paid', 'fulfilled', 'shipped', 'delivered'].includes(o.status)) || []
@@ -105,23 +114,41 @@ export async function GET(request: Request) {
     const revenueByMonth = Object.values(monthlyRevenue)
 
     // Inventory value
-    const { data: variants } = await supabase
+    let variantsQuery = supabase
       .from('product_variants')
       .select('stock, price_cents')
+
+    if (tenant?.id) {
+      variantsQuery = variantsQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: variants } = await variantsQuery
     
     const inventoryValue = variants?.reduce((sum, v) => sum + (v.stock * v.price_cents), 0) || 0
 
     // Low stock count
-    const { count: lowStockCount } = await supabase
+    let lowStockQuery = supabase
       .from('product_variants')
       .select('id', { count: 'exact', head: true })
       .lte('stock', 3)
 
+    if (tenant?.id) {
+      lowStockQuery = lowStockQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { count: lowStockCount } = await lowStockQuery
+
     // Pending orders
-    const { count: pendingOrders } = await supabase
+    let pendingOrdersQuery = supabase
       .from('orders')
       .select('id', { count: 'exact', head: true })
       .in('status', ['pending', 'paid'])
+
+    if (tenant?.id) {
+      pendingOrdersQuery = pendingOrdersQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { count: pendingOrders } = await pendingOrdersQuery
 
     return NextResponse.json({
       totalRevenue,

@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -10,7 +12,7 @@ export async function GET() {
   }
 
   try {
-    const { data: orders, error } = await supabase
+    let ordersQuery = supabase
       .from('orders')
       .select(`
         id,
@@ -26,6 +28,12 @@ export async function GET() {
       `)
       .eq('customer_id', user.id)
       .order('created_at', { ascending: false })
+
+    if (tenant?.id) {
+      ordersQuery = ordersQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: orders, error } = await ordersQuery
 
     if (error) {
       return NextResponse.json({ error: 'Failed to fetch orders' }, { status: 500 })

@@ -2,17 +2,19 @@ import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { isAdmin } from '@/lib/roles'
 import { SupabaseClient } from '@supabase/supabase-js'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 // Update a single variant
 export async function PATCH(req: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(req)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user || !user.id) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 
-  if (!isAdmin(await getUserRole(supabase, user.id!))) {
+  if (!isAdmin(await getUserRole(supabase, user.id!, tenant?.id))) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 
@@ -44,6 +46,7 @@ export async function PATCH(req: Request) {
         .from('product_variants')
         .select('stock')
         .eq('id', variantId)
+        .eq('tenant_id', tenant?.id)
         .single()
       
       if (current && updates.stock !== current.stock) {
@@ -51,6 +54,7 @@ export async function PATCH(req: Request) {
         
         // Create audit entry
         await supabase.from('inventory_audit').insert({
+          tenant_id: tenant?.id,
           variant_id: variantId,
           delta,
           reason: `Manual stock adjustment: ${current.stock} → ${updates.stock}`,
@@ -82,6 +86,7 @@ export async function PATCH(req: Request) {
       .from('product_variants')
       .update(updateData)
       .eq('id', variantId)
+      .eq('tenant_id', tenant?.id)
       .select()
       .single()
 
@@ -97,13 +102,14 @@ export async function PATCH(req: Request) {
 // Delete a variant
 export async function DELETE(req: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(req)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user || !user.id) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 
-  if (!isAdmin(await getUserRole(supabase, user.id!))) {
+  if (!isAdmin(await getUserRole(supabase, user.id!, tenant?.id))) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 
@@ -120,6 +126,7 @@ export async function DELETE(req: Request) {
       .from('order_items')
       .select('id')
       .eq('variant_id', variantId)
+      .eq('tenant_id', tenant?.id)
       .limit(1)
 
     if (orderItems && orderItems.length > 0) {
@@ -132,6 +139,7 @@ export async function DELETE(req: Request) {
       .from('product_variants')
       .delete()
       .eq('id', variantId)
+      .eq('tenant_id', tenant?.id)
 
     if (error) throw error
 
@@ -142,12 +150,17 @@ export async function DELETE(req: Request) {
   }
 }
 
-async function getUserRole(supabase: SupabaseClient, userId: string): Promise<string | undefined> {
-  const { data: profile } = await supabase
+async function getUserRole(supabase: SupabaseClient, userId: string, tenantId?: string): Promise<string | undefined> {
+  let query = supabase
     .from('709_profiles')
     .select('role')
     .eq('id', userId)
-    .single()
+
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId)
+  }
+
+  const { data: profile } = await query.single()
 
   return profile?.role
 }

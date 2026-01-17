@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 interface ShippingAddress {
   name?: string
@@ -14,17 +15,21 @@ interface ShippingAddress {
 
 export async function GET(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { data: profile } = await supabase
+  let profileQuery = supabase
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
-    .single()
+  if (tenant?.id) {
+    profileQuery = profileQuery.eq('tenant_id', tenant.id)
+  }
+  const { data: profile } = await profileQuery.single()
 
   // Only owners can export data
   if (!profile || profile.role !== 'owner') {
@@ -40,7 +45,7 @@ export async function GET(request: Request) {
     let csv = ''
 
     if (type === 'orders') {
-      const { data: orders } = await supabase
+      let ordersQuery = supabase
         .from('orders')
         .select(`
           id,
@@ -55,6 +60,10 @@ export async function GET(request: Request) {
         `)
         .gte('created_at', startDate)
         .order('created_at', { ascending: false })
+      if (tenant?.id) {
+        ordersQuery = ordersQuery.eq('tenant_id', tenant.id)
+      }
+      const { data: orders } = await ordersQuery
 
       csv = 'Order ID,Status,Total,Customer Email,Name,Address,City,Province,Postal,Tracking,Carrier,Created,Paid,Shipped\n'
       orders?.forEach(o => {
@@ -64,7 +73,7 @@ export async function GET(request: Request) {
     }
 
     else if (type === 'inventory') {
-      const { data: variants } = await supabase
+      let variantsQuery = supabase
         .from('product_variants')
         .select(`
           sku,
@@ -76,6 +85,10 @@ export async function GET(request: Request) {
           product:products(brand, model)
         `)
         .order('sku')
+      if (tenant?.id) {
+        variantsQuery = variantsQuery.eq('tenant_id', tenant.id)
+      }
+      const { data: variants } = await variantsQuery
 
       csv = 'SKU,Brand,Model,Size,Condition,Stock,Reserved,Available,Price\n'
       variants?.forEach(v => {
@@ -85,10 +98,14 @@ export async function GET(request: Request) {
     }
 
     else if (type === 'customers') {
-      const { data: orders } = await supabase
+      let ordersQuery = supabase
         .from('orders')
         .select('shipping_address, total_cents, created_at')
         .gte('created_at', startDate)
+      if (tenant?.id) {
+        ordersQuery = ordersQuery.eq('tenant_id', tenant.id)
+      }
+      const { data: orders } = await ordersQuery
 
       // Aggregate by customer email
       const customers: Record<string, { email: string; orders: number; total: number; lastOrder: string }> = {}
@@ -116,7 +133,7 @@ export async function GET(request: Request) {
     }
 
     else if (type === 'products') {
-      const { data: orders } = await supabase
+      let ordersQuery = supabase
         .from('orders')
         .select(`
           order_items(
@@ -130,6 +147,10 @@ export async function GET(request: Request) {
         `)
         .in('status', ['paid', 'fulfilled', 'shipped', 'delivered'])
         .gte('created_at', startDate)
+      if (tenant?.id) {
+        ordersQuery = ordersQuery.eq('tenant_id', tenant.id)
+      }
+      const { data: orders } = await ordersQuery
 
       const products: Record<string, { name: string; sku: string; sold: number; revenue: number }> = {}
       orders?.forEach(order => {
@@ -158,7 +179,7 @@ export async function GET(request: Request) {
     }
 
     else if (type === 'brands') {
-      const { data: orders } = await supabase
+      let ordersQuery = supabase
         .from('orders')
         .select(`
           order_items(
@@ -171,6 +192,10 @@ export async function GET(request: Request) {
         `)
         .in('status', ['paid', 'fulfilled', 'shipped', 'delivered'])
         .gte('created_at', startDate)
+      if (tenant?.id) {
+        ordersQuery = ordersQuery.eq('tenant_id', tenant.id)
+      }
+      const { data: orders } = await ordersQuery
 
       const brands: Record<string, { brand: string; sold: number; revenue: number }> = {}
       orders?.forEach(order => {
@@ -198,12 +223,16 @@ export async function GET(request: Request) {
     }
 
     else if (type === 'revenue') {
-      const { data: orders } = await supabase
+      let ordersQuery = supabase
         .from('orders')
         .select('total_cents, created_at')
         .in('status', ['paid', 'fulfilled', 'shipped', 'delivered'])
         .gte('created_at', startDate)
         .order('created_at')
+      if (tenant?.id) {
+        ordersQuery = ordersQuery.eq('tenant_id', tenant.id)
+      }
+      const { data: orders } = await ordersQuery
 
       const monthly: Record<string, { month: string; revenue: number; orders: number }> = {}
       orders?.forEach(o => {
@@ -223,6 +252,7 @@ export async function GET(request: Request) {
 
     // Log the export
     await supabase.from('activity_logs').insert({
+      tenant_id: tenant?.id,
       user_id: user.id,
       user_email: user.email,
       action: 'export_report',

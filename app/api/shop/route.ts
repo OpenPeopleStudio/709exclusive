@@ -1,15 +1,23 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 export async function GET(request: Request) {
   try {
     const supabase = await createSupabaseServer()
+    const tenant = await getTenantFromRequest(request)
 
     // Simple test - just get all products
-    const { data: rawProducts, error: productsError } = await supabase
+    let productsQuery = supabase
       .from('products')
       .select('id, name, brand, slug, category, created_at')
       .limit(10)
+
+    if (tenant?.id) {
+      productsQuery = productsQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: rawProducts, error: productsError } = await productsQuery
 
     if (productsError) {
       return NextResponse.json({
@@ -19,16 +27,28 @@ export async function GET(request: Request) {
     }
 
     // Get images for these products
-    const { data: imagesData, error: imagesError } = await supabase
+    let imagesQuery = supabase
       .from('product_images')
       .select('product_id, url, is_primary')
       .in('product_id', rawProducts.map(p => p.id))
 
+    if (tenant?.id) {
+      imagesQuery = imagesQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: imagesData, error: imagesError } = await imagesQuery
+
     // Get variants for these products
-    const { data: variantsData, error: variantsError } = await supabase
+    let variantsQuery = supabase
       .from('product_variants')
       .select('product_id, price_cents, stock, reserved')
       .in('product_id', rawProducts.map(p => p.id))
+
+    if (tenant?.id) {
+      variantsQuery = variantsQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: variantsData, error: variantsError } = await variantsQuery
 
     // Create lookup maps
     const imageMap: Record<string, string> = {}

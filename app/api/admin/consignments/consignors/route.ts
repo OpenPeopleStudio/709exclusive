@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -10,11 +12,14 @@ export async function POST(request: Request) {
   }
 
   // Check admin role
-  const { data: profile } = await supabase
+  let profileQuery = supabase
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
-    .single()
+  if (tenant?.id) {
+    profileQuery = profileQuery.eq('tenant_id', tenant.id)
+  }
+  const { data: profile } = await profileQuery.single()
 
   if (!profile || !['admin', 'owner'].includes(profile.role)) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
@@ -26,6 +31,7 @@ export async function POST(request: Request) {
     const { data: consignor, error } = await supabase
       .from('consignors')
       .insert({
+        tenant_id: tenant?.id,
         name,
         email,
         phone,

@@ -1,14 +1,51 @@
 export type UserRole = 'customer' | 'staff' | 'admin' | 'owner'
 
+export type TenantStatus = 'active' | 'inactive' | 'suspended'
+
+export interface Tenant {
+  id: string
+  name: string
+  slug: string
+  status: TenantStatus
+  primary_domain: string | null
+  settings: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface TenantDomain {
+  id: string
+  tenant_id: string
+  domain: string
+  is_primary: boolean
+  verified_at: string | null
+  created_at: string
+}
+
+export type TenantBillingStatus = 'trialing' | 'active' | 'past_due' | 'canceled'
+
+export interface TenantBilling {
+  tenant_id: string
+  plan: string
+  status: TenantBillingStatus
+  billing_email: string | null
+  stripe_customer_id: string | null
+  trial_ends_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Profile {
   id: string
   role: UserRole
   full_name: string | null
+  tenant_id: string
   created_at: string
 }
 
 export interface Product {
   id: string
+  tenant_id: string
   name: string
   slug: string
   brand: string | null
@@ -22,6 +59,7 @@ export interface Product {
 
 export interface ProductVariant {
   id: string
+  tenant_id: string
   product_id: string
   sku: string
   brand: string
@@ -38,6 +76,7 @@ export interface ProductVariant {
 
 export interface ProductImage {
   id: string
+  tenant_id: string
   product_id: string
   url: string
   position: number
@@ -59,6 +98,7 @@ export interface ShippingAddress {
 
 export interface Order {
   id: string
+  tenant_id: string
   customer_id: string
   status: OrderStatus
   subtotal_cents: number
@@ -82,6 +122,7 @@ export interface Order {
 
 export interface OrderItem {
   id: string
+  tenant_id: string
   order_id: string
   variant_id: string
   qty: number
@@ -90,6 +131,7 @@ export interface OrderItem {
 
 export interface StaffLocation {
   id: string
+  tenant_id: string
   user_id: string
   recorded_at: string
   latitude: number

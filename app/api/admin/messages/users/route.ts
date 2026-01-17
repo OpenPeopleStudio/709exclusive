@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { createClient } from '@supabase/supabase-js'
+import { getTenantFromRequest } from '@/lib/tenant'
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -15,6 +17,7 @@ export async function GET() {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || !['admin', 'owner', 'staff'].includes(profile.role)) {
@@ -41,8 +44,17 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
     }
 
+    const { data: tenantProfiles } = await supabase
+      .from('709_profiles')
+      .select('id')
+      .eq('tenant_id', tenant?.id)
+
+    const allowedIds = new Set((tenantProfiles || []).map(p => p.id))
+
     // Map users to a simpler format
-    const users = authData.users.map(u => ({
+    const users = authData.users
+      .filter(u => allowedIds.has(u.id))
+      .map(u => ({
       id: u.id,
       email: u.email || '',
       full_name: u.user_metadata?.full_name || null,

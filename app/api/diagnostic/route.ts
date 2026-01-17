@@ -1,28 +1,48 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
 
   try {
     // Check products count
-    const { data: products, error: productsError } = await supabase
+    let productsQuery = supabase
       .from('products')
       .select('id, name, brand, slug')
+
+    if (tenant?.id) {
+      productsQuery = productsQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: products, error: productsError } = await productsQuery
 
     if (productsError) throw productsError
 
     // Check variants count and stock levels
-    const { data: variants, error: variantsError } = await supabase
+    let variantsQuery = supabase
       .from('product_variants')
       .select('id, product_id, stock, reserved, sku')
+
+    if (tenant?.id) {
+      variantsQuery = variantsQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: variants, error: variantsError } = await variantsQuery
 
     if (variantsError) throw variantsError
 
     // Check images count
-    const { data: images, error: imagesError } = await supabase
+    let imagesQuery = supabase
       .from('product_images')
       .select('id, product_id, url')
+
+    if (tenant?.id) {
+      imagesQuery = imagesQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: images, error: imagesError } = await imagesQuery
 
     if (imagesError) throw imagesError
 

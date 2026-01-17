@@ -2,12 +2,14 @@ import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { hasAdminAccess } from '@/lib/roles'
 import { redactErrorMessage } from '@/lib/privacy'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 const sanitizeFilename = (name: string) =>
   name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -18,6 +20,7 @@ export async function POST(request: Request) {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   const formData = await request.formData()
@@ -35,7 +38,8 @@ export async function POST(request: Request) {
 
   const targetId = customerId || user.id
   const safeName = sanitizeFilename(typeof filename === 'string' ? filename : file.name)
-  const path = `messages/${targetId}/${Date.now()}-${safeName}`
+  const tenantPrefix = tenant?.id || 'default'
+  const path = `messages/${tenantPrefix}/${targetId}/${Date.now()}-${safeName}`
 
   const buffer = await file.arrayBuffer()
   const { error } = await supabase

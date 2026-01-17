@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
+import { useTenant } from '@/context/TenantContext'
 
 interface LoginModalProps {
   isOpen: boolean
@@ -12,6 +13,7 @@ interface LoginModalProps {
 
 export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
   const router = useRouter()
+  const { id: tenantId, slug: tenantSlug } = useTenant()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
@@ -94,6 +96,7 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
           .from('709_profiles')
           .select('role')
           .eq('id', data.session.user.id)
+          .eq('tenant_id', tenantId)
           .single()
 
         const role = profile?.role || ''
@@ -136,6 +139,8 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
         options: {
           data: {
             full_name: fullName,
+            tenant_id: tenantId,
+            tenant_slug: tenantSlug,
           },
           emailRedirectTo: `${window.location.origin}/account`,
         },

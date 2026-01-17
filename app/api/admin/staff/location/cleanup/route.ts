@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { redactErrorMessage } from '@/lib/privacy'
+import { getTenantFromRequest } from '@/lib/tenant'
 
-export async function POST() {
+export async function POST(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -14,6 +16,7 @@ export async function POST() {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || !['admin', 'owner'].includes(profile.role)) {
@@ -23,17 +26,24 @@ export async function POST() {
   const now = new Date().toISOString()
 
   try {
-    const { data, error } = await supabase
+    let deleteQuery = supabase
       .from('staff_locations')
       .delete()
       .lt('expires_at', now)
       .select('id')
+
+    if (tenant?.id) {
+      deleteQuery = deleteQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data, error } = await deleteQuery
 
     if (error) {
       return NextResponse.json({ error: redactErrorMessage('Failed to purge locations') }, { status: 500 })
     }
 
     await supabase.from('activity_logs').insert({
+      tenant_id: tenant?.id,
       user_id: user.id,
       user_email: user.email,
       action: 'cleanup_staff_locations',

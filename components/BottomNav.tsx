@@ -6,11 +6,13 @@ import { useCart } from '@/context/CartContext'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import LoginModal from './LoginModal'
+import { useTenant } from '@/context/TenantContext'
 
 export default function BottomNav() {
   const pathname = usePathname()
   const router = useRouter()
   const { itemCount, isHydrated } = useCart()
+  const { id: tenantId, featureFlags } = useTenant()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
@@ -25,6 +27,7 @@ export default function BottomNav() {
           .from('709_profiles')
           .select('role')
           .eq('id', user.id)
+          .eq('tenant_id', tenantId)
           .single()
         
         setUserRole(profile?.role || null)
@@ -40,6 +43,7 @@ export default function BottomNav() {
           .from('709_profiles')
           .select('role')
           .eq('id', session.user.id)
+          .eq('tenant_id', tenantId)
           .single()
         
         setUserRole(profile?.role || null)
@@ -54,8 +58,9 @@ export default function BottomNav() {
   const isAdmin = userRole === 'owner' || userRole === 'admin'
   const isStaff = userRole === 'staff'
 
+  const canAccessAdmin = featureFlags.admin !== false
   const accountLink = isLoggedIn
-    ? (isAdmin ? '/admin/products' : isStaff ? '/staff/location' : '/account')
+    ? (isAdmin && canAccessAdmin ? '/admin/products' : isStaff ? '/staff/location' : '/account')
     : '/account/login'
 
   // Hide on admin/staff pages
@@ -97,7 +102,7 @@ export default function BottomNav() {
     },
     {
       href: accountLink,
-      label: isLoggedIn ? (isAdmin ? 'Admin' : isStaff ? 'Staff' : 'Account') : 'Sign in',
+      label: isLoggedIn ? (isAdmin && canAccessAdmin ? 'Admin' : isStaff ? 'Staff' : 'Account') : 'Sign in',
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />

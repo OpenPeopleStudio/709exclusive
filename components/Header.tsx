@@ -6,13 +6,16 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useCart } from '@/context/CartContext'
 import { supabase } from '@/lib/supabaseClient'
 import LoginModal from './LoginModal'
+import { useTenant } from '@/context/TenantContext'
 
 function HeaderContent() {
   const { itemCount, isHydrated } = useCart()
+  const { id: tenantId, settings, featureFlags } = useTenant()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const router = useRouter()
   const isDropsActive = searchParams.get('drops') === 'true'
+  const brandName = settings?.theme?.brand_name || 'Store'
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isClosing, setIsClosing] = useState(false)
@@ -41,6 +44,7 @@ function HeaderContent() {
           .from('709_profiles')
           .select('role')
           .eq('id', user.id)
+          .eq('tenant_id', tenantId)
           .single()
         
         setIsAdmin(['owner', 'admin', 'staff'].includes(profile?.role || ''))
@@ -57,6 +61,7 @@ function HeaderContent() {
           .from('709_profiles')
           .select('role')
           .eq('id', session.user.id)
+          .eq('tenant_id', tenantId)
           .single()
         
         setIsAdmin(['owner', 'admin', 'staff'].includes(profile?.role || ''))
@@ -134,12 +139,13 @@ function HeaderContent() {
   }
 
   // Determine the account link based on role
+  const canAccessAdmin = featureFlags.admin !== false
   const accountLink = isLoggedIn 
-    ? (isAdmin ? '/admin/products' : '/account') 
+    ? (isAdmin && canAccessAdmin ? '/admin/products' : '/account') 
     : '/account/login'
   
   const accountLabel = isLoggedIn 
-    ? (isAdmin ? 'Admin' : 'Account') 
+    ? (isAdmin && canAccessAdmin ? 'Admin' : 'Account') 
     : 'Sign in'
 
   return (
@@ -156,7 +162,7 @@ function HeaderContent() {
             {/* Logo */}
             <Link href="/" className="group flex items-center gap-2">
               <span className="text-2xl font-semibold tracking-tight text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent)]">
-                709exclusive
+                {brandName}
               </span>
             </Link>
 
@@ -172,22 +178,26 @@ function HeaderContent() {
               >
                 Shop
               </Link>
-              <Link 
-                href="/shop?drops=true" 
-                className={`text-sm font-medium transition-colors ${
-                  isDropsActive
-                    ? 'text-[var(--text-primary)]'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                Drops
-              </Link>
-              <Link 
-                href="/policies/shipping" 
-                className="text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-              >
-                Delivery & Pickup
-              </Link>
+              {featureFlags.drops !== false && (
+                <Link 
+                  href="/shop?drops=true" 
+                  className={`text-sm font-medium transition-colors ${
+                    isDropsActive
+                      ? 'text-[var(--text-primary)]'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  Drops
+                </Link>
+              )}
+              {(featureFlags.local_delivery || featureFlags.pickup) && (
+                <Link 
+                  href="/policies/shipping" 
+                  className="text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                >
+                  Delivery & Pickup
+                </Link>
+              )}
             </nav>
 
             {/* Right side */}
@@ -340,20 +350,22 @@ function HeaderContent() {
                   <span className="text-lg font-medium">Shop</span>
                 </Link>
 
-                <Link 
-                  href="/shop?drops=true" 
-                  className={`flex items-center gap-4 px-4 py-4 rounded-xl transition-colors ${
-                    isDropsActive 
-                      ? 'bg-[var(--accent)]/10 text-[var(--accent)]' 
-                      : 'text-[var(--text-primary)] hover:bg-white/5'
-                  }`}
-                  onClick={closeMobileMenu}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v4m0 0a4 4 0 014 4c0 2.757-2 5-4 8-2-3-4-5.243-4-8a4 4 0 014-4z" />
-                  </svg>
-                  <span className="text-lg font-medium">Drops</span>
-                </Link>
+                {featureFlags.drops !== false && (
+                  <Link 
+                    href="/shop?drops=true" 
+                    className={`flex items-center gap-4 px-4 py-4 rounded-xl transition-colors ${
+                      isDropsActive 
+                        ? 'bg-[var(--accent)]/10 text-[var(--accent)]' 
+                        : 'text-[var(--text-primary)] hover:bg-white/5'
+                    }`}
+                    onClick={closeMobileMenu}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v4m0 0a4 4 0 014 4c0 2.757-2 5-4 8-2-3-4-5.243-4-8a4 4 0 014-4z" />
+                    </svg>
+                    <span className="text-lg font-medium">Drops</span>
+                  </Link>
+                )}
 
                 <Link 
                   href="/cart" 
@@ -392,16 +404,18 @@ function HeaderContent() {
                   <span className="text-lg font-medium">Orders</span>
                 </Link>
 
-                <Link 
-                  href="/policies/shipping" 
-                  className="flex items-center gap-4 px-4 py-4 rounded-xl transition-colors text-[var(--text-primary)] hover:bg-white/5"
-                  onClick={closeMobileMenu}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 7h12v10H3V7zm12 3h3l3 3v4h-6V10zm-9 7h.01M15 17h.01M6 7V5a2 2 0 012-2h6a2 2 0 012 2v2" />
-                  </svg>
-                  <span className="text-lg font-medium">Delivery & Pickup</span>
-                </Link>
+                {(featureFlags.local_delivery || featureFlags.pickup) && (
+                  <Link 
+                    href="/policies/shipping" 
+                    className="flex items-center gap-4 px-4 py-4 rounded-xl transition-colors text-[var(--text-primary)] hover:bg-white/5"
+                    onClick={closeMobileMenu}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 7h12v10H3V7zm12 3h3l3 3v4h-6V10zm-9 7h.01M15 17h.01M6 7V5a2 2 0 012-2h6a2 2 0 012 2v2" />
+                    </svg>
+                    <span className="text-lg font-medium">Delivery & Pickup</span>
+                  </Link>
+                )}
               </div>
 
               {/* Divider */}
@@ -459,7 +473,7 @@ function HeaderContent() {
             {/* Footer */}
             <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-[var(--border-primary)]" style={{ paddingBottom: 'calc(24px + var(--safe-area-bottom, 0px))' }}>
               <p className="text-xs text-[var(--text-muted)] text-center">
-                709exclusive &middot; St. John&apos;s, NL
+                {brandName} &middot; St. John&apos;s, NL
               </p>
             </div>
           </div>

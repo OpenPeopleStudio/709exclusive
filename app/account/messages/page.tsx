@@ -14,6 +14,7 @@ import PWAInstallButton from '@/components/account/PWAInstallButton'
 import Button from '@/components/ui/Button'
 import Surface from '@/components/ui/Surface'
 import { generateFileKey, encryptFileWithKey, decryptFileWithKey } from '@/lib/crypto/e2e'
+import { useTenant } from '@/context/TenantContext'
 
 interface Message {
   id: string
@@ -45,6 +46,7 @@ interface DecryptedMessage extends Message {
 
 export default function MessagesPage() {
   const router = useRouter()
+  const { id: tenantId, featureFlags } = useTenant()
   const [messages, setMessages] = useState<DecryptedMessage[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
@@ -101,6 +103,12 @@ export default function MessagesPage() {
   }, [])
 
   useEffect(() => {
+    if (featureFlags.messages === false) {
+      router.push('/account')
+    }
+  }, [featureFlags.messages, router])
+
+  useEffect(() => {
     if (!showKeyBackup && typeof window !== 'undefined') {
       setLastBackupAt(localStorage.getItem('709e2e:lastBackupAt'))
     }
@@ -109,19 +117,24 @@ export default function MessagesPage() {
   // Find an admin to message (for E2EE purposes)
   useEffect(() => {
     const findAdmin = async () => {
-      const { data } = await supabase
+      let adminQuery = supabase
         .from('709_profiles')
         .select('id, public_key')
         .in('role', ['admin', 'owner'])
         .limit(1)
-        .single()
+
+      if (tenantId) {
+        adminQuery = adminQuery.eq('tenant_id', tenantId)
+      }
+
+      const { data } = await adminQuery.single()
       
       if (data) {
         setAdminId(data.id)
       }
     }
     findAdmin()
-  }, [])
+  }, [tenantId])
 
   // Get admin fingerprint for verification
   useEffect(() => {
@@ -177,11 +190,16 @@ export default function MessagesPage() {
       }
       setUserId(user.id)
 
-      const { data: profile } = await supabase
+      let profileQuery = supabase
         .from('709_profiles')
         .select('message_retention_enabled, message_retention_days')
         .eq('id', user.id)
-        .single()
+
+      if (tenantId) {
+        profileQuery = profileQuery.eq('tenant_id', tenantId)
+      }
+
+      const { data: profile } = await profileQuery.single()
 
       const enabled = Boolean(profile?.message_retention_enabled)
       const days = profile?.message_retention_days || 90
@@ -196,10 +214,16 @@ export default function MessagesPage() {
         })
       }
 
-      const { data: orders } = await supabase
+      let ordersQuery = supabase
         .from('orders')
         .select('id, status')
         .eq('customer_id', user.id)
+
+      if (tenantId) {
+        ordersQuery = ordersQuery.eq('tenant_id', tenantId)
+      }
+
+      const { data: orders } = await ordersQuery
 
       const eligibleOrders = (orders || []).filter((order) =>
         eligibleOrderStatuses.includes(order.status)
@@ -208,11 +232,17 @@ export default function MessagesPage() {
       setEligibilityLoaded(true)
 
       // Fetch messages
-      const { data } = await supabase
+      let messagesQuery = supabase
         .from('messages')
         .select('*')
         .eq('customer_id', user.id)
         .order('created_at', { ascending: true })
+
+      if (tenantId) {
+        messagesQuery = messagesQuery.eq('tenant_id', tenantId)
+      }
+
+      const { data } = await messagesQuery
 
       if (data) {
         const decrypted = await loadAndDecryptMessages(data)
@@ -222,16 +252,22 @@ export default function MessagesPage() {
       setLoading(false)
 
       // Mark messages as read
-      await supabase
+      let markReadQuery = supabase
         .from('messages')
         .update({ read: true })
         .eq('customer_id', user.id)
         .eq('sender_type', 'admin')
         .eq('read', false)
+
+      if (tenantId) {
+        markReadQuery = markReadQuery.eq('tenant_id', tenantId)
+      }
+
+      await markReadQuery
     }
 
     loadMessages()
-  }, [router, loadAndDecryptMessages])
+  }, [router, loadAndDecryptMessages, tenantId])
 
   // Re-decrypt when encryption is initialized
   useEffect(() => {
@@ -294,6 +330,11 @@ export default function MessagesPage() {
     const plaintext = newMessage.trim()
 
     try {
+      if (!tenantId) {
+        setSendError('Tenant not resolved')
+        setSending(false)
+        return
+      }
       if (attachmentFile && (!adminId || !isInitialized)) {
         setAttachmentError('Attachments require encrypted chat setup.')
         setSending(false)
@@ -301,6 +342,7 @@ export default function MessagesPage() {
       }
 
       let messageData: {
+        tenant_id: string
         customer_id: string
         content: string
         sender_type: 'customer'
@@ -319,6 +361,7 @@ export default function MessagesPage() {
         attachment_key_sender_public_key?: string | null
         attachment_key_message_index?: number | null
       } = {
+        tenant_id: tenantId,
         customer_id: userId,
         content: plaintext,
         sender_type: 'customer',

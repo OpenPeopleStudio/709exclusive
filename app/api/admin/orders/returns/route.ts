@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -14,6 +16,7 @@ export async function GET() {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || !['admin', 'owner'].includes(profile.role)) {
@@ -21,13 +24,19 @@ export async function GET() {
   }
 
   try {
-    const { data: returns } = await supabase
+    let returnsQuery = supabase
       .from('returns')
       .select(`
         *,
         order:orders(id, shipping_address, status)
       `)
       .order('created_at', { ascending: false })
+
+    if (tenant?.id) {
+      returnsQuery = returnsQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: returns } = await returnsQuery
 
     // Transform to include customer info from shipping_address
     const transformedReturns = returns?.map(ret => {
@@ -56,6 +65,7 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -67,6 +77,7 @@ export async function PATCH(request: Request) {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || !['admin', 'owner'].includes(profile.role)) {
@@ -81,12 +92,17 @@ export async function PATCH(request: Request) {
       updateData.completed_at = new Date().toISOString()
     }
 
-    const { data: returnRecord, error } = await supabase
+    let updateQuery = supabase
       .from('returns')
       .update(updateData)
       .eq('id', returnId)
       .select()
-      .single()
+
+    if (tenant?.id) {
+      updateQuery = updateQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: returnRecord, error } = await updateQuery.single()
 
     if (error) throw error
 

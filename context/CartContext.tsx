@@ -15,31 +15,38 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
 
-export function CartProvider({ children }: { children: React.ReactNode }) {
+export function CartProvider({
+  children,
+  tenantId,
+}: {
+  children: React.ReactNode
+  tenantId: string
+}) {
   // Start with empty cart to match server render
   const [cart, setCart] = useState<Cart>([])
   const [isHydrated, setIsHydrated] = useState(false)
+  const tenantKey = tenantId || 'default'
 
   // Hydrate cart from localStorage after mount
   useEffect(() => {
-    setCart(getCart())
+    setCart(getCart(tenantKey))
     setIsHydrated(true)
-  }, [])
+  }, [tenantKey])
 
   const addToCart = (variantId: string, qty: number = 1) => {
-    setCart(currentCart => addToCartUtil([...currentCart], variantId, qty))
+    setCart(currentCart => addToCartUtil([...currentCart], variantId, qty, tenantKey))
   }
 
   const removeFromCart = (variantId: string) => {
-    setCart(currentCart => removeFromCartUtil([...currentCart], variantId))
+    setCart(currentCart => removeFromCartUtil([...currentCart], variantId, tenantKey))
   }
 
   const updateQty = (variantId: string, qty: number) => {
-    setCart(currentCart => updateQtyUtil([...currentCart], variantId, qty))
+    setCart(currentCart => updateQtyUtil([...currentCart], variantId, qty, tenantKey))
   }
 
   const clearCart = () => {
-    clearCartUtil()
+    clearCartUtil(tenantKey)
     setCart([])
   }
 

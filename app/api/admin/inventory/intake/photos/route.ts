@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -13,6 +15,7 @@ export async function POST(request: Request) {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || !['admin', 'owner', 'staff'].includes(profile.role)) {
@@ -58,6 +61,7 @@ export async function POST(request: Request) {
       .from('product_models')
       .select('brand, model')
       .eq('id', modelId)
+      .eq('tenant_id', tenant?.id)
       .single()
 
     if (!modelInfo) {
@@ -70,6 +74,7 @@ export async function POST(request: Request) {
       .select('id')
       .eq('brand', modelInfo.brand)
       .eq('name', modelInfo.model)
+      .eq('tenant_id', tenant?.id)
       .single()
 
     if (!product) {
@@ -132,6 +137,7 @@ export async function POST(request: Request) {
       const { error } = await supabase
         .from('product_images')
         .insert({
+          tenant_id: tenant?.id,
           product_id: product.id,
           url: imageUrl,
           is_primary: entry.isPrimary,
@@ -151,22 +157,26 @@ export async function POST(request: Request) {
         .from('product_images')
         .update({ is_primary: false })
         .eq('product_id', product.id)
+        .eq('tenant_id', tenant?.id)
 
       await supabase
         .from('product_images')
         .update({ is_primary: true })
         .eq('product_id', product.id)
         .eq('url', primaryUrl)
+        .eq('tenant_id', tenant?.id)
     } else if (primaryUrl) {
       await supabase
         .from('product_images')
         .update({ is_primary: false })
         .eq('product_id', product.id)
         .neq('url', primaryUrl)
+        .eq('tenant_id', tenant?.id)
     }
 
     // Log the action
     await supabase.from('activity_logs').insert({
+      tenant_id: tenant?.id,
       user_id: user.id,
       user_email: user.email,
       action: 'attach_product_images',

@@ -31,16 +31,20 @@ export async function POST(req: Request) {
 
     const { data: order } = await supabase
       .from('orders')
-      .select('id, status')
+      .select('id, status, tenant_id')
       .eq('stripe_payment_intent', intent.id)
       .single()
 
     // Idempotency: only process if not already paid
     if (order && order.status === 'pending') {
-      const { data: items } = await supabase
+      let itemsQuery = supabase
         .from('order_items')
         .select('variant_id, qty')
         .eq('order_id', order.id)
+      if (order.tenant_id) {
+        itemsQuery = itemsQuery.eq('tenant_id', order.tenant_id)
+      }
+      const { data: items } = await itemsQuery
 
       if (items) {
         for (const item of items) {
@@ -51,13 +55,17 @@ export async function POST(req: Request) {
         }
       }
 
-      await supabase
+      let updateQuery = supabase
         .from('orders')
         .update({
           status: 'paid',
           paid_at: new Date().toISOString()
         })
         .eq('id', order.id)
+      if (order.tenant_id) {
+        updateQuery = updateQuery.eq('tenant_id', order.tenant_id)
+      }
+      await updateQuery
 
       // Trigger order confirmation email
       await sendOrderConfirmation(order.id)
@@ -69,16 +77,20 @@ export async function POST(req: Request) {
     // Get order and release reserved inventory
     const { data: order } = await supabase
       .from('orders')
-      .select('id, status')
+      .select('id, status, tenant_id')
       .eq('stripe_payment_intent', intent.id)
       .single()
 
     if (order && order.status === 'pending') {
       // Get order items and release reservations
-      const { data: orderItems } = await supabase
+      let itemsQuery = supabase
         .from('order_items')
         .select('variant_id, qty')
         .eq('order_id', order.id)
+      if (order.tenant_id) {
+        itemsQuery = itemsQuery.eq('tenant_id', order.tenant_id)
+      }
+      const { data: orderItems } = await itemsQuery
 
       if (orderItems) {
         for (const item of orderItems) {
@@ -90,13 +102,17 @@ export async function POST(req: Request) {
       }
 
       // Update order status
-      await supabase
+      let updateQuery = supabase
         .from('orders')
         .update({
           status: 'cancelled',
           cancelled_at: new Date().toISOString()
         })
         .eq('id', order.id)
+      if (order.tenant_id) {
+        updateQuery = updateQuery.eq('tenant_id', order.tenant_id)
+      }
+      await updateQuery
     }
   }
 

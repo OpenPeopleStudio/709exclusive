@@ -3,11 +3,20 @@ import { createSupabaseServer } from '@/lib/supabaseServer'
 import { stripe } from '@/lib/stripe'
 import { getCheckoutQuote } from '@/lib/checkoutPricing'
 import type { CartItem } from '@/types/cart'
+import { getTenantFromRequest } from '@/lib/tenant'
+import { resolveDeliveryProvider, resolvePaymentProvider } from '@/lib/integrations'
 
 export async function POST(req: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(req)
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const paymentProvider = resolvePaymentProvider(tenant?.settings)
+  if (paymentProvider !== 'stripe') {
+    return NextResponse.json({ error: 'Card payments are not enabled for this tenant' }, { status: 400 })
+  }
+  const deliveryProvider = resolveDeliveryProvider(tenant?.settings)
 
   const { items, shippingAddress, shippingMethodCode }: {
     items: CartItem[]
@@ -43,6 +52,8 @@ export async function POST(req: Request) {
       items,
       shippingAddress,
       requestedShippingMethodCode: shippingMethodCode,
+      tenantId: tenant?.id,
+      deliveryProvider,
     })
   } catch (error) {
     const anyError = error as Error & { variant_id?: string }
@@ -87,6 +98,7 @@ export async function POST(req: Request) {
   const { data: order, error: orderError } = await supabase
     .from('orders')
     .insert({
+      tenant_id: tenant?.id,
       customer_id: user.id,
       status: 'pending',
       subtotal_cents: quote.subtotalCents,
@@ -110,10 +122,16 @@ export async function POST(req: Request) {
   }
 
   // Create order items
-  const { data: variantsForItems, error: variantsError } = await supabase
+  let variantsQuery = supabase
     .from('product_variants')
     .select('id, price_cents')
     .in('id', reserved.map(r => r.variant_id))
+
+  if (tenant?.id) {
+    variantsQuery = variantsQuery.eq('tenant_id', tenant.id)
+  }
+
+  const { data: variantsForItems, error: variantsError } = await variantsQuery
 
   if (variantsError || !variantsForItems) {
     await supabase.from('orders').delete().eq('id', order.id)
@@ -126,6 +144,7 @@ export async function POST(req: Request) {
   const orderItems = reserved.map(r => {
     const variant = variantsForItems.find(v => v.id === r.variant_id)
     return {
+      tenant_id: tenant?.id,
       order_id: order.id,
       variant_id: r.variant_id,
       qty: r.qty,
@@ -152,6 +171,7 @@ export async function POST(req: Request) {
       receipt_email: shippingAddress.email,
       metadata: {
         order_id: order.id,
+        tenant_id: tenant?.id || 'unknown',
         shipping_method_code: quote.selectedShippingMethodCode,
       },
     })

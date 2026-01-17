@@ -4,16 +4,18 @@ import { stripe } from '@/lib/stripe'
 import { isAdmin } from '@/lib/roles'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { sendOrderRefunded } from '@/lib/email'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 export async function POST(req: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(req)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user || !user.id) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 
-  if (!isAdmin(await getUserRole(supabase, user.id!))) {
+  if (!isAdmin(await getUserRole(supabase, user.id!, tenant?.id))) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 
@@ -29,6 +31,7 @@ export async function POST(req: Request) {
       .from('orders')
       .select('status, stripe_payment_intent, total_cents')
       .eq('id', orderId)
+      .eq('tenant_id', tenant?.id)
       .single()
 
     if (orderError || !order) {
@@ -59,6 +62,7 @@ export async function POST(req: Request) {
         refunded_at: new Date().toISOString()
       })
       .eq('id', orderId)
+      .eq('tenant_id', tenant?.id)
 
     if (updateError) {
       return NextResponse.json({ error: 'Failed to update order' }, { status: 500 })
@@ -75,12 +79,17 @@ export async function POST(req: Request) {
   }
 }
 
-async function getUserRole(supabase: SupabaseClient, userId: string): Promise<string | undefined> {
-  const { data: profile } = await supabase
+async function getUserRole(supabase: SupabaseClient, userId: string, tenantId?: string): Promise<string | undefined> {
+  let query = supabase
     .from('709_profiles')
     .select('role')
     .eq('id', userId)
-    .single()
+
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId)
+  }
+
+  const { data: profile } = await query.single()
 
   return profile?.role
 }

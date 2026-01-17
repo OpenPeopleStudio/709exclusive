@@ -2,16 +2,21 @@ import { redirect } from 'next/navigation'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { isAdmin } from '@/lib/roles'
 import AdminShell from '@/components/admin/AdminShell'
+import { getTenantFromRequest } from '@/lib/tenant'
 
-export const metadata = {
-  title: '709 Admin',
-  manifest: '/admin/manifest.webmanifest',
-  appleWebApp: {
-    capable: true,
-    title: '709 Admin',
-    statusBarStyle: 'black-translucent',
-  },
-} as const
+export async function generateMetadata() {
+  const tenant = await getTenantFromRequest()
+  const brandName = tenant?.settings?.theme?.brand_name || tenant?.name || 'Store'
+  return {
+    title: `${brandName} Admin`,
+    manifest: '/admin/manifest.webmanifest',
+    appleWebApp: {
+      capable: true,
+      title: `${brandName} Admin`,
+      statusBarStyle: 'black-translucent',
+    },
+  } as const
+}
 
 export const viewport = {
   themeColor: '#0E0E0E',
@@ -28,10 +33,13 @@ const navItems = [
   { href: '/admin/app', label: 'Install App', icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M8 12l4 4m0 0l4-4m-4 4V4' },
   { href: '/admin/reports', label: 'Reports', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
   { href: '/admin/settings', label: 'Settings', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' },
+  { href: '/admin/tenant-settings', label: 'Tenant', icon: 'M12 3l9 4.5-9 4.5-9-4.5L12 3zm9 8.5V17a2 2 0 01-1.106 1.789L12 23l-7.894-4.211A2 2 0 013 17v-5.5l9 4.5 9-4.5z' },
+  { href: '/admin/tenants', label: 'Super Admin', icon: 'M7 7h10M7 12h10M7 17h10M4 4h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2z' },
 ]
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) redirect('/')
@@ -40,6 +48,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!isAdmin(profile?.role)) redirect('/')

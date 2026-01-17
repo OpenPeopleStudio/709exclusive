@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -10,11 +12,14 @@ export async function GET() {
   }
 
   // Check admin role
-  const { data: profile } = await supabase
+  let profileQuery = supabase
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
-    .single()
+  if (tenant?.id) {
+    profileQuery = profileQuery.eq('tenant_id', tenant.id)
+  }
+  const { data: profile } = await profileQuery.single()
 
   if (!profile || !['admin', 'owner'].includes(profile.role)) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
@@ -22,13 +27,17 @@ export async function GET() {
 
   try {
     // Fetch consignors
-    const { data: consignors } = await supabase
+    let consignorsQuery = supabase
       .from('consignors')
       .select('*')
       .order('name')
+    if (tenant?.id) {
+      consignorsQuery = consignorsQuery.eq('tenant_id', tenant.id)
+    }
+    const { data: consignors } = await consignorsQuery
 
     // Fetch consignment items
-    const { data: items } = await supabase
+    let itemsQuery = supabase
       .from('consignment_items')
       .select(`
         *,
@@ -36,15 +45,23 @@ export async function GET() {
         consignor:consignors(name)
       `)
       .order('created_at', { ascending: false })
+    if (tenant?.id) {
+      itemsQuery = itemsQuery.eq('tenant_id', tenant.id)
+    }
+    const { data: items } = await itemsQuery
 
     // Fetch payouts
-    const { data: payouts } = await supabase
+    let payoutsQuery = supabase
       .from('consignment_payouts')
       .select(`
         *,
         consignor:consignors(name)
       `)
       .order('created_at', { ascending: false })
+    if (tenant?.id) {
+      payoutsQuery = payoutsQuery.eq('tenant_id', tenant.id)
+    }
+    const { data: payouts } = await payoutsQuery
 
     return NextResponse.json({
       consignors: consignors || [],

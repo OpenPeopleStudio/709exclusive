@@ -9,6 +9,7 @@ import { useEncryption } from '@/components/EncryptionProvider'
 import PWAInstallButton from '@/components/account/PWAInstallButton'
 import Surface from '@/components/ui/Surface'
 import Button from '@/components/ui/Button'
+import { useTenant } from '@/context/TenantContext'
 
 interface Order {
   id: string
@@ -25,6 +26,7 @@ interface UserProfile {
 }
 
 export default function AccountPage() {
+  const { id: tenantId, featureFlags } = useTenant()
   const [user, setUser] = useState<UserProfile | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,19 +47,25 @@ export default function AccountPage() {
       })
 
       // Fetch recent orders
-      const { data: ordersData } = await supabase
+      let ordersQuery = supabase
         .from('orders')
         .select('*')
         .eq('customer_id', authUser.id)
         .order('created_at', { ascending: false })
         .limit(5)
 
+      if (tenantId) {
+        ordersQuery = ordersQuery.eq('tenant_id', tenantId)
+      }
+
+      const { data: ordersData } = await ordersQuery
+
       setOrders(ordersData || [])
       setLoading(false)
     }
 
     loadAccount()
-  }, [])
+  }, [tenantId])
 
   const getStatusStyles = (status: string) => {
     switch (status) {
@@ -122,49 +130,53 @@ export default function AccountPage() {
               </Surface>
             </Link>
 
-            <Link 
-              href="/account/wishlist"
-              className="block"
-            >
-              <Surface padding="md" className="hover:border-[var(--border-secondary)] transition-colors">
-              <div className="w-10 h-10 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center mb-3">
-                <svg className="w-5 h-5 text-[var(--text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-              </div>
-              <h3 className="font-medium text-[var(--text-primary)]">Wishlist</h3>
-              <p className="text-xs text-[var(--text-muted)] mt-1 hidden md:block">Saved items</p>
-              </Surface>
-            </Link>
+            {featureFlags.wishlist !== false && (
+              <Link 
+                href="/account/wishlist"
+                className="block"
+              >
+                <Surface padding="md" className="hover:border-[var(--border-secondary)] transition-colors">
+                <div className="w-10 h-10 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center mb-3">
+                  <svg className="w-5 h-5 text-[var(--text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                </div>
+                <h3 className="font-medium text-[var(--text-primary)]">Wishlist</h3>
+                <p className="text-xs text-[var(--text-muted)] mt-1 hidden md:block">Saved items</p>
+                </Surface>
+              </Link>
+            )}
 
-            <Link 
-              href="/account/messages"
-              className="block"
-            >
-              <Surface padding="md" className="hover:border-[var(--border-secondary)] transition-colors">
-              <div className="w-10 h-10 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center mb-3 relative">
-                <svg className="w-5 h-5 text-[var(--text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-                {hasKeys && (
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[var(--success)] flex items-center justify-center">
-                    <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                )}
-                {isInitializing && (
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[var(--bg-tertiary)] border border-[var(--border-primary)] flex items-center justify-center">
-                    <div className="w-2 h-2 border border-[var(--text-muted)] border-t-transparent rounded-full animate-spin"></div>
-                  </div>
-                )}
-              </div>
-              <h3 className="font-medium text-[var(--text-primary)]">Messages</h3>
-              <p className="text-xs text-[var(--text-muted)] mt-1 hidden md:block">
-                {hasKeys ? 'Encrypted chat' : 'Chat with seller'}
-              </p>
-              </Surface>
-            </Link>
+            {featureFlags.messages !== false && (
+              <Link 
+                href="/account/messages"
+                className="block"
+              >
+                <Surface padding="md" className="hover:border-[var(--border-secondary)] transition-colors">
+                <div className="w-10 h-10 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center mb-3 relative">
+                  <svg className="w-5 h-5 text-[var(--text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  {featureFlags.e2e_encryption !== false && hasKeys && (
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[var(--success)] flex items-center justify-center">
+                      <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  )}
+                  {featureFlags.e2e_encryption !== false && isInitializing && (
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[var(--bg-tertiary)] border border-[var(--border-primary)] flex items-center justify-center">
+                      <div className="w-2 h-2 border border-[var(--text-muted)] border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  )}
+                </div>
+                <h3 className="font-medium text-[var(--text-primary)]">Messages</h3>
+                <p className="text-xs text-[var(--text-muted)] mt-1 hidden md:block">
+                  {featureFlags.e2e_encryption !== false && hasKeys ? 'Encrypted chat' : 'Chat with seller'}
+                </p>
+                </Surface>
+              </Link>
+            )}
 
             <Link 
               href="/account/settings"

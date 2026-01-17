@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { searchGoogleImages } from '@/lib/imageSources/google'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 export async function POST(req: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(req)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user || !user.id) {
@@ -15,6 +17,7 @@ export async function POST(req: Request) {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || !['owner', 'admin'].includes(profile.role)) {

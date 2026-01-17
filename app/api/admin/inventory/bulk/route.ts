@@ -2,16 +2,18 @@ import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { isAdmin } from '@/lib/roles'
 import { SupabaseClient } from '@supabase/supabase-js'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 export async function POST(req: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(req)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user || !user.id) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 
-  if (!isAdmin(await getUserRole(supabase, user.id!))) {
+  if (!isAdmin(await getUserRole(supabase, user.id!, tenant?.id))) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 
@@ -47,6 +49,7 @@ export async function POST(req: Request) {
           .from('product_variants')
           .select('id, stock, price_cents, sku')
           .eq('id', variantId)
+          .eq('tenant_id', tenant?.id)
           .single()
 
         if (fetchError || !variant) {
@@ -85,6 +88,7 @@ export async function POST(req: Request) {
           
           // Create audit entry for stock changes
           await supabase.from('inventory_audit').insert({
+            tenant_id: tenant?.id,
             variant_id: variantId,
             delta: newStock - variant.stock,
             reason: reason || `Bulk ${operation}: ${variant.stock} → ${newStock}`,
@@ -101,6 +105,7 @@ export async function POST(req: Request) {
             .from('product_variants')
             .update(updateData)
             .eq('id', variantId)
+            .eq('tenant_id', tenant?.id)
 
           if (updateError) {
             errors.push(`Failed to update ${variant.sku}`)
@@ -128,12 +133,17 @@ export async function POST(req: Request) {
   }
 }
 
-async function getUserRole(supabase: SupabaseClient, userId: string): Promise<string | undefined> {
-  const { data: profile } = await supabase
+async function getUserRole(supabase: SupabaseClient, userId: string, tenantId?: string): Promise<string | undefined> {
+  let query = supabase
     .from('709_profiles')
     .select('role')
     .eq('id', userId)
-    .single()
+
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId)
+  }
+
+  const { data: profile } = await query.single()
 
   return profile?.role
 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { isStaff } from '@/lib/roles'
 import { redactErrorMessage } from '@/lib/privacy'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 const RETENTION_HOURS = 48
 const MAX_WINDOW_HOURS = 72
@@ -25,6 +26,7 @@ const isValidLatLng = (lat: number, lng: number) =>
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -35,6 +37,7 @@ export async function POST(request: Request) {
     .from('709_profiles')
     .select('role, full_name')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!isStaff(profile?.role)) {
@@ -87,6 +90,7 @@ export async function POST(request: Request) {
           : 'staff_location_tracking_stopped'
 
       await supabase.from('activity_logs').insert({
+        tenant_id: tenant?.id,
         user_id: user.id,
         user_email: user.email,
         action,
@@ -111,6 +115,7 @@ export async function POST(request: Request) {
     const { data, error } = await supabase
       .from('staff_locations')
       .insert({
+        tenant_id: tenant?.id,
         user_id: user.id,
         recorded_at: effectiveRecordedAt.toISOString(),
         latitude: lat,
@@ -136,6 +141,7 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -146,6 +152,7 @@ export async function GET(request: Request) {
     .from('709_profiles')
     .select('role, full_name')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'owner'
@@ -173,13 +180,19 @@ export async function GET(request: Request) {
   const now = new Date()
   const since = new Date(now.getTime() - windowHours * 60 * 60 * 1000)
 
-  const { data: locations, error } = await supabase
+  let locationsQuery = supabase
     .from('staff_locations')
     .select('user_id, recorded_at, latitude, longitude, accuracy_m')
     .gte('recorded_at', since.toISOString())
     .gt('expires_at', now.toISOString())
     .order('recorded_at', { ascending: false })
     .limit(limit)
+
+  if (tenant?.id) {
+    locationsQuery = locationsQuery.eq('tenant_id', tenant.id)
+  }
+
+  const { data: locations, error } = await locationsQuery
 
   if (error) {
     return NextResponse.json({ error: redactErrorMessage('Failed to load locations') }, { status: 500 })
@@ -190,10 +203,16 @@ export async function GET(request: Request) {
   }
 
   const userIds = Array.from(new Set(locations.map((row) => row.user_id)))
-  const { data: profiles } = await supabase
+  let profilesQuery = supabase
     .from('709_profiles')
     .select('id, full_name, role')
     .in('id', userIds)
+
+  if (tenant?.id) {
+    profilesQuery = profilesQuery.eq('tenant_id', tenant.id)
+  }
+
+  const { data: profiles } = await profilesQuery
 
   const profileById = new Map(
     (profiles || []).map((entry) => [entry.id, entry])

@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { hasAdminAccess } from '@/lib/roles'
 import { redactErrorMessage } from '@/lib/privacy'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -17,6 +19,7 @@ export async function POST(request: Request) {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   const isAdmin = hasAdminAccess(profile?.role)
@@ -33,14 +36,20 @@ export async function POST(request: Request) {
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
   const now = new Date().toISOString()
 
-  const { data: targets } = await supabase
+  let targetsQuery = supabase
     .from('messages')
     .select('id, attachment_path')
     .eq('customer_id', targetCustomerId)
     .is('deleted_at', null)
     .lt('created_at', cutoff)
 
-  const { data, error } = await supabase
+  if (tenant?.id) {
+    targetsQuery = targetsQuery.eq('tenant_id', tenant.id)
+  }
+
+  const { data: targets } = await targetsQuery
+
+  let purgeQuery = supabase
     .from('messages')
     .update({
       deleted_at: now,
@@ -64,6 +73,12 @@ export async function POST(request: Request) {
     .is('deleted_at', null)
     .lt('created_at', cutoff)
     .select('id')
+
+  if (tenant?.id) {
+    purgeQuery = purgeQuery.eq('tenant_id', tenant.id)
+  }
+
+  const { data, error } = await purgeQuery
 
   if (error) {
     return NextResponse.json({ error: redactErrorMessage('Failed to purge messages') }, { status: 500 })

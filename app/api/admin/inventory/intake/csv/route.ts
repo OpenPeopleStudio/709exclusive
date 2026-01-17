@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 interface CSVRow {
   brand: string
@@ -12,6 +13,7 @@ interface CSVRow {
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -22,6 +24,7 @@ export async function POST(request: Request) {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || !['admin', 'owner', 'staff'].includes(profile.role)) {
@@ -47,6 +50,7 @@ export async function POST(request: Request) {
             .select('id')
             .eq('brand', row.brand)
             .eq('name', row.model)
+            .eq('tenant_id', tenant?.id)
             .single()
 
           if (existingProduct) {
@@ -62,6 +66,7 @@ export async function POST(request: Request) {
             const { data: newProduct, error: productError } = await supabase
               .from('products')
               .insert({
+                tenant_id: tenant?.id,
                 name: row.model,
                 brand: row.brand,
                 slug,
@@ -82,10 +87,11 @@ export async function POST(request: Request) {
             await supabase
               .from('product_models')
               .upsert({
+                tenant_id: tenant?.id,
                 brand: row.brand,
                 model: row.model,
                 slug: modelSlug
-              }, { onConflict: 'slug' })
+              }, { onConflict: 'tenant_id,slug' })
           }
 
           productCache[cacheKey] = productId
@@ -110,6 +116,7 @@ export async function POST(request: Request) {
         const { error: variantError } = await supabase
           .from('product_variants')
           .insert({
+            tenant_id: tenant?.id,
             product_id: productId,
             sku,
             brand: row.brand,
@@ -131,6 +138,7 @@ export async function POST(request: Request) {
 
     // Log the action
     await supabase.from('activity_logs').insert({
+      tenant_id: tenant?.id,
       user_id: user.id,
       user_email: user.email,
       action: 'csv_import',

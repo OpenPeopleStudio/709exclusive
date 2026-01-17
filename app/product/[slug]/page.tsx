@@ -15,6 +15,7 @@ import SizingGuide from '@/components/SizingGuide'
 import Badge from '@/components/ui/Badge'
 import Accordion, { AccordionItem } from '@/components/ui/Accordion'
 import Surface from '@/components/ui/Surface'
+import { useTenant } from '@/context/TenantContext'
 
 interface PriceHistory {
   price_cents: number
@@ -22,6 +23,7 @@ interface PriceHistory {
 }
 
 export default function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { id: tenantId, featureFlags } = useTenant()
   const [slug, setSlug] = useState<string>('')
   const [product, setProduct] = useState<Product | null>(null)
   const [variants, setVariants] = useState<ProductVariant[]>([])
@@ -46,55 +48,84 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
     if (!slug) return
 
     const fetchProduct = async () => {
-      const { data: productData } = await supabase
+      let productQuery = supabase
         .from('products')
         .select('*')
         .eq('slug', slug)
-        .single()
+
+      if (tenantId) {
+        productQuery = productQuery.eq('tenant_id', tenantId)
+      }
+
+      const { data: productData } = await productQuery.single()
 
       if (productData) {
         setProduct(productData)
 
-        const { data: variantsData } = await supabase
+        let variantsQuery = supabase
           .from('product_variants')
           .select('*')
           .eq('product_id', productData.id)
 
+        if (tenantId) {
+          variantsQuery = variantsQuery.eq('tenant_id', tenantId)
+        }
+
+        const { data: variantsData } = await variantsQuery
+
         setVariants(variantsData || [])
 
-        const { data: imagesData } = await supabase
+        let imagesQuery = supabase
           .from('product_images')
           .select('*')
           .eq('product_id', productData.id)
           .order('position')
+
+        if (tenantId) {
+          imagesQuery = imagesQuery.eq('tenant_id', tenantId)
+        }
+
+        const { data: imagesData } = await imagesQuery
 
         setImages(imagesData || [])
 
         // Fetch price history
         if (variantsData && variantsData.length > 0) {
           const variantIds = variantsData.map(v => v.id)
-          const { data: historyData } = await supabase
+          let historyQuery = supabase
             .from('price_history')
             .select('price_cents, recorded_at')
             .in('variant_id', variantIds)
             .order('recorded_at', { ascending: false })
             .limit(20)
+
+          if (tenantId) {
+            historyQuery = historyQuery.eq('tenant_id', tenantId)
+          }
+
+          const { data: historyData } = await historyQuery
           
           setPriceHistory(historyData || [])
         }
 
         // Check wishlist status
         const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          const { data: wishlistItem } = await supabase
+        if (user && featureFlags.wishlist !== false) {
+          let wishlistQuery = supabase
             .from('wishlist_items')
             .select('id')
             .eq('user_id', user.id)
             .eq('product_id', productData.id)
-            .maybeSingle()
-          
-          setIsWishlisted(!!wishlistItem)
 
+          if (tenantId) {
+            wishlistQuery = wishlistQuery.eq('tenant_id', tenantId)
+          }
+
+          const { data: wishlistItem } = await wishlistQuery.maybeSingle()
+          setIsWishlisted(!!wishlistItem)
+        }
+
+        if (user) {
           // Track recently viewed
           fetch('/api/recently-viewed', {
             method: 'POST',
@@ -117,10 +148,11 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
     }
 
     fetchProduct()
-  }, [slug])
+  }, [slug, tenantId, featureFlags.wishlist])
 
   useEffect(() => {
     if (!product) return
+    if (featureFlags.wishlist === false) return
 
     const updateTimer = () => {
       const dropStatus = getDropStatus(product)
@@ -228,6 +260,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
 
   const handleStockAlert = async () => {
     if (!product || !selectedSize) return
+    if (featureFlags.wishlist === false) return
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
@@ -282,7 +315,9 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
     )
   }
 
-  const dropStatus = getDropStatus(product)
+  const dropStatus = featureFlags.drops === false
+    ? { status: 'none', isPurchasable: true, timeUntilStart: null, timeUntilEnd: null }
+    : getDropStatus(product)
   const isOutOfStock = !selectedVariant || (selectedVariant.stock - selectedVariant.reserved) <= 0
   const canPurchase = selectedVariant && dropStatus.isPurchasable && !isOutOfStock
 
@@ -348,18 +383,20 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                 </div>
 
                 {/* Wishlist Button */}
-                <button
-                  onClick={handleWishlist}
-                  className={`absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                    isWishlisted 
-                      ? 'bg-[var(--accent)] text-white'
-                      : 'bg-black/50 text-white hover:bg-black/70'
-                  }`}
-                >
-                  <svg className="w-5 h-5" fill={isWishlisted ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                  </svg>
-                </button>
+                {featureFlags.wishlist !== false && (
+                  <button
+                    onClick={handleWishlist}
+                    className={`absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                      isWishlisted 
+                        ? 'bg-[var(--accent)] text-white'
+                        : 'bg-black/50 text-white hover:bg-black/70'
+                    }`}
+                  >
+                    <svg className="w-5 h-5" fill={isWishlisted ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    </svg>
+                  </button>
+                )}
               </div>
 
               {/* Thumbnails */}

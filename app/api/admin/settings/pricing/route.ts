@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -13,6 +15,7 @@ export async function POST(request: Request) {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || !['admin', 'owner'].includes(profile.role)) {
@@ -25,6 +28,7 @@ export async function POST(request: Request) {
     const { data: rule, error } = await supabase
       .from('pricing_rules')
       .insert({
+        tenant_id: tenant?.id,
         rule_type: ruleType,
         match_value: matchValue,
         multiplier,
@@ -37,6 +41,7 @@ export async function POST(request: Request) {
 
     // Log the action
     await supabase.from('activity_logs').insert({
+      tenant_id: tenant?.id,
       user_id: user.id,
       user_email: user.email,
       action: 'create_pricing_rule',
@@ -57,6 +62,7 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -67,6 +73,7 @@ export async function PATCH(request: Request) {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || !['admin', 'owner'].includes(profile.role)) {
@@ -80,6 +87,7 @@ export async function PATCH(request: Request) {
       .from('pricing_rules')
       .update({ active })
       .eq('id', ruleId)
+      .eq('tenant_id', tenant?.id)
 
     if (error) throw error
 
@@ -95,6 +103,7 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -105,6 +114,7 @@ export async function DELETE(request: Request) {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || !['admin', 'owner'].includes(profile.role)) {
@@ -123,11 +133,13 @@ export async function DELETE(request: Request) {
       .from('pricing_rules')
       .delete()
       .eq('id', ruleId)
+      .eq('tenant_id', tenant?.id)
 
     if (error) throw error
 
     // Log the action
     await supabase.from('activity_logs').insert({
+      tenant_id: tenant?.id,
       user_id: user.id,
       user_email: user.email,
       action: 'delete_pricing_rule',

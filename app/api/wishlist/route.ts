@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -10,7 +12,7 @@ export async function GET() {
   }
 
   try {
-    const { data: items, error } = await supabase
+    let itemsQuery = supabase
       .from('wishlist_items')
       .select(`
         id,
@@ -36,6 +38,12 @@ export async function GET() {
       `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
+
+    if (tenant?.id) {
+      itemsQuery = itemsQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: items, error } = await itemsQuery
 
     if (error) throw error
 
@@ -89,6 +97,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -105,6 +114,7 @@ export async function POST(request: Request) {
     const { data: item, error } = await supabase
       .from('wishlist_items')
       .upsert({
+        tenant_id: tenant?.id,
         user_id: user.id,
         product_id: productId,
         variant_id: variantId || null,
@@ -128,6 +138,7 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -143,6 +154,10 @@ export async function DELETE(request: Request) {
       .from('wishlist_items')
       .delete()
       .eq('user_id', user.id)
+
+    if (tenant?.id) {
+      query = query.eq('tenant_id', tenant.id)
+    }
 
     if (itemId) {
       query = query.eq('id', itemId)

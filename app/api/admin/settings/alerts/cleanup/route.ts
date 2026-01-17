@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
-export async function POST() {
+export async function POST(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -13,6 +15,7 @@ export async function POST() {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || !['admin', 'owner'].includes(profile.role)) {
@@ -23,11 +26,17 @@ export async function POST() {
     // Get stuck reservations
     const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString()
     
-    const { data: reservations } = await supabase
+    let reservationsQuery = supabase
       .from('inventory_reservations')
       .select('id, variant_id, quantity')
       .lt('created_at', thirtyMinutesAgo)
       .eq('status', 'pending')
+
+    if (tenant?.id) {
+      reservationsQuery = reservationsQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: reservations } = await reservationsQuery
 
     if (!reservations || reservations.length === 0) {
       return NextResponse.json({ message: 'No stuck reservations to clean up' })
@@ -42,11 +51,17 @@ export async function POST() {
     }
 
     // If RPC doesn't exist, manually release
-    const { error: deleteError } = await supabase
+    let deleteQuery = supabase
       .from('inventory_reservations')
       .delete()
       .lt('created_at', thirtyMinutesAgo)
       .eq('status', 'pending')
+
+    if (tenant?.id) {
+      deleteQuery = deleteQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { error: deleteError } = await deleteQuery
 
     if (deleteError) {
       console.error('Delete error:', deleteError)
@@ -54,6 +69,7 @@ export async function POST() {
 
     // Log the action
     await supabase.from('activity_logs').insert({
+      tenant_id: tenant?.id,
       user_id: user.id,
       user_email: user.email,
       action: 'cleanup_reservations',

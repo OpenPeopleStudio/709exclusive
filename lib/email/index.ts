@@ -1,5 +1,7 @@
 // Unified email interface with order ID-based wrappers
 import { createSupabaseServer } from '../supabaseServer'
+import type { TenantSettings } from '@/types/tenant'
+import { resolveEmailProvider, type EmailProvider } from '../integrations'
 import {
   sendOrderConfirmation as sendOrderConfirmationSG,
   sendOrderShipped as sendOrderShippedSG,
@@ -7,6 +9,12 @@ import {
   sendOrderRefunded as sendOrderRefundedSG,
   sendAdminOrderNotification
 } from './sendgrid'
+import {
+  sendOrderConfirmation as sendOrderConfirmationPM,
+  sendOrderShipped as sendOrderShippedPM,
+  sendOrderCancelled as sendOrderCancelledPM,
+  sendOrderRefunded as sendOrderRefundedPM,
+} from './postmark'
 
 interface OrderEmailData {
   orderId: string
@@ -34,6 +42,7 @@ interface OrderEmailData {
   }
   trackingNumber?: string
   carrier?: string
+  emailProvider: EmailProvider
 }
 
 // Fetch order data from database
@@ -43,11 +52,18 @@ async function getOrderEmailData(orderId: string): Promise<OrderEmailData | null
   // Get order with stored shipping address (includes customer email)
   const { data: order } = await supabase
     .from('orders')
-    .select('*')
+    .select(`
+      *,
+      tenant:tenants(settings)
+    `)
     .eq('id', orderId)
     .single()
 
   if (!order) return null
+
+  const tenant = Array.isArray(order.tenant) ? order.tenant[0] : order.tenant
+  const tenantSettings = (tenant?.settings || undefined) as TenantSettings | undefined
+  const emailProvider = resolveEmailProvider(tenantSettings)
 
   // Get order items with variant details
   const { data: items } = await supabase
@@ -95,7 +111,8 @@ async function getOrderEmailData(orderId: string): Promise<OrderEmailData | null
     total,
     shippingAddress: order.shipping_address,
     trackingNumber: order.tracking_number,
-    carrier: order.carrier
+    carrier: order.carrier,
+    emailProvider
   }
 }
 
@@ -105,6 +122,13 @@ export async function sendOrderConfirmation(orderId: string): Promise<void> {
     const data = await getOrderEmailData(orderId)
     if (!data) {
       console.error('Order not found for email:', orderId)
+      return
+    }
+    if (data.emailProvider === 'disabled') {
+      return
+    }
+    if (data.emailProvider === 'postmark') {
+      await sendOrderConfirmationPM(data)
       return
     }
     await sendOrderConfirmationSG(data)
@@ -120,6 +144,13 @@ export async function sendOrderShipped(orderId: string): Promise<void> {
       console.error('Order not found for email:', orderId)
       return
     }
+    if (data.emailProvider === 'disabled') {
+      return
+    }
+    if (data.emailProvider === 'postmark') {
+      await sendOrderShippedPM(data)
+      return
+    }
     await sendOrderShippedSG(data)
   } catch (error) {
     console.error('Failed to send shipping notification:', error)
@@ -133,6 +164,13 @@ export async function sendOrderCancelled(orderId: string): Promise<void> {
       console.error('Order not found for email:', orderId)
       return
     }
+    if (data.emailProvider === 'disabled') {
+      return
+    }
+    if (data.emailProvider === 'postmark') {
+      await sendOrderCancelledPM(data)
+      return
+    }
     await sendOrderCancelledSG(data)
   } catch (error) {
     console.error('Failed to send cancellation email:', error)
@@ -144,6 +182,13 @@ export async function sendOrderRefunded(orderId: string): Promise<void> {
     const data = await getOrderEmailData(orderId)
     if (!data) {
       console.error('Order not found for email:', orderId)
+      return
+    }
+    if (data.emailProvider === 'disabled') {
+      return
+    }
+    if (data.emailProvider === 'postmark') {
+      await sendOrderRefundedPM(data)
       return
     }
     await sendOrderRefundedSG(data)

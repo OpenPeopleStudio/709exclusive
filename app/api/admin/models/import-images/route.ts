@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { importImageToStorage } from '@/lib/imageSources/importImage'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 export async function POST(req: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(req)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user || !user.id) {
@@ -15,6 +17,7 @@ export async function POST(req: Request) {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || !['owner', 'admin'].includes(profile.role)) {
@@ -37,6 +40,7 @@ export async function POST(req: Request) {
       .from('product_models')
       .select('id')
       .eq('id', modelId)
+      .eq('tenant_id', tenant?.id)
       .single()
 
     if (!model) {
@@ -59,6 +63,7 @@ export async function POST(req: Request) {
         const { error: insertError } = await supabase
           .from('model_images')
           .insert({
+            tenant_id: tenant?.id,
             model_id: modelId,
             source: source || 'google',
             url: storedUrl,

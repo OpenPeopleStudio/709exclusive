@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -13,6 +15,7 @@ export async function GET() {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
   if (!profile || !['admin', 'owner'].includes(profile.role)) {
@@ -21,16 +24,22 @@ export async function GET() {
 
   try {
     // Get low stock items (3 or fewer)
-    const { data: lowStock } = await supabase
+    let lowStockQuery = supabase
       .from('product_variants')
       .select('id, sku, brand, model, stock')
       .lte('stock', 3)
       .order('stock', { ascending: true })
 
+    if (tenant?.id) {
+      lowStockQuery = lowStockQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: lowStock } = await lowStockQuery
+
     // Get stuck reservations (older than 30 minutes)
     const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString()
     
-    const { data: reservations } = await supabase
+    let reservationsQuery = supabase
       .from('inventory_reservations')
       .select(`
         id,
@@ -41,6 +50,12 @@ export async function GET() {
       `)
       .lt('created_at', thirtyMinutesAgo)
       .eq('status', 'pending')
+
+    if (tenant?.id) {
+      reservationsQuery = reservationsQuery.eq('tenant_id', tenant.id)
+    }
+
+    const { data: reservations } = await reservationsQuery
 
     const stuckReservations = reservations?.map(r => {
       const variant = Array.isArray(r.product_variants) ? r.product_variants[0] : r.product_variants

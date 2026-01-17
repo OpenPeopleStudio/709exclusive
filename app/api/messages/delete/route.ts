@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { hasAdminAccess } from '@/lib/roles'
 import { redactErrorMessage } from '@/lib/privacy'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -21,13 +23,19 @@ export async function POST(request: Request) {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
+    .eq('tenant_id', tenant?.id)
     .single()
 
-  const { data: message } = await supabase
+  let messageQuery = supabase
     .from('messages')
     .select('id, customer_id, attachment_path')
     .eq('id', messageId)
-    .single()
+
+  if (tenant?.id) {
+    messageQuery = messageQuery.eq('tenant_id', tenant.id)
+  }
+
+  const { data: message } = await messageQuery.single()
 
   if (!message) {
     return NextResponse.json({ error: 'Message not found' }, { status: 404 })
@@ -42,7 +50,7 @@ export async function POST(request: Request) {
 
   const now = new Date().toISOString()
 
-  const { error } = await supabase
+  let deleteQuery = supabase
     .from('messages')
     .update({
       deleted_at: now,
@@ -63,6 +71,12 @@ export async function POST(request: Request) {
       attachment_key_message_index: null,
     })
     .eq('id', messageId)
+
+  if (tenant?.id) {
+    deleteQuery = deleteQuery.eq('tenant_id', tenant.id)
+  }
+
+  const { error } = await deleteQuery
 
   if (error) {
     return NextResponse.json({ error: redactErrorMessage('Failed to delete message') }, { status: 500 })

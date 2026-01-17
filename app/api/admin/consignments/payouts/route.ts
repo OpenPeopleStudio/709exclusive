@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
+import { getTenantFromRequest } from '@/lib/tenant'
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -10,11 +12,14 @@ export async function POST(request: Request) {
   }
 
   // Check admin role
-  const { data: profile } = await supabase
+  let profileQuery = supabase
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
-    .single()
+  if (tenant?.id) {
+    profileQuery = profileQuery.eq('tenant_id', tenant.id)
+  }
+  const { data: profile } = await profileQuery.single()
 
   if (!profile || !['admin', 'owner'].includes(profile.role)) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
@@ -27,6 +32,7 @@ export async function POST(request: Request) {
     const { data: payout, error: payoutError } = await supabase
       .from('consignment_payouts')
       .insert({
+        tenant_id: tenant?.id,
         consignor_id: consignorId,
         amount_cents: amountCents,
         method,
@@ -47,13 +53,17 @@ export async function POST(request: Request) {
 
     // If RPC doesn't exist, do manual update
     if (updateError) {
-      await supabase
+      let consignorUpdate = supabase
         .from('consignors')
         .update({
           balance_cents: supabase.rpc('subtract', { value: amountCents }),
           total_paid_cents: supabase.rpc('add', { value: amountCents })
         })
         .eq('id', consignorId)
+      if (tenant?.id) {
+        consignorUpdate = consignorUpdate.eq('tenant_id', tenant.id)
+      }
+      await consignorUpdate
     }
 
     return NextResponse.json({ payout })
