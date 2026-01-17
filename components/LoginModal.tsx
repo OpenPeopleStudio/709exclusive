@@ -88,15 +88,31 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
         } else {
           setError(error.message)
         }
-      } else if (data.session) {
-        // Successfully logged in - close modal and refresh
+      } else if (data.session?.user) {
+        // Successfully logged in - redirect based on role
+        const { data: profile } = await supabase
+          .from('709_profiles')
+          .select('role')
+          .eq('id', data.session.user.id)
+          .single()
+
+        const role = profile?.role || ''
+        const isAdmin = ['owner', 'admin'].includes(role)
+        const isStaff = role === 'staff'
+
         onClose()
-        
-        // Small delay to ensure session is propagated, then hard refresh
-        // This ensures all components pick up the new auth state
-        setTimeout(() => {
-          window.location.reload()
-        }, 100)
+        if (onSuccess) {
+          onSuccess()
+          return
+        }
+        if (isAdmin) {
+          router.push('/admin/products')
+        } else if (isStaff) {
+          router.push('/staff/location')
+        } else {
+          router.push('/account')
+        }
+        router.refresh()
       } else {
         setError('Login failed. Please try again.')
       }

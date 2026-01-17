@@ -16,6 +16,7 @@ export async function proxy(request: NextRequest) {
 
   if (
     pathname.startsWith('/admin') ||
+    pathname.startsWith('/staff') ||
     pathname.startsWith('/api') ||
     pathname === '/maintenance' ||
     isPublicAsset(pathname)

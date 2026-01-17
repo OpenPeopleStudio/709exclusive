@@ -87,10 +87,22 @@ export async function getActiveKeyPair(): Promise<StoredKeyPair | null> {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([KEYS_STORE], 'readonly')
     const store = transaction.objectStore(KEYS_STORE)
-    const index = store.index('isActive')
-    const request = index.get(IDBKeyRange.only(true))
+    const request = store.getAll()
     request.onerror = () => reject(request.error)
-    request.onsuccess = () => resolve(request.result || null)
+    request.onsuccess = () => {
+      const keys = request.result || []
+      const activeKeys = keys.filter((key) => key?.isActive)
+      if (activeKeys.length === 0) {
+        resolve(null)
+        return
+      }
+      activeKeys.sort((a, b) => {
+        const aTime = a.lastUsedAt ?? a.createdAt ?? 0
+        const bTime = b.lastUsedAt ?? b.createdAt ?? 0
+        return bTime - aTime
+      })
+      resolve(activeKeys[0] || null)
+    }
   })
 }
 
