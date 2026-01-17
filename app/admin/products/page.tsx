@@ -35,6 +35,7 @@ export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [analytics, setAnalytics] = useState<VariantAnalytics[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     const fetchData = async () => {
@@ -76,8 +77,6 @@ export default function AdminProductsPage() {
     )
   }
 
-  const [search, setSearch] = useState('')
-  
   const totalSold = analytics.reduce((sum, a) => sum + a.sold_units, 0)
   const totalStock = analytics.reduce((sum, a) => sum + a.stock, 0)
   const slowMovers = analytics.filter(a => a.sell_through_rate < 0.1).length
