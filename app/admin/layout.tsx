@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createSupabaseServer } from '@/lib/supabaseServer'
-import { isAdmin } from '@/lib/roles'
+import { isAdmin, isOwner } from '@/lib/roles'
 import AdminShell from '@/components/admin/AdminShell'
 import { getTenantFromRequest } from '@/lib/tenant'
 
@@ -51,10 +51,31 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     .eq('tenant_id', tenant?.id)
     .single()
 
-  if (!isAdmin(profile?.role)) redirect('/')
+  const { data: superTenant } = await supabase
+    .from('tenants')
+    .select('id, slug')
+    .eq('slug', '709exclusive')
+    .maybeSingle()
+
+  const { data: superProfile } = superTenant?.id
+    ? await supabase
+        .from('709_profiles')
+        .select('role')
+        .eq('id', user.id)
+        .eq('tenant_id', superTenant.id)
+        .maybeSingle()
+    : { data: null }
+
+  const isSuperAdmin = isOwner(superProfile?.role)
+
+  if (!isAdmin(profile?.role) && !isSuperAdmin) redirect('/')
+
+  const scopedNavItems = isSuperAdmin
+    ? navItems
+    : navItems.filter((item) => item.href !== '/admin/tenants')
 
   return (
-    <AdminShell userEmail={user.email} navItems={navItems}>
+    <AdminShell userEmail={user.email} navItems={scopedNavItems}>
       {children}
     </AdminShell>
   )

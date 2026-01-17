@@ -30,7 +30,13 @@ async function requireSuperAdmin(request: Request) {
     return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
   }
 
-  if (!tenant?.id) {
+  const { data: superTenant } = await supabase
+    .from('tenants')
+    .select('id, slug')
+    .eq('slug', '709exclusive')
+    .maybeSingle()
+
+  if (!superTenant?.id) {
     return { error: NextResponse.json({ error: 'Tenant not resolved' }, { status: 400 }) }
   }
 
@@ -38,14 +44,14 @@ async function requireSuperAdmin(request: Request) {
     .from('709_profiles')
     .select('role')
     .eq('id', user.id)
-    .eq('tenant_id', tenant.id)
+    .eq('tenant_id', superTenant.id)
     .single()
 
   if (!isOwner(profile?.role)) {
     return { error: NextResponse.json({ error: 'Owner access required' }, { status: 403 }) }
   }
 
-  if (tenant.slug !== '709exclusive') {
+  if (tenant?.slug && tenant.slug !== superTenant.slug) {
     return { error: NextResponse.json({ error: 'Internal access required' }, { status: 403 }) }
   }
 
