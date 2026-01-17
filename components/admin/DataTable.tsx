@@ -31,17 +31,17 @@ export default function DataTable<T>({
 }: DataTableProps<T>) {
   if (loading) {
     return (
-      <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl p-8 text-center">
-        <div className="w-8 h-8 border-4 border-[var(--accent)] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        <p className="text-sm text-[var(--text-muted)]">Loading...</p>
+      <div className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-2xl p-12 text-center">
+        <div className="w-12 h-12 border-3 border-transparent border-t-[var(--neon-magenta)] border-r-[var(--neon-cyan)] rounded-full animate-spin mx-auto mb-4 shadow-[0_0_30px_rgba(255,0,255,0.5)]" />
+        <p className="text-sm font-medium text-[var(--text-secondary)]">Loading...</p>
       </div>
     )
   }
 
   if (data.length === 0) {
     return (
-      <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl p-12 text-center">
-        <p className="text-[var(--text-muted)]">{emptyMessage}</p>
+      <div className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-2xl p-12 sm:p-16 text-center">
+        <p className="text-[var(--text-secondary)] font-medium">{emptyMessage}</p>
       </div>
     )
   }
@@ -55,8 +55,8 @@ export default function DataTable<T>({
             <div
               key={keyExtractor(item)}
               onClick={() => onRowClick?.(item)}
-              className={`bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl p-4 ${
-                onRowClick ? 'cursor-pointer active:bg-[var(--bg-tertiary)] transition-colors' : ''
+              className={`bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-2xl p-4 transition-all duration-300 ${
+                onRowClick ? 'cursor-pointer active:scale-98 hover:border-[var(--border-glow)]' : ''
               }`}
             >
               {mobileCard(item)}
@@ -66,15 +66,15 @@ export default function DataTable<T>({
       )}
 
       {/* Desktop table view */}
-      <div className={`${mobileCard ? 'hidden md:block' : 'block'} bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl overflow-hidden`}>
+      <div className={`${mobileCard ? 'hidden md:block' : 'block'} bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-2xl overflow-hidden`}>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-[var(--border-primary)] bg-[var(--bg-tertiary)]">
+              <tr className="border-b border-[var(--glass-border)] bg-[var(--bg-secondary)]">
                 {columns.map((column) => (
                   <th
                     key={column.key}
-                    className={`px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider ${
+                    className={`px-6 py-4 text-left text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider ${
                       column.mobileHidden ? 'hidden lg:table-cell' : ''
                     } ${column.className || ''}`}
                   >
@@ -83,21 +83,21 @@ export default function DataTable<T>({
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[var(--border-primary)]">
+            <tbody className="divide-y divide-[var(--glass-border)]">
               {data.map((item) => (
                 <tr
                   key={keyExtractor(item)}
                   onClick={() => onRowClick?.(item)}
-                  className={`${
+                  className={`transition-all duration-200 ${
                     onRowClick
-                      ? 'cursor-pointer hover:bg-[var(--bg-tertiary)] transition-colors'
+                      ? 'cursor-pointer hover:bg-white/5'
                       : ''
                   }`}
                 >
                   {columns.map((column) => (
                     <td
                       key={column.key}
-                      className={`px-4 md:px-6 py-3 md:py-4 text-sm text-[var(--text-primary)] ${
+                      className={`px-6 py-4 text-sm text-[var(--text-primary)] ${
                         column.mobileHidden ? 'hidden lg:table-cell' : ''
                       } ${column.className || ''}`}
                     >

@@ -332,7 +332,8 @@ export async function decryptMessage(
     const decoder = new TextDecoder()
     return decoder.decode(decryptedBuffer)
   } catch (error) {
-    console.error('Decryption failed:', error)
+    // Silent fail for old messages with rotated/missing keys
+    // console.warn('Decryption failed (old/rotated key):', error instanceof Error ? error.message : 'Unknown')
     throw new Error('Unable to decrypt message')
   }
 }
