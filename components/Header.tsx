@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useCart } from '@/context/CartContext'
 import { supabase } from '@/lib/supabaseClient'
@@ -167,9 +168,25 @@ function HeaderContent() {
           <div className="flex items-center justify-between h-20">
             {/* Logo */}
             <Link href="/" className="group flex items-center gap-2">
-              <span className="text-2xl font-bold tracking-tight text-[var(--text-primary)] transition-all duration-300 group-hover:text-gradient">
-                {brandName}
-              </span>
+              {settings?.theme?.logo_url ? (
+                <Image
+                  src={settings.theme.logo_url}
+                  alt={brandName}
+                  width={160}
+                  height={48}
+                  className="h-12 w-auto transition-all duration-300 group-hover:opacity-80"
+                  priority
+                />
+              ) : (
+                <Image
+                  src="/logo.svg"
+                  alt={brandName}
+                  width={160}
+                  height={48}
+                  className="h-12 w-auto transition-all duration-300 group-hover:opacity-80"
+                  priority
+                />
+              )}
             </Link>
 
             {/* Center Navigation - Desktop */}

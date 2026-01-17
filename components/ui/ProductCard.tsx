@@ -120,21 +120,23 @@ export default function ProductCard({
       </div>
 
       {/* Product Info */}
-      <div className={size === 'small' ? 'space-y-1' : 'space-y-2'}>
+      <div className={`flex flex-col ${size === 'small' ? 'gap-1' : 'gap-2'}`}>
         {/* Brand */}
-        <p className={`font-bold uppercase tracking-wider text-[var(--text-muted)] ${size === 'small' ? 'text-[10px]' : 'text-xs'}`}>
+        <p className={`font-bold uppercase tracking-wider text-[var(--text-muted)] ${size === 'small' ? 'text-[10px] leading-tight' : 'text-xs leading-tight'}`}>
           {product.brand}
         </p>
         
-        {/* Name */}
-        <h3 className={`font-semibold text-[var(--text-primary)] group-hover:text-gradient transition-all duration-300 line-clamp-2 ${
-          size === 'small' ? 'text-sm' : 'text-base'
-        }`}>
-          {product.name}
-        </h3>
+        {/* Name - Fixed height container */}
+        <div className={size === 'small' ? 'h-8' : 'h-10'}>
+          <h3 className={`font-semibold text-[var(--text-primary)] group-hover:text-gradient transition-all duration-300 line-clamp-2 ${
+            size === 'small' ? 'text-sm leading-4' : 'text-base leading-5'
+          }`}>
+            {product.name}
+          </h3>
+        </div>
         
-        {/* Price */}
-        <div className="flex items-center gap-2">
+        {/* Price - Fixed height to ensure alignment */}
+        <div className={`flex items-center gap-2 ${size === 'small' ? 'h-6' : 'h-7'}`}>
           <span className={`font-bold bg-gradient-to-r from-[var(--neon-magenta)] to-[var(--neon-cyan)] bg-clip-text text-transparent ${size === 'small' ? 'text-base' : 'text-lg'}`}>
             ${(product.lowest_price_cents / 100).toFixed(0)}
           </span>
@@ -146,10 +148,12 @@ export default function ProductCard({
         </div>
 
         {/* Secondary info (sizes, conditions) - hidden in compact mode and on mobile */}
-        {!compact && product.sizes_available && product.sizes_available.length > 0 && (
-          <p className="text-xs text-[var(--text-muted)] hidden md:block">
+        {!compact && product.sizes_available && product.sizes_available.length > 0 ? (
+          <p className="text-xs text-[var(--text-muted)] hidden md:block h-4">
             {product.sizes_available.length} sizes available
           </p>
+        ) : (
+          !compact && <div className="h-4 hidden md:block" />
         )}
       </div>
     </Link>

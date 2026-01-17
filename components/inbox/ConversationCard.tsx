@@ -33,13 +33,19 @@ export default function ConversationCard({
   conversationType,
   onClick
 }: ConversationCardProps) {
+  // Safely handle timestamp
   const time = new Date(timestamp)
   const now = new Date()
-  const isToday = now.toDateString() === time.toDateString()
-  const isThisWeek = (now.getTime() - time.getTime()) < 7 * 24 * 60 * 60 * 1000
+  
+  // Check if timestamp is valid
+  const isValidDate = !isNaN(time.getTime())
+  const isToday = isValidDate && now.toDateString() === time.toDateString()
+  const isThisWeek = isValidDate && (now.getTime() - time.getTime()) < 7 * 24 * 60 * 60 * 1000
 
   let timeStr: string
-  if (isToday) {
+  if (!isValidDate) {
+    timeStr = ''
+  } else if (isToday) {
     timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   } else if (isThisWeek) {
     timeStr = time.toLocaleDateString([], { weekday: 'short' })
