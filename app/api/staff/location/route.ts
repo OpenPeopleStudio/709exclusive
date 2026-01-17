@@ -155,9 +155,8 @@ export async function GET(request: Request) {
     .eq('tenant_id', tenant?.id)
     .single()
 
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'owner'
-  if (!isAdmin) {
-    return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+  if (!isStaff(profile?.role)) {
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 })
   }
 
   const url = new URL(request.url)

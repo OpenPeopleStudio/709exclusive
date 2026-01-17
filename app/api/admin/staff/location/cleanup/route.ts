@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { redactErrorMessage } from '@/lib/privacy'
 import { getTenantFromRequest } from '@/lib/tenant'
+import { isStaff } from '@/lib/roles'
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServer()
@@ -19,8 +20,8 @@ export async function POST(request: Request) {
     .eq('tenant_id', tenant?.id)
     .single()
 
-  if (!profile || !['admin', 'owner'].includes(profile.role)) {
-    return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+  if (!isStaff(profile?.role)) {
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 })
   }
 
   const now = new Date().toISOString()

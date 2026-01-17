@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
-import { isAdmin } from '@/lib/roles'
+import { hasAdminAccess } from '@/lib/roles'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { getTenantFromRequest } from '@/lib/tenant'
 
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 
-  if (!isAdmin(await getUserRole(supabase, user.id!, tenant?.id))) {
+  if (!hasAdminAccess(await getUserRole(supabase, user.id!, tenant?.id))) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 
