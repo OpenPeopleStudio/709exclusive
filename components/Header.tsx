@@ -148,6 +148,12 @@ function HeaderContent() {
     ? (isAdmin && canAccessAdmin ? 'Admin' : 'Account') 
     : 'Sign in'
 
+  const isShopActive =
+    pathname === '/shop' ||
+    pathname?.startsWith('/product') ||
+    isDropsActive ||
+    pathname === '/policies/shipping'
+
   return (
     <>
       <header 
@@ -167,43 +173,100 @@ function HeaderContent() {
             </Link>
 
             {/* Center Navigation - Desktop */}
-            <nav className="hidden md:flex items-center gap-8">
-              <Link 
-                href="/shop" 
-                className={`relative text-sm font-semibold transition-all duration-300 ${
-                  pathname === '/shop' || pathname?.startsWith('/product')
-                    ? 'text-[var(--text-primary)]'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                Shop
-                {(pathname === '/shop' || pathname?.startsWith('/product')) && (
-                  <span className="absolute -bottom-2 left-0 right-0 h-0.5 bg-gradient-to-r from-[var(--neon-magenta)] to-[var(--neon-cyan)] rounded-full" />
-                )}
-              </Link>
-              {featureFlags.drops !== false && (
-                <Link 
-                  href="/shop?drops=true" 
-                  className={`relative text-sm font-semibold transition-all duration-300 ${
-                    isDropsActive
+            <nav className="hidden md:flex items-center gap-6">
+              <div className="relative group">
+                <button
+                  type="button"
+                  className={`flex items-center gap-2 text-sm font-semibold transition-all duration-300 ${
+                    isShopActive
                       ? 'text-[var(--text-primary)]'
                       : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
+                  aria-haspopup="true"
+                  aria-expanded="false"
                 >
-                  Drops
-                  {isDropsActive && (
-                    <span className="absolute -bottom-2 left-0 right-0 h-0.5 bg-gradient-to-r from-[var(--neon-magenta)] to-[var(--neon-cyan)] rounded-full" />
-                  )}
-                </Link>
-              )}
-              {(featureFlags.local_delivery || featureFlags.pickup) && (
-                <Link 
-                  href="/policies/shipping" 
-                  className="text-sm font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all duration-300"
-                >
-                  Delivery & Pickup
-                </Link>
-              )}
+                  Explore
+                  <svg className="w-4 h-4 transition-transform duration-300 group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {isShopActive && (
+                  <span className="absolute -bottom-2 left-0 right-0 h-0.5 bg-gradient-to-r from-[var(--neon-magenta)] to-[var(--neon-cyan)] rounded-full" />
+                )}
+                <div className="absolute left-0 top-full mt-3 min-w-[220px] rounded-2xl bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] border border-[var(--glass-border)] shadow-[0_0_30px_rgba(0,0,0,0.5)] opacity-0 translate-y-2 pointer-events-none transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto">
+                  <div className="py-2">
+                    <div className="px-3 py-2">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2">
+                        Quick Actions
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href="/shop?sort=newest"
+                          className="flex-1 text-center text-xs font-semibold px-3 py-2 rounded-full bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/10 transition-colors"
+                        >
+                          New
+                        </Link>
+                        <Link
+                          href="/cart"
+                          className="flex-1 text-center text-xs font-semibold px-3 py-2 rounded-full bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/10 transition-colors"
+                        >
+                          Cart
+                        </Link>
+                      </div>
+                    </div>
+                    <div className="h-px bg-[var(--glass-border)] my-1" />
+                    <Link
+                      href="/shop"
+                      className={`block px-4 py-2.5 text-sm font-semibold transition-colors ${
+                        pathname === '/shop' || pathname?.startsWith('/product')
+                          ? 'text-[var(--text-primary)] bg-white/5'
+                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5'
+                      }`}
+                    >
+                      Shop all
+                    </Link>
+                    {featureFlags.drops !== false && (
+                      <Link
+                        href="/shop?drops=true"
+                        className={`block px-4 py-2.5 text-sm font-semibold transition-colors ${
+                          isDropsActive
+                            ? 'text-[var(--text-primary)] bg-white/5'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5'
+                        }`}
+                      >
+                        Drops
+                      </Link>
+                    )}
+                    {(featureFlags.local_delivery || featureFlags.pickup) && (
+                      <Link
+                        href="/policies/shipping"
+                        className={`block px-4 py-2.5 text-sm font-semibold transition-colors ${
+                          pathname === '/policies/shipping'
+                            ? 'text-[var(--text-primary)] bg-white/5'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5'
+                        }`}
+                      >
+                        Delivery & Pickup
+                      </Link>
+                    )}
+                    <div className="h-px bg-[var(--glass-border)] my-1" />
+                    <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                      Account
+                    </div>
+                    <Link
+                      href={accountLink}
+                      className={`block px-4 py-2.5 text-sm font-semibold transition-colors ${
+                        pathname?.startsWith('/account') ||
+                        (isAdmin && canAccessAdmin && pathname?.startsWith('/admin'))
+                          ? 'text-[var(--text-primary)] bg-white/5'
+                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5'
+                      }`}
+                    >
+                      {accountLabel}
+                    </Link>
+                  </div>
+                </div>
+              </div>
             </nav>
 
             {/* Right side */}

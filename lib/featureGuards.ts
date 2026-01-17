@@ -56,7 +56,7 @@ export function getCryptoProvider(tenant: TenantContextValue | null): 'nowpaymen
   return tenant?.settings?.integrations?.payments?.crypto_provider || 'disabled'
 }
 
-export function getEmailProvider(tenant: TenantContextValue | null): 'sendgrid' | 'postmark' | 'disabled' {
+export function getEmailProvider(tenant: TenantContextValue | null): 'sendgrid' | 'postmark' | 'resend' | 'disabled' {
   return tenant?.settings?.integrations?.email?.provider || 'disabled'
 }
 

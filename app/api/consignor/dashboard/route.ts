@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     const consignorId = validation[0].consignor_id
 
     // Get dashboard data
-    let dashboardQuery = supabase
+    const dashboardQuery = supabase
       .from('consignor_dashboard')
       .select('*')
       .eq('consignor_id', consignorId)
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     }
 
     // Get recent items
-    let itemsQuery = supabase
+    const itemsQuery = supabase
       .from('consignor_items_view')
       .select('*')
       .eq('consignor_id', consignorId)

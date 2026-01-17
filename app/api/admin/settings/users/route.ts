@@ -169,6 +169,8 @@ export async function POST(request: Request) {
     const { email, role } = await request.json()
     const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : ''
 
+    console.log('[Invite User] Starting invite process for:', normalizedEmail, 'with role:', role)
+
     if (!normalizedEmail) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 })
     }
@@ -199,6 +201,7 @@ export async function POST(request: Request) {
       },
     }
     const emailProvider = resolveEmailProvider(tenant?.settings)
+    console.log('[Invite User] Email provider resolved to:', emailProvider)
     let invitedUserId: string | null = null
 
     const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
@@ -209,18 +212,21 @@ export async function POST(request: Request) {
     if (inviteError) {
       const errorMessage = inviteError.message?.toLowerCase() ?? ''
       const shouldFallback = errorMessage.includes('error sending email')
+      console.log('[Invite User] Supabase invite error:', inviteError.message, 'shouldFallback:', shouldFallback)
+      
       if (!shouldFallback) {
         console.error('Invite user error:', inviteError)
         return NextResponse.json({ error: inviteError.message }, { status: 500 })
       }
 
       if (emailProvider === 'disabled') {
+        console.log('[Invite User] Email provider is disabled')
         return NextResponse.json({
           error: 'Email provider disabled. Configure email integration or Supabase SMTP to send invites.'
         }, { status: 500 })
       }
 
-      console.warn('Supabase invite email failed. Using app email provider.', inviteError)
+      console.warn('Supabase invite email failed. Using app email provider:', emailProvider)
       const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
         type: 'invite',
         email: normalizedEmail,
@@ -233,17 +239,27 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: linkError?.message || 'Failed to generate invite link' }, { status: 500 })
       }
 
-      await sendInviteEmail({
-        inviteeEmail: normalizedEmail,
-        inviteLink: actionLink,
-        tenantName: tenant?.name || '709exclusive',
-        role,
-        inviterEmail: user.email,
-        emailProvider,
-      })
+      console.log('[Invite User] Generated invite link, sending via', emailProvider)
+      try {
+        await sendInviteEmail({
+          inviteeEmail: normalizedEmail,
+          inviteLink: actionLink,
+          tenantName: tenant?.name || '709exclusive',
+          role,
+          inviterEmail: user.email,
+          emailProvider,
+        })
+        console.log('[Invite User] Successfully sent invite email via', emailProvider)
+      } catch (emailError) {
+        console.error('Failed to send invite via app email provider:', emailError)
+        return NextResponse.json({ 
+          error: emailError instanceof Error ? emailError.message : 'Failed to send invite email. Please check your email provider configuration.'
+        }, { status: 500 })
+      }
 
       invitedUserId = linkData?.user?.id ?? null
     } else {
+      console.log('[Invite User] Supabase successfully sent invite email')
       invitedUserId = inviteData?.user?.id ?? null
     }
 

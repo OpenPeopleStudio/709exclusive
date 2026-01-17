@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { supabase } from '@/lib/supabaseClient'
+import { useE2EEncryption } from '@/hooks/useE2EEncryption'
+import EncryptionLockScreen from '@/components/EncryptionLockScreen'
 
 interface OrderItem {
   id: string
@@ -44,6 +47,19 @@ export default function AdminOrdersPage() {
   const [showRefundModal, setShowRefundModal] = useState<Order | null>(null)
   const [showReturnModal, setShowReturnModal] = useState<Order | null>(null)
   const [showShipModal, setShowShipModal] = useState<Order | null>(null)
+  const [adminId, setAdminId] = useState<string | null>(null)
+
+  const { isLocked, unlockKeys, error: encryptionError } = useE2EEncryption(adminId)
+
+  useEffect(() => {
+    const getAdminId = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setAdminId(user.id)
+      }
+    }
+    getAdminId()
+  }, [])
 
   useEffect(() => {
     fetchOrders()
@@ -128,6 +144,11 @@ export default function AdminOrdersPage() {
     delivered: orders.filter(o => o.status === 'delivered').length,
     cancelled: orders.filter(o => o.status === 'cancelled').length,
     refunded: orders.filter(o => o.status === 'refunded').length,
+  }
+
+  // Show lock screen if encryption is locked
+  if (isLocked) {
+    return <EncryptionLockScreen onUnlock={unlockKeys} error={encryptionError} />
   }
 
   return (

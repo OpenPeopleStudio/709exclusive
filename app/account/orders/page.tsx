@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { supabase } from '@/lib/supabaseClient'
+import { useE2EEncryption } from '@/hooks/useE2EEncryption'
+import EncryptionLockScreen from '@/components/EncryptionLockScreen'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Surface from '@/components/ui/Surface'
@@ -23,6 +26,19 @@ interface Order {
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
+  const [userId, setUserId] = useState<string | null>(null)
+
+  const { isLocked, unlockKeys, error: encryptionError } = useE2EEncryption(userId)
+
+  useEffect(() => {
+    const getUserId = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setUserId(user.id)
+      }
+    }
+    getUserId()
+  }, [])
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -60,6 +76,21 @@ export default function OrdersPage() {
         <div className="flex-1 flex items-center justify-center pt-20">
           <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin"></div>
         </div>
+        <Footer />
+      </div>
+    )
+  }
+
+  // Show lock screen if encryption is locked
+  if (isLocked) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-primary)] flex flex-col">
+        <Header />
+        <main className="flex-1 pt-24 pb-16 md:pt-28 md:pb-24">
+          <div className="container max-w-4xl">
+            <EncryptionLockScreen onUnlock={unlockKeys} error={encryptionError} />
+          </div>
+        </main>
         <Footer />
       </div>
     )

@@ -6,7 +6,7 @@ interface ActionCardProps {
   title: string
   description: string
   icon: ReactNode
-  onClick: () => void
+  onClick?: () => void
   badge?: string
   badgeColor?: 'success' | 'warning' | 'error' | 'info'
 }
@@ -27,9 +27,9 @@ export default function ActionCard({
   }
 
   return (
-    <button
+    <div
       onClick={onClick}
-      className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl md:rounded-2xl p-5 md:p-6 text-left transition-all hover:border-[var(--accent)]/50 hover:shadow-lg active:scale-95 group"
+      className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl md:rounded-2xl p-5 md:p-6 text-left transition-all hover:border-[var(--accent)]/50 hover:shadow-lg active:scale-95 group cursor-pointer"
     >
       <div className="flex items-start gap-4">
         <div className="flex-shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-[var(--accent)]/10 flex items-center justify-center text-[var(--accent)] group-hover:bg-[var(--accent)]/20 transition-colors">
@@ -51,6 +51,6 @@ export default function ActionCard({
           </p>
         </div>
       </div>
-    </button>
+    </div>
   )
 }

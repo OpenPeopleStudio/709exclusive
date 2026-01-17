@@ -17,6 +17,13 @@ import {
   sendOrderRefunded as sendOrderRefundedPM,
   sendInviteEmail as sendInviteEmailPM,
 } from './postmark'
+import {
+  sendOrderConfirmation as sendOrderConfirmationRS,
+  sendOrderShipped as sendOrderShippedRS,
+  sendOrderCancelled as sendOrderCancelledRS,
+  sendOrderRefunded as sendOrderRefundedRS,
+  sendInviteEmail as sendInviteEmailRS,
+} from './resend-order'
 
 interface OrderEmailData {
   orderId: string
@@ -138,6 +145,10 @@ export async function sendOrderConfirmation(orderId: string): Promise<void> {
     if (data.emailProvider === 'disabled') {
       return
     }
+    if (data.emailProvider === 'resend') {
+      await sendOrderConfirmationRS(data)
+      return
+    }
     if (data.emailProvider === 'postmark') {
       await sendOrderConfirmationPM(data)
       return
@@ -156,6 +167,10 @@ export async function sendOrderShipped(orderId: string): Promise<void> {
       return
     }
     if (data.emailProvider === 'disabled') {
+      return
+    }
+    if (data.emailProvider === 'resend') {
+      await sendOrderShippedRS(data)
       return
     }
     if (data.emailProvider === 'postmark') {
@@ -178,6 +193,10 @@ export async function sendOrderCancelled(orderId: string): Promise<void> {
     if (data.emailProvider === 'disabled') {
       return
     }
+    if (data.emailProvider === 'resend') {
+      await sendOrderCancelledRS(data)
+      return
+    }
     if (data.emailProvider === 'postmark') {
       await sendOrderCancelledPM(data)
       return
@@ -196,6 +215,10 @@ export async function sendOrderRefunded(orderId: string): Promise<void> {
       return
     }
     if (data.emailProvider === 'disabled') {
+      return
+    }
+    if (data.emailProvider === 'resend') {
+      await sendOrderRefundedRS(data)
       return
     }
     if (data.emailProvider === 'postmark') {
@@ -220,6 +243,11 @@ interface InviteEmailParams {
 export async function sendInviteEmail(data: InviteEmailParams): Promise<void> {
   try {
     if (data.emailProvider === 'disabled') {
+      console.warn('Email provider is disabled. Cannot send invite email.')
+      throw new Error('Email provider is disabled. Please configure an email service.')
+    }
+    if (data.emailProvider === 'resend') {
+      await sendInviteEmailRS(data)
       return
     }
     if (data.emailProvider === 'postmark') {
@@ -229,6 +257,11 @@ export async function sendInviteEmail(data: InviteEmailParams): Promise<void> {
     await sendInviteEmailSG(data)
   } catch (error) {
     console.error('Failed to send invite email:', error)
+    // Re-throw the error with more context
+    if (error instanceof Error) {
+      throw new Error(`Failed to send invite email: ${error.message}`)
+    }
+    throw new Error('Failed to send invite email due to an unknown error')
   }
 }
 

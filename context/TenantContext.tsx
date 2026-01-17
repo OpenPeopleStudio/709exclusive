@@ -6,27 +6,8 @@ import type { TenantContextValue, TenantSettings, TenantThemeColors, TenantFeatu
 const defaultSettings: TenantSettings = {
   theme: {
     brand_name: '709exclusive',
-    colors: {
-      bg_primary: '#0B0B0C',
-      bg_secondary: '#121317',
-      bg_tertiary: '#1A1C22',
-      bg_elevated: '#20232B',
-      text_primary: '#F8F8F8',
-      text_secondary: '#C9CBD1',
-      text_muted: '#8A8F98',
-      accent: '#E10600',
-      accent_hover: '#FF1A14',
-      accent_muted: '#991A1A',
-      accent_blue: '#3B82F6',
-      accent_blue_hover: '#60A5FA',
-      accent_amber: '#F59E0B',
-      accent_amber_hover: '#FBBF24',
-      border_primary: '#272A33',
-      border_secondary: '#343846',
-      success: '#22C55E',
-      warning: '#EAB308',
-      error: '#EF4444',
-    },
+    // Colors now default to CSS variables in globals.css
+    colors: undefined,
   },
   features: {
     drops: true,

@@ -201,6 +201,11 @@ interface InviteEmailData {
 }
 
 export async function sendInviteEmail(data: InviteEmailData): Promise<void> {
+  const apiKey = process.env.SENDGRID_API_KEY
+  if (!apiKey || apiKey === 'dummy-key') {
+    throw new Error('SendGrid API key not configured. Please set SENDGRID_API_KEY environment variable.')
+  }
+
   const roleLabel = data.role.charAt(0).toUpperCase() + data.role.slice(1)
   const inviterLine = data.inviterEmail ? `<p>Invited by: ${data.inviterEmail}</p>` : ''
 
@@ -220,5 +225,17 @@ export async function sendInviteEmail(data: InviteEmailData): Promise<void> {
     `,
   }
 
-  await sendgrid.send(msg)
+  try {
+    await sendgrid.send(msg)
+  } catch (error: unknown) {
+    console.error('SendGrid error:', error)
+    if (error && typeof error === 'object' && 'response' in error) {
+      const response = (error as { response?: { body?: { errors?: Array<{ message: string }> } } }).response
+      const errors = response?.body?.errors
+      if (errors && errors.length > 0) {
+        throw new Error(`SendGrid: ${errors.map(e => e.message).join(', ')}`)
+      }
+    }
+    throw new Error('SendGrid failed to send email. Check API key and sender verification.')
+  }
 }

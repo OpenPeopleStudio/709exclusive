@@ -8,6 +8,7 @@ import { useE2EEncryption } from '@/hooks/useE2EEncryption'
 import KeyVerification from '@/components/KeyVerification'
 import KeyBackup from '@/components/KeyBackup'
 import EncryptionSettings from '@/components/EncryptionSettings'
+import EncryptionLockScreen from '@/components/EncryptionLockScreen'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import PWAInstallButton from '@/components/account/PWAInstallButton'
@@ -522,6 +523,13 @@ export default function MessagesPage() {
         return
       }
 
+      // Calculate expiry time upfront
+      // eslint-disable-next-line react-hooks/purity
+      const now = Date.now()
+      const expiresAt = retentionEnabled && retentionDays 
+        ? new Date(now + retentionDays * 24 * 60 * 60 * 1000).toISOString()
+        : undefined
+
       let messageData: {
         tenant_id: string
         customer_id: string
@@ -549,10 +557,8 @@ export default function MessagesPage() {
         read: false,
       }
 
-      if (retentionEnabled && retentionDays) {
-        messageData.expires_at = new Date(
-          Date.now() + retentionDays * 24 * 60 * 60 * 1000
-        ).toISOString()
+      if (expiresAt) {
+        messageData.expires_at = expiresAt
       }
 
       // Try to encrypt if admin has E2EE set up
@@ -808,6 +814,29 @@ export default function MessagesPage() {
         <div className="flex-1 flex items-center justify-center pt-20">
           <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin"></div>
         </div>
+        <Footer />
+      </div>
+    )
+  }
+
+  // Show lock screen if encryption is locked
+  if (isLocked) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-primary)] flex flex-col">
+        <Header />
+        <main className="flex-1 pt-24 pb-16 md:pt-28 md:pb-24">
+          <div className="container max-w-2xl">
+            <div className="mb-6">
+              <Link href="/account" className="text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
+                ← Back to Account
+              </Link>
+            </div>
+            <EncryptionLockScreen
+              onUnlock={unlockKeys}
+              error={encryptionError}
+            />
+          </div>
+        </main>
         <Footer />
       </div>
     )

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import "./globals-leaflet.css";
 import { CartProvider } from "@/context/CartContext";
 import BottomNav from "@/components/BottomNav";
 import { getTenantFromRequest } from "@/lib/tenant";

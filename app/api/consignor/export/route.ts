@@ -39,7 +39,7 @@ export async function GET(request: Request) {
     const { data: consignor } = await consignorQuery.single()
 
     // Get all items
-    let itemsQuery = supabase
+    const itemsQuery = supabase
       .from('consignor_items_view')
       .select('*')
       .eq('consignor_id', consignorId)

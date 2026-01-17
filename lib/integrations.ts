@@ -2,7 +2,8 @@ import type { TenantSettings } from '@/types/tenant'
 
 export type PaymentProvider = 'stripe' | 'manual'
 export type CryptoProvider = 'nowpayments' | 'disabled'
-export type EmailProvider = 'sendgrid' | 'postmark' | 'disabled'
+export type EmailProvider = 'sendgrid' | 'postmark' | 'resend' | 'disabled'
+export type SmsProvider = 'twilio' | 'disabled'
 export type DeliveryProvider = 'internal' | 'manual'
 
 export function resolvePaymentProvider(settings?: TenantSettings): PaymentProvider {
@@ -15,6 +16,10 @@ export function resolveCryptoProvider(settings?: TenantSettings): CryptoProvider
 
 export function resolveEmailProvider(settings?: TenantSettings): EmailProvider {
   return settings?.integrations?.email?.provider ?? 'sendgrid'
+}
+
+export function resolveSmsProvider(settings?: TenantSettings): SmsProvider {
+  return settings?.integrations?.sms?.provider ?? 'disabled'
 }
 
 export function resolveDeliveryProvider(settings?: TenantSettings): DeliveryProvider {

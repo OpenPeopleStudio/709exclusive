@@ -1,6 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { supabase } from '@/lib/supabaseClient'
+import { useE2EEncryption } from '@/hooks/useE2EEncryption'
+import EncryptionLockScreen from '@/components/EncryptionLockScreen'
 
 interface Customer {
   id: string
@@ -21,6 +25,19 @@ export default function AdminCustomersPage() {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [purchaseFilter, setPurchaseFilter] = useState<'all' | 'buyers' | 'window'>('all')
+  const [adminId, setAdminId] = useState<string | null>(null)
+
+  const { isLocked, unlockKeys, error: encryptionError } = useE2EEncryption(adminId)
+
+  useEffect(() => {
+    const getAdminId = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setAdminId(user.id)
+      }
+    }
+    getAdminId()
+  }, [])
 
   useEffect(() => {
     const fetchCustomers = async () => {
@@ -62,6 +79,11 @@ export default function AdminCustomersPage() {
   const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
   const buyerCount = customers.filter((c) => c.hasPurchase).length
   const windowShopperCount = customers.length - buyerCount
+
+  // Show lock screen if encryption is locked
+  if (isLocked) {
+    return <EncryptionLockScreen onUnlock={unlockKeys} error={encryptionError} />
+  }
 
   if (loading) {
     return (
@@ -202,21 +224,21 @@ export default function AdminCustomersPage() {
               {filteredCustomers.map((customer) => (
                 <tr key={customer.id} className="hover:bg-[var(--bg-tertiary)] transition-colors">
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
+                    <Link href={`/admin/customers/${customer.id}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
                       <div className="w-10 h-10 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center">
                         <span className="text-sm font-medium text-[var(--text-primary)]">
                           {(customer.name || customer.email || '?').charAt(0).toUpperCase()}
                         </span>
                       </div>
                       <div>
-                        <p className="font-medium text-[var(--text-primary)]">
+                        <p className="font-medium text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors">
                           {customer.name || 'No name'}
                         </p>
                         <p className="text-sm text-[var(--text-muted)]">
                           {customer.email || 'No email'}
                         </p>
                       </div>
-                    </div>
+                    </Link>
                   </td>
                   <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
                     {customer.phone || '—'}

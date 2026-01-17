@@ -21,17 +21,33 @@ export default function MessageDebugPanel({
   isInitialized, 
   isLocked,
   publicKey,
-  adminId 
+  adminId,
+  show,
+  onShowChange,
+  hideTrigger = false,
 }: { 
   isInitialized: boolean
   isLocked: boolean
   publicKey: string | null
   adminId: string | null
+  show?: boolean
+  onShowChange?: (show: boolean) => void
+  hideTrigger?: boolean
 }) {
   const { id: tenantId } = useTenant()
-  const [show, setShow] = useState(false)
+  const [internalShow, setInternalShow] = useState(false)
   const [info, setInfo] = useState<DebugInfo | null>(null)
   const [loading, setLoading] = useState(false)
+  const isControlled = typeof show === 'boolean' && !!onShowChange
+  const isOpen = isControlled ? show : internalShow
+
+  const toggleShow = () => {
+    if (isControlled) {
+      onShowChange?.(!show)
+      return
+    }
+    setInternalShow((prev) => !prev)
+  }
 
   const runDiagnostics = async () => {
     setLoading(true)
@@ -84,16 +100,18 @@ export default function MessageDebugPanel({
 
   return (
     <div className="fixed bottom-4 right-4 z-50">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => setShow(!show)}
-        className="bg-[var(--bg-secondary)] border border-[var(--border-primary)]"
-      >
-        {show ? 'Hide' : 'Debug'} 🔍
-      </Button>
+      {!hideTrigger && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={toggleShow}
+          className="bg-[var(--bg-secondary)] border border-[var(--border-primary)]"
+        >
+          {isOpen ? 'Hide' : 'Debug'} 🔍
+        </Button>
+      )}
 
-      {show && (
+      {isOpen && (
         <Surface className="absolute bottom-12 right-0 w-96 max-h-[600px] overflow-y-auto">
           <div className="p-4 border-b border-[var(--border-primary)]">
             <h3 className="font-semibold text-[var(--text-primary)]">Message System Debug</h3>

@@ -29,7 +29,8 @@ export function CartProvider({
 
   // Hydrate cart from localStorage after mount
   useEffect(() => {
-    setCart(getCart(tenantKey))
+    const savedCart = getCart(tenantKey)
+    setCart(savedCart)
     setIsHydrated(true)
   }, [tenantKey])
 

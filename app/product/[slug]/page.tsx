@@ -15,11 +15,22 @@ import SizingGuide from '@/components/SizingGuide'
 import Badge from '@/components/ui/Badge'
 import Accordion, { AccordionItem } from '@/components/ui/Accordion'
 import Surface from '@/components/ui/Surface'
+import ProductAdminTools from '@/components/admin/ProductAdminTools'
 import { useTenant } from '@/context/TenantContext'
 
 interface PriceHistory {
   price_cents: number
   recorded_at: string
+}
+
+interface ProductStats {
+  views?: number
+  wishlistCount?: number
+  stockAlerts?: number
+  totalOrders?: number
+  avgPrice?: number
+  profitMargin?: number
+  daysInStock?: number
 }
 
 export default function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -37,6 +48,8 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
   const [addedToCart, setAddedToCart] = useState(false)
   const [isWishlisted, setIsWishlisted] = useState(false)
   const [showAlertModal, setShowAlertModal] = useState(false)
+  const [userRole, setUserRole] = useState<string>('')
+  const [productStats, setProductStats] = useState<ProductStats | null>(null)
   const { addToCart } = useCart()
 
   // Resolve params promise
@@ -123,6 +136,26 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
 
           const { data: wishlistItem } = await wishlistQuery.maybeSingle()
           setIsWishlisted(!!wishlistItem)
+          
+          // Fetch user role for admin tools
+          const { data: profile } = await supabase
+            .from('709_profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+          
+          if (profile) {
+            setUserRole(profile.role || '')
+            
+            // Fetch admin stats if user is staff/admin/owner
+            if (['staff', 'admin', 'owner'].includes(profile.role || '')) {
+              const statsRes = await fetch(`/api/admin/products/stats?productId=${productData.id}`)
+              if (statsRes.ok) {
+                const statsData = await statsRes.json()
+                setProductStats(statsData.stats)
+              }
+            }
+          }
         }
 
         if (user) {
@@ -440,6 +473,16 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
 
             {/* Product Info - Sticky on Desktop */}
             <div className="lg:sticky lg:top-28 lg:self-start space-y-6">
+              {/* Admin Tools */}
+              {product && userRole && (
+                <ProductAdminTools
+                  productId={product.id}
+                  productSlug={product.slug}
+                  stats={productStats || undefined}
+                  userRole={userRole}
+                />
+              )}
+
               {/* Brand & Name */}
               <div>
                 {product.brand && (

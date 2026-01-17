@@ -5,6 +5,7 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import Surface from '@/components/ui/Surface'
 import Button from '@/components/ui/Button'
+import { encryptLocation, getLocationEncryptionKeys } from '@/lib/crypto/location'
 
 const UPDATE_INTERVAL_MS = 45 * 1000
 const RETENTION_HOURS = 48
@@ -25,6 +26,9 @@ export default function StaffLocationClient({ staffName }: StaffLocationClientPr
   const [lastAccuracy, setLastAccuracy] = useState<number | null>(null)
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [encryptionEnabled, setEncryptionEnabled] = useState(false)
+  const [ownerPublicKey, setOwnerPublicKey] = useState<string | null>(null)
+  
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const watchIdRef = useRef<number | null>(null)
   const flushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -33,6 +37,7 @@ export default function StaffLocationClient({ staffName }: StaffLocationClientPr
   const trackingRef = useRef(false)
   const isOnlineRef = useRef(true)
   const inFlightRef = useRef(false)
+  const encryptionKeysRef = useRef<{ publicKey: string; privateKey: string; id: string } | null>(null)
 
   useEffect(() => {
     if (typeof navigator === 'undefined') return
@@ -43,6 +48,24 @@ export default function StaffLocationClient({ staffName }: StaffLocationClientPr
     }
 
     setIsOnline(navigator.onLine)
+
+    // Initialize encryption keys
+    const initEncryption = async () => {
+      try {
+        const keys = await getLocationEncryptionKeys()
+        if (keys && keys.privateKey) {
+          encryptionKeysRef.current = keys as { publicKey: string; privateKey: string; id: string }
+          // TODO: Fetch owner's public key from API
+          // For now, encryption is optional
+          setEncryptionEnabled(false)
+        }
+      } catch (err) {
+        console.error('Failed to initialize encryption:', err)
+        setEncryptionEnabled(false)
+      }
+    }
+    
+    initEncryption()
 
     if ('permissions' in navigator && navigator.permissions?.query) {
       navigator.permissions
@@ -138,20 +161,47 @@ export default function StaffLocationClient({ staffName }: StaffLocationClientPr
     setError(null)
 
     try {
+      const recordedAt = new Date(position.timestamp).toISOString()
+      const payload: Record<string, unknown> = {
+        lat: latitude,
+        lng: longitude,
+        accuracy,
+        recordedAt,
+      }
+
+      // Try to encrypt location if keys are available
+      if (encryptionEnabled && encryptionKeysRef.current && ownerPublicKey) {
+        try {
+          const encrypted = await encryptLocation(
+            latitude,
+            longitude,
+            accuracy,
+            recordedAt,
+            encryptionKeysRef.current.privateKey,
+            encryptionKeysRef.current.publicKey,
+            ownerPublicKey,
+            'owner' // TODO: Get actual owner ID
+          )
+
+          if (encrypted) {
+            payload.encryptedLocation = encrypted
+            payload.encryptionKeyId = encryptionKeysRef.current.id
+          }
+        } catch (encErr) {
+          console.error('Encryption failed, sending plaintext:', encErr)
+          // Continue with plaintext
+        }
+      }
+
       const response = await fetch('/api/staff/location', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          lat: latitude,
-          lng: longitude,
-          accuracy,
-          recordedAt: new Date(position.timestamp).toISOString(),
-        }),
+        body: JSON.stringify(payload),
       })
 
       if (!response.ok) {
-        const payload = await response.json().catch(() => ({}))
-        throw new Error(payload?.error || 'Unable to update location')
+        const errorPayload = await response.json().catch(() => ({}))
+        throw new Error(errorPayload?.error || 'Unable to update location')
       }
 
       setLastSentAt(new Date().toISOString())
@@ -305,6 +355,19 @@ export default function StaffLocationClient({ staffName }: StaffLocationClientPr
               <p className="text-xs text-[var(--text-muted)] mt-2">
                 You can stop sharing at any time. Location history is retained for about {RETENTION_HOURS} hours and only visible to dispatch.
               </p>
+              {encryptionEnabled && (
+                <div className="mt-3 p-3 bg-[var(--success)]/10 border border-[var(--success)]/20 rounded-lg">
+                  <div className="flex items-center gap-2 text-[var(--success)] text-xs font-medium mb-1">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    E2E Encryption Enabled
+                  </div>
+                  <p className="text-[10px] text-[var(--text-muted)]">
+                    Your location is encrypted before transmission
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-2">

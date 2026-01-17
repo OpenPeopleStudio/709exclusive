@@ -35,7 +35,7 @@ export default function LocationHistoryViewer({ userId, days = 7 }: LocationHist
 
       const startDate = new Date(Date.now() - selectedPeriod * 24 * 60 * 60 * 1000).toISOString()
       
-      let query = `/api/staff/location?windowHours=${selectedPeriod * 24}&maxPerStaff=500`
+      const query = `/api/staff/location?windowHours=${selectedPeriod * 24}&maxPerStaff=500`
       
       const response = await fetch(query)
       if (!response.ok) {

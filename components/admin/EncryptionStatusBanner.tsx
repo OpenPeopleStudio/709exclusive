@@ -16,6 +16,9 @@ interface EncryptionStatusBannerProps {
   recipientId: string | null
   onBackupKeys?: () => void
   onVerifyKeys?: () => void
+  supportTitle?: string
+  supportDescription?: string
+  supportWarning?: string
 }
 
 export default function EncryptionStatusBanner({
@@ -30,6 +33,9 @@ export default function EncryptionStatusBanner({
   recipientId,
   onBackupKeys,
   onVerifyKeys,
+  supportTitle,
+  supportDescription,
+  supportWarning,
 }: EncryptionStatusBannerProps) {
   const [showDetails, setShowDetails] = useState(false)
 
@@ -119,6 +125,26 @@ export default function EncryptionStatusBanner({
             {showDetails ? 'Hide' : 'Show'} details
           </button>
         </div>
+
+        {(supportTitle || supportDescription || supportWarning) && (
+          <div className="pl-7 space-y-1">
+            {supportTitle && (
+              <p className="text-sm font-medium text-[var(--text-primary)]">
+                {supportTitle}
+              </p>
+            )}
+            {supportDescription && (
+              <p className="text-xs text-[var(--text-muted)]">
+                {supportDescription}
+              </p>
+            )}
+            {supportWarning && (
+              <p className="text-xs text-[var(--warning)]">
+                {supportWarning}
+              </p>
+            )}
+          </div>
+        )}
 
         {showDetails && (
           <div className="pl-7 space-y-1">

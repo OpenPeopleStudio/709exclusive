@@ -61,9 +61,17 @@ export async function POST(request: Request) {
   const recordedAt = typeof payload.recordedAt === 'string' ? payload.recordedAt : null
   const taskId = typeof payload.taskId === 'string' ? payload.taskId : null
   const event = (payload.event === 'start' || payload.event === 'stop') ? payload.event : null
+  
+  // E2E encryption support
+  const encryptedLocation = payload.encryptedLocation && typeof payload.encryptedLocation === 'object'
+    ? payload.encryptedLocation as Record<string, unknown>
+    : null
+  const encryptionKeyId = typeof payload.encryptionKeyId === 'string' ? payload.encryptionKeyId : null
 
   const hasCoords = lat !== null && lng !== null
-  if (!hasCoords && !event) {
+  const hasEncrypted = encryptedLocation !== null
+  
+  if (!hasCoords && !hasEncrypted && !event) {
     return NextResponse.json({ error: 'Location or event required' }, { status: 400 })
   }
 
@@ -116,19 +124,28 @@ export async function POST(request: Request) {
     const expiresAt = new Date(effectiveRecordedAt.getTime() + RETENTION_HOURS * 60 * 60 * 1000)
     const normalizedAccuracy = accuracy !== null ? Math.max(0, accuracy) : null
 
+    // Prepare insert data (without encrypted fields for now - will be enabled after migration)
+    const insertData: Record<string, unknown> = {
+      tenant_id: tenant?.id,
+      user_id: user.id,
+      recorded_at: effectiveRecordedAt.toISOString(),
+      latitude: lat,
+      longitude: lng,
+      accuracy_m: normalizedAccuracy,
+      task_id: taskId,
+      source: 'web',
+      expires_at: expiresAt.toISOString(),
+    }
+
+    // TODO: Re-enable encrypted location after running migration 041
+    // if (hasEncrypted && encryptedLocation) {
+    //   insertData.encrypted_location = encryptedLocation
+    //   insertData.encryption_key_id = encryptionKeyId
+    // }
+
     const { data, error } = await supabase
       .from('staff_locations')
-      .insert({
-        tenant_id: tenant?.id,
-        user_id: user.id,
-        recorded_at: effectiveRecordedAt.toISOString(),
-        latitude: lat,
-        longitude: lng,
-        accuracy_m: normalizedAccuracy,
-        task_id: taskId,
-        source: 'web',
-        expires_at: expiresAt.toISOString(),
-      })
+      .insert(insertData)
       .select('id')
       .single()
 

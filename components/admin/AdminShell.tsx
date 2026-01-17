@@ -83,17 +83,55 @@ export default function AdminShell({ children, userEmail, navItems, isSuperAdmin
             <span className="hidden md:inline">Help</span>
           </button>
           <PWAInstallButton />
-          <span className="text-sm text-[var(--text-muted)] hidden md:inline">{userEmail}</span>
-          <button
-            type="button"
-            onClick={handleSignOut}
-            disabled={isSigningOut}
-            className={`text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors ${
-              isSigningOut ? 'opacity-60 cursor-not-allowed' : ''
-            }`}
-          >
-            Sign out
-          </button>
+          <details className="relative hidden md:block">
+            <summary className="list-none">
+              <button
+                type="button"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-all"
+                aria-label="Account menu"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                </svg>
+                <svg className="w-4 h-4 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </summary>
+            <div className="absolute right-0 mt-2 w-56 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] shadow-xl">
+              {userEmail && (
+                <div className="px-4 py-3 border-b border-[var(--border-primary)] text-xs text-[var(--text-muted)] truncate">
+                  {userEmail}
+                </div>
+              )}
+              <div className="py-2">
+                <Link
+                  href="/account/settings"
+                  className="block px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                >
+                  Account settings
+                </Link>
+                {!isSuperAdmin && (
+                  <Link
+                    href="/admin/tenant-settings"
+                    className="block px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                  >
+                    Tenant settings
+                  </Link>
+                )}
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  disabled={isSigningOut}
+                  className={`w-full text-left px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors ${
+                    isSigningOut ? 'opacity-60 cursor-not-allowed' : ''
+                  }`}
+                >
+                  Sign out
+                </button>
+              </div>
+            </div>
+          </details>
           {!isSuperAdmin && (
             <Link 
               href="/" 
@@ -160,6 +198,39 @@ export default function AdminShell({ children, userEmail, navItems, isSuperAdmin
             )
           })}
         </nav>
+
+        {!isSuperAdmin && (
+          <div className="px-4 pb-4">
+            <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+              Settings
+            </div>
+            <div className="space-y-1">
+              <Link
+                href="/admin/tenant-settings"
+                onClick={() => setIsSidebarOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors group ${
+                  pathname?.startsWith('/admin/tenant-settings')
+                    ? 'bg-[var(--accent)]/10 text-[var(--accent)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
+                }`}
+              >
+                <svg
+                  className={`w-5 h-5 transition-colors ${
+                    pathname?.startsWith('/admin/tenant-settings')
+                      ? 'text-[var(--accent)]'
+                      : 'text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]'
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3l8 4v6c0 5-3.5 8-8 8s-8-3-8-8V7l8-4z" />
+                </svg>
+                <span className="font-medium">Tenant</span>
+              </Link>
+            </div>
+          </div>
+        )}
         
         {/* Mobile footer links */}
         <div className="p-4 border-t border-[var(--border-primary)] lg:hidden mt-auto">

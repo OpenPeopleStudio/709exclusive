@@ -6,7 +6,6 @@ import { useE2EEncryption } from '@/hooks/useE2EEncryption'
 import KeyVerification from '@/components/KeyVerification'
 import KeyBackup from '@/components/KeyBackup'
 import EncryptionSettings from '@/components/EncryptionSettings'
-import EncryptionStatusBanner from '@/components/admin/EncryptionStatusBanner'
 import EncryptionSetupPanel from '@/components/admin/EncryptionSetupPanel'
 import MessagesLayout from '@/components/admin/MessagesLayout'
 import ConversationListItem from '@/components/admin/ConversationListItem'
@@ -90,6 +89,7 @@ export default function AdminMessagesPage() {
   const [recoveryError, setRecoveryError] = useState<string | null>(null)
   const [showRecoveryModal, setShowRecoveryModal] = useState(false)
   const [showAdvancedActions, setShowAdvancedActions] = useState(false)
+  const [showDebugPanel, setShowDebugPanel] = useState(false)
   const [retentionEnabled, setRetentionEnabled] = useState(false)
   const [retentionDays, setRetentionDays] = useState(90)
   const [showRetentionSettings, setShowRetentionSettings] = useState(false)
@@ -394,14 +394,14 @@ export default function AdminMessagesPage() {
       m.encrypted && (m.decryptedContent === 'Secure message' || m.decryptedContent === '[Unable to decrypt]')
     )
     if (needsRetry) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       loadMessages(selectedCustomer)
     }
   }, [isInitialized, selectedCustomer, messages, loadMessages])
 
   useEffect(() => {
     // Initial data fetch
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     loadConversations()
   }, [loadConversations])
 
@@ -413,7 +413,7 @@ export default function AdminMessagesPage() {
 
   useEffect(() => {
     if (selectedCustomer) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       loadMessages(selectedCustomer)
       loadRetentionSettings(selectedCustomer)
     }
@@ -943,75 +943,116 @@ export default function AdminMessagesPage() {
     )
   })
 
+  const isDev = process.env.NODE_ENV === 'development'
+
   return (
     <div>
       {/* Debug Panel (dev only) */}
-      {process.env.NODE_ENV === 'development' && (
+      {isDev && (
         <MessageDebugPanel
           isInitialized={isInitialized}
           isLocked={isLocked}
           publicKey={publicKey}
           adminId={adminId}
+          show={showDebugPanel}
+          onShowChange={setShowDebugPanel}
+          hideTrigger
         />
       )}
 
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Messages</h1>
-        
-        {/* E2EE Status & Actions */}
-        <div className="flex items-center gap-2">
-          {encryptionError ? (
-            <span className="text-sm text-[var(--warning)]">
-              Secure chat unavailable
-            </span>
-          ) : deviceSecureReady && (!selectedCustomer || recipientHasKey) ? (
-            <span className="flex items-center gap-2 px-3 py-1.5 bg-[var(--success)]/10 text-[var(--success)] text-sm rounded-full">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-              </svg>
-              Secure
-            </span>
-          ) : (
-            <span className="text-sm text-[var(--text-muted)]">
-              {isLocked
-                ? 'Security locked'
-                : selectedCustomer && !recipientHasKey
-                  ? 'Recipient not secured'
-                  : isInitializing
-                    ? 'Securing your chat...'
-                    : 'Secure chat unavailable'}
-            </span>
-          )}
+      <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Messages</h1>
+        </div>
 
-          <Button
-            onClick={() => setShowEncryptionSettings(true)}
-            variant="ghost"
-            size="sm"
-          >
-            Security
-          </Button>
-          <Button
-            onClick={handleCreateRecovery}
-            variant="secondary"
-            size="sm"
-            disabled={!isInitialized || isLocked}
-          >
-            Save recovery code
-          </Button>
-          <Button
-            onClick={() => setShowNewMessage(true)}
-            variant="secondary"
-            size="sm"
-          >
-            New message
-          </Button>
-          <Button
-            onClick={() => setShowAdvancedActions((prev) => !prev)}
-            variant="ghost"
-            size="sm"
-          >
-            Advanced
-          </Button>
+        {/* E2EE Status & Actions */}
+        <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center md:gap-4">
+          <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm">
+            <details className="relative group">
+              <summary
+                className={`flex list-none items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                  encryptionError || isLocked || (selectedCustomer && !recipientHasKey)
+                    ? 'bg-[var(--warning)]/10 text-[var(--warning)]'
+                    : 'bg-[var(--success)]/10 text-[var(--success)]'
+                }`}
+              >
+                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                  <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                </svg>
+                End-to-end encrypted
+                <svg className="h-3.5 w-3.5 transition-transform duration-300 group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2} aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </summary>
+              <div className="absolute z-20 mt-2 w-72 rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4 shadow-xl">
+                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                  </svg>
+                  Secure support inbox
+                </div>
+                <p className="mt-2 text-xs text-[var(--text-muted)]">
+                  Messages are protected on this device. Save a recovery code to keep access if you switch browsers.
+                </p>
+                {(encryptionError || isLocked || (selectedCustomer && !recipientHasKey)) && (
+                  <p className="mt-2 text-xs text-[var(--warning)]">
+                    {encryptionError
+                      ? 'Secure chat unavailable.'
+                      : isLocked
+                        ? 'Unlock security to save a recovery code.'
+                        : selectedCustomer && !recipientHasKey
+                          ? 'Recipient not secured.'
+                          : isInitializing
+                            ? 'Securing your chat...'
+                            : 'Secure chat unavailable.'}
+                  </p>
+                )}
+                {isDev && (
+                  <>
+                    <div className="mt-3 h-px bg-[var(--border-primary)]" />
+                    <button
+                      type="button"
+                      onClick={() => setShowDebugPanel((prev) => !prev)}
+                      className="mt-3 flex w-full items-center justify-between rounded-lg px-2 py-2 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5 transition-colors"
+                    >
+                      <span>Debug tools</span>
+                      <span className="text-[10px] text-[var(--text-muted)]">
+                        {showDebugPanel ? 'Hide' : 'Show'}
+                      </span>
+                    </button>
+                  </>
+                )}
+              </div>
+            </details>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 md:gap-1 md:rounded-2xl md:border md:border-[var(--border-primary)] md:bg-[var(--bg-secondary)]/60 md:p-1 md:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]">
+            <Button
+              onClick={() => setShowEncryptionSettings(true)}
+              variant="ghost"
+              size="sm"
+              className="w-full sm:w-auto"
+            >
+              Security
+            </Button>
+            <Button
+              onClick={handleCreateRecovery}
+              variant="secondary"
+              size="sm"
+              disabled={!isInitialized || isLocked}
+              className="w-full sm:w-auto"
+            >
+              Save recovery code
+            </Button>
+            <Button
+              onClick={() => setShowAdvancedActions((prev) => !prev)}
+              variant="ghost"
+              size="sm"
+              className="w-full sm:w-auto"
+            >
+              Advanced
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -1034,20 +1075,7 @@ export default function AdminMessagesPage() {
         </div>
       )}
 
-      {/* Prominent Encryption Status Banner */}
-      <EncryptionStatusBanner
-        isInitialized={isInitialized}
-        isInitializing={isInitializing}
-        publicKey={publicKey}
-        fingerprint={fingerprint}
-        shortFingerprint={shortFingerprint}
-        error={encryptionError}
-        isLocked={isLocked}
-        recipientHasKey={recipientHasKey}
-        recipientId={selectedCustomer}
-        onBackupKeys={() => setShowKeyBackup(true)}
-        onVerifyKeys={() => setShowKeyVerification(true)}
-      />
+      {/* Prominent Encryption Status Banner removed in favor of top bar dropdown */}
 
       {/* Encryption Setup Panel for selected conversation */}
       {selectedCustomer && (
@@ -1059,22 +1087,6 @@ export default function AdminMessagesPage() {
           recipientName={filteredConversations.find(c => c.customer_id === selectedCustomer)?.customer_name || 'User'}
         />
       )}
-
-      <Surface padding="md" className="mb-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm text-[var(--text-primary)] font-medium">Secure support inbox</p>
-            <p className="text-xs text-[var(--text-muted)] mt-1">
-              Messages are protected on this device. Save a recovery code to keep access if you switch browsers.
-            </p>
-            {isLocked && (
-              <p className="text-xs text-[var(--warning)] mt-2">
-                Unlock security to save a recovery code.
-              </p>
-            )}
-          </div>
-        </div>
-      </Surface>
 
       {selectedCustomer && (
         <Surface padding="md" className="mb-4">
@@ -1145,17 +1157,29 @@ export default function AdminMessagesPage() {
             <div className="p-4 border-b border-[var(--border-primary)] space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="font-semibold text-[var(--text-primary)]">Inbox</h2>
-                <button
-                  type="button"
-                  onClick={() => setShowUnreadOnly((v) => !v)}
-                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                    showUnreadOnly
-                      ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
-                      : 'border-[var(--border-primary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-                  }`}
-                >
-                  Unread
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowUnreadOnly((v) => !v)}
+                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                      showUnreadOnly
+                        ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
+                        : 'border-[var(--border-primary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                    }`}
+                  >
+                    Unread
+                  </button>
+                  <Button
+                    onClick={() => setShowNewMessage(true)}
+                    variant="secondary"
+                    size="sm"
+                    aria-label="New message"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                  </Button>
+                </div>
               </div>
               <input
                 type="text"

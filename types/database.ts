@@ -41,6 +41,22 @@ export interface Profile {
   full_name: string | null
   tenant_id: string
   created_at: string
+  last_active_at: string | null
+  is_online: boolean
+}
+
+export interface VerifiedContact {
+  id: string
+  user_id: string
+  verified_user_id: string
+  verified_public_key: string
+  verified_fingerprint: string
+  verified_short_fingerprint: string
+  verified_at: string
+  verified_method: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface Product {

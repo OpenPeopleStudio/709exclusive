@@ -63,7 +63,10 @@ export type TenantIntegrations = {
     crypto_provider?: 'nowpayments' | 'disabled'
   }
   email?: {
-    provider?: 'sendgrid' | 'postmark' | 'disabled'
+    provider?: 'sendgrid' | 'postmark' | 'resend' | 'disabled'
+  }
+  sms?: {
+    provider?: 'twilio' | 'disabled'
   }
   delivery?: {
     provider?: 'internal' | 'manual'

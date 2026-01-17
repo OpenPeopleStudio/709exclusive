@@ -162,22 +162,36 @@ export async function sendOrderRefunded(data: EmailData): Promise<void> {
 }
 
 export async function sendInviteEmail(data: InviteEmailData): Promise<void> {
-  const client = getClient()
+  let client
+  try {
+    client = getClient()
+  } catch (error) {
+    throw new Error('Postmark API key not configured. Please set POSTMARK_API_KEY environment variable.')
+  }
+
   const roleLabel = data.role.charAt(0).toUpperCase() + data.role.slice(1)
   const inviterLine = data.inviterEmail ? `<p>Invited by: ${data.inviterEmail}</p>` : ''
 
-  await client.sendEmail({
-    From: 'orders@709exclusive.com',
-    To: data.inviteeEmail,
-    Subject: `You're invited to ${data.tenantName}`,
-    HtmlBody: `
-      <h1>You're invited to ${data.tenantName}</h1>
-      <p>Role: ${roleLabel}</p>
-      ${inviterLine}
-      <p><a href="${data.inviteLink}">Accept your invite</a></p>
-      <p>If you did not expect this invite, you can ignore this email.</p>
-    `,
-    TextBody: `You've been invited to join ${data.tenantName} as ${roleLabel}.\n${data.inviterEmail ? `Invited by: ${data.inviterEmail}\n` : ''}Accept invite: ${data.inviteLink}`,
-    MessageStream: 'outbound'
-  })
+  try {
+    await client.sendEmail({
+      From: 'orders@709exclusive.com',
+      To: data.inviteeEmail,
+      Subject: `You're invited to ${data.tenantName}`,
+      HtmlBody: `
+        <h1>You're invited to ${data.tenantName}</h1>
+        <p>Role: ${roleLabel}</p>
+        ${inviterLine}
+        <p><a href="${data.inviteLink}">Accept your invite</a></p>
+        <p>If you did not expect this invite, you can ignore this email.</p>
+      `,
+      TextBody: `You've been invited to join ${data.tenantName} as ${roleLabel}.\n${data.inviterEmail ? `Invited by: ${data.inviterEmail}\n` : ''}Accept invite: ${data.inviteLink}`,
+      MessageStream: 'outbound'
+    })
+  } catch (error: unknown) {
+    console.error('Postmark error:', error)
+    if (error && typeof error === 'object' && 'message' in error) {
+      throw new Error(`Postmark: ${(error as { message: string }).message}`)
+    }
+    throw new Error('Postmark failed to send email. Check API key and sender verification.')
+  }
 }
