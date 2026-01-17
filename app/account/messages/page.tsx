@@ -69,13 +69,18 @@ export default function MessagesPage() {
   const attachmentInputRef = useRef<HTMLInputElement>(null)
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null)
   const [attachmentError, setAttachmentError] = useState<string | null>(null)
-  const [encryptionHint, setEncryptionHint] = useState<string | null>(null)
+  const [sendNotice, setSendNotice] = useState<string | null>(null)
   const [sendError, setSendError] = useState<string | null>(null)
+  const [recoveryData, setRecoveryData] = useState<{ code: string; backup: string } | null>(null)
+  const [recoveryError, setRecoveryError] = useState<string | null>(null)
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false)
+  const [showAdvancedActions, setShowAdvancedActions] = useState(false)
 
   const eligibleOrderStatuses = ['pending', 'paid', 'fulfilled', 'shipped']
 
   const {
     isInitialized,
+    isInitializing,
     fingerprint,
     shortFingerprint,
     publicKey,
@@ -84,6 +89,7 @@ export default function MessagesPage() {
     decryptMessages,
     getRecipientPublicKey,
     backupKeys,
+    createRecoveryBackup,
     restoreKeys,
     verifyUserKey,
     keyPairs,
@@ -161,7 +167,7 @@ export default function MessagesPage() {
         decryptedContent: msg.deleted_at
           ? '[Message deleted]'
           : msg.encrypted
-            ? '🔐 Encrypted message'
+            ? 'Secure message'
             : msg.content
       }))
     }
@@ -271,7 +277,7 @@ export default function MessagesPage() {
 
   // Re-decrypt when encryption is initialized
   useEffect(() => {
-    if (isInitialized && messages.some(m => m.encrypted && m.decryptedContent === '🔐 Encrypted message')) {
+    if (isInitialized && messages.some(m => m.encrypted && m.decryptedContent === 'Secure message')) {
       const redecrypt = async () => {
         const decrypted = await loadAndDecryptMessages(messages)
         setMessages(decrypted as DecryptedMessage[])
@@ -326,8 +332,9 @@ export default function MessagesPage() {
     setSending(true)
     setAttachmentError(null)
     setSendError(null)
-    setEncryptionHint(null)
+    setSendNotice(null)
     const plaintext = newMessage.trim()
+    let didEncrypt = false
 
     try {
       if (!tenantId) {
@@ -336,7 +343,7 @@ export default function MessagesPage() {
         return
       }
       if (attachmentFile && (!adminId || !isInitialized)) {
-        setAttachmentError('Attachments require encrypted chat setup.')
+        setAttachmentError('Attachments require secure chat to be ready.')
         setSending(false)
         return
       }
@@ -377,9 +384,7 @@ export default function MessagesPage() {
       // Try to encrypt if admin has E2EE set up
       if (adminId && isInitialized) {
         const recipientPublicKey = await getRecipientPublicKey(adminId)
-        if (!recipientPublicKey) {
-          setEncryptionHint('Support has not enabled encryption yet. Sending unencrypted.')
-        } else {
+        if (recipientPublicKey) {
           const encrypted = await encrypt(plaintext, adminId)
           if (encrypted) {
             messageData = {
@@ -390,6 +395,7 @@ export default function MessagesPage() {
               sender_public_key: encrypted.senderPublicKey,
               message_index: encrypted.messageIndex,
             }
+            didEncrypt = true
           }
         }
       }
@@ -397,7 +403,7 @@ export default function MessagesPage() {
       if (attachmentFile) {
         const recipientPublicKey = adminId ? await getRecipientPublicKey(adminId) : null
         if (!recipientPublicKey) {
-          setAttachmentError('Attachments require encryption to be enabled by support.')
+          setAttachmentError('Attachments require secure chat with support.')
           setSending(false)
           return
         }
@@ -418,6 +424,10 @@ export default function MessagesPage() {
         }])
         setNewMessage('')
         setAttachmentFile(null)
+        if (!didEncrypt) {
+          setSendNotice('Sent standard')
+          setTimeout(() => setSendNotice(null), 4000)
+        }
       } else if (error) {
         setSendError(error.message || 'Unable to send message')
       }
@@ -506,6 +516,40 @@ export default function MessagesPage() {
       attachment_key_sender_public_key: encryptedKey.senderPublicKey,
       attachment_key_message_index: encryptedKey.messageIndex,
     }
+  }
+
+  const handleCreateRecovery = async () => {
+    setRecoveryError(null)
+    try {
+      const data = await createRecoveryBackup()
+      setRecoveryData(data)
+      setLastBackupAt(new Date().toISOString())
+      setShowRecoveryModal(true)
+    } catch (err) {
+      setRecoveryError(err instanceof Error ? err.message : 'Unable to create recovery code')
+      setShowRecoveryModal(true)
+    }
+  }
+
+  const handleCopyRecoveryCode = async () => {
+    if (!recoveryData?.code) return
+    try {
+      await navigator.clipboard.writeText(recoveryData.code)
+    } catch (err) {
+      setRecoveryError(err instanceof Error ? err.message : 'Failed to copy recovery code')
+    }
+  }
+
+  const handleDownloadRecoveryFile = () => {
+    if (!recoveryData) return
+    const contents = `Recovery code: ${recoveryData.code}\n\nBackup:\n${recoveryData.backup}\n`
+    const blob = new Blob([contents], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = '709exclusive-recovery.txt'
+    link.click()
+    URL.revokeObjectURL(url)
   }
 
   const handleDownloadAttachment = async (msg: DecryptedMessage) => {
@@ -618,40 +662,26 @@ export default function MessagesPage() {
                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
                     </svg>
-                    Encrypted
+                    Secure
                   </span>
                 ) : encryptionError ? (
                   <span className="flex items-center gap-1 px-2 py-1 bg-[var(--warning)]/10 text-[var(--warning)] text-xs rounded-full">
-                    Encryption unavailable
+                    Secure chat unavailable
                   </span>
                 ) : (
                   <span className="flex items-center gap-1 px-2 py-1 bg-[var(--bg-tertiary)] text-[var(--text-muted)] text-xs rounded-full">
-                    Setting up...
+                    {isInitializing ? 'Securing your chat...' : 'Securing your chat...'}
                   </span>
                 )}
               </div>
             </div>
-            {encryptionHint && (
-              <p className="mt-3 text-xs text-[var(--warning)]">{encryptionHint}</p>
+            {sendNotice && (
+              <p className="mt-3 text-xs text-[var(--text-muted)]">{sendNotice}</p>
             )}
           </div>
 
-          {/* E2EE Action Buttons */}
-          <div className="flex gap-2 mb-4">
-            <Button
-              onClick={() => setShowKeyVerification(true)}
-              variant="ghost"
-              size="sm"
-            >
-              Verify keys
-            </Button>
-            <Button
-              onClick={() => setShowKeyBackup(true)}
-              variant="ghost"
-              size="sm"
-            >
-              Backup
-            </Button>
+          {/* Security Actions */}
+          <div className="flex flex-wrap gap-2 mb-4">
             <Button
               onClick={() => setShowEncryptionSettings(true)}
               variant="ghost"
@@ -659,7 +689,40 @@ export default function MessagesPage() {
             >
               Security
             </Button>
+            <Button
+              onClick={handleCreateRecovery}
+              variant="secondary"
+              size="sm"
+              disabled={!isInitialized || isLocked}
+            >
+              Save recovery code
+            </Button>
+            <Button
+              onClick={() => setShowAdvancedActions((prev) => !prev)}
+              variant="ghost"
+              size="sm"
+            >
+              Advanced
+            </Button>
           </div>
+          {showAdvancedActions && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              <Button
+                onClick={() => setShowKeyVerification(true)}
+                variant="ghost"
+                size="sm"
+              >
+                Verify contact
+              </Button>
+              <Button
+                onClick={() => setShowKeyBackup(true)}
+                variant="ghost"
+                size="sm"
+              >
+                Manual backup
+              </Button>
+            </div>
+          )}
           {adminVerified && (
             <div className="mb-4">
               <span className="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-[var(--success)]/20 text-[var(--success)]">
@@ -814,7 +877,7 @@ export default function MessagesPage() {
                   <textarea
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder={isInitialized && adminId ? "Type an encrypted message..." : "Type a message..."}
+                    placeholder="Type a message..."
                     className="flex-1 resize-none w-full"
                     rows={2}
                     disabled={sending || !canMessage}
@@ -873,13 +936,77 @@ export default function MessagesPage() {
           {/* E2EE Info */}
           <Surface padding="md" className="mt-4">
             <p className="text-xs text-[var(--text-muted)]">
-              <span className="text-[var(--text-secondary)] font-medium">End-to-end encrypted:</span> Messages are encrypted on your device before sending. Only you and support can read them.
+              <span className="text-[var(--text-secondary)] font-medium">Secure chat:</span> Messages are protected on your device before sending. Only you and support can read them.
             </p>
           </Surface>
         </div>
       </main>
 
       <Footer />
+
+      {showRecoveryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--text-primary)]">Recovery code</h2>
+                <p className="text-sm text-[var(--text-muted)] mt-1">
+                  Save this code to restore secure chat if you switch devices.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRecoveryModal(false)
+                  setRecoveryData(null)
+                }}
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              >
+                ✕
+              </button>
+            </div>
+
+            {recoveryData ? (
+              <div className="mt-4 space-y-3">
+                <div className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] p-3 font-mono text-sm text-[var(--text-primary)]">
+                  {recoveryData.code}
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="secondary" size="sm" onClick={handleCopyRecoveryCode}>
+                    Copy code
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={handleDownloadRecoveryFile}>
+                    Download backup
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 text-sm text-[var(--text-muted)]">
+                Unable to create a recovery code right now.
+              </div>
+            )}
+
+            {recoveryError && (
+              <div className="mt-4 p-3 bg-[var(--error)]/10 border border-[var(--error)]/20 rounded-lg">
+                <p className="text-sm text-[var(--error)]">{recoveryError}</p>
+              </div>
+            )}
+
+            <div className="mt-5 flex justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowRecoveryModal(false)
+                  setRecoveryData(null)
+                }}
+              >
+                Done
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Key Verification Modal */}
       {showKeyVerification && (

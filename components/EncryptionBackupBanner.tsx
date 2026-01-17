@@ -2,11 +2,45 @@
 
 import { useState } from 'react'
 import { useEncryption } from './EncryptionProvider'
-import KeyBackup from './KeyBackup'
 
 export default function EncryptionBackupBanner() {
-  const { needsBackup, dismissBackupReminder, backupKeys, restoreKeys } = useEncryption()
-  const [showBackupModal, setShowBackupModal] = useState(false)
+  const { needsBackup, dismissBackupReminder, createRecoveryBackup } = useEncryption()
+  const [recoveryData, setRecoveryData] = useState<{ code: string; backup: string } | null>(null)
+  const [recoveryError, setRecoveryError] = useState<string | null>(null)
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false)
+
+  const handleCreateRecovery = async () => {
+    setRecoveryError(null)
+    try {
+      const data = await createRecoveryBackup()
+      setRecoveryData(data)
+      setShowRecoveryModal(true)
+    } catch (err) {
+      setRecoveryError(err instanceof Error ? err.message : 'Unable to create recovery code')
+      setShowRecoveryModal(true)
+    }
+  }
+
+  const handleCopyRecoveryCode = async () => {
+    if (!recoveryData?.code) return
+    try {
+      await navigator.clipboard.writeText(recoveryData.code)
+    } catch (err) {
+      setRecoveryError(err instanceof Error ? err.message : 'Failed to copy recovery code')
+    }
+  }
+
+  const handleDownloadRecoveryFile = () => {
+    if (!recoveryData) return
+    const contents = `Recovery code: ${recoveryData.code}\n\nBackup:\n${recoveryData.backup}\n`
+    const blob = new Blob([contents], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = '709exclusive-recovery.txt'
+    link.click()
+    URL.revokeObjectURL(url)
+  }
 
   if (!needsBackup) return null
 
@@ -22,17 +56,17 @@ export default function EncryptionBackupBanner() {
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-                Secure your messages
+                Keep chat secure
               </h3>
               <p className="text-xs text-[var(--text-muted)] mt-1">
-                Back up your encryption keys to read messages on other devices. Without a backup, you won&apos;t be able to decrypt old messages if you switch browsers.
+                Save a recovery code so you can restore secure chat if you switch devices.
               </p>
               <div className="flex gap-2 mt-3">
                 <button
-                  onClick={() => setShowBackupModal(true)}
+                  onClick={handleCreateRecovery}
                   className="px-3 py-1.5 text-xs font-medium bg-[var(--accent)] text-white rounded-md hover:bg-[var(--accent-hover)] transition-colors"
                 >
-                  Back up now
+                  Save recovery code
                 </button>
                 <button
                   onClick={dismissBackupReminder}
@@ -54,12 +88,61 @@ export default function EncryptionBackupBanner() {
         </div>
       </div>
 
-      {showBackupModal && (
-        <KeyBackup
-          onBackup={backupKeys}
-          onRestore={restoreKeys}
-          onClose={() => setShowBackupModal(false)}
-        />
+      {showRecoveryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--text-primary)]">Recovery code</h2>
+                <p className="text-sm text-[var(--text-muted)] mt-1">
+                  Save this code to restore secure chat if you switch devices.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRecoveryModal(false)
+                  setRecoveryData(null)
+                }}
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              >
+                ✕
+              </button>
+            </div>
+
+            {recoveryData ? (
+              <div className="mt-4 space-y-3">
+                <div className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] p-3 font-mono text-sm text-[var(--text-primary)]">
+                  {recoveryData.code}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCopyRecoveryCode}
+                    className="px-3 py-1.5 text-xs font-medium bg-[var(--accent)] text-white rounded-md hover:bg-[var(--accent-hover)] transition-colors"
+                  >
+                    Copy code
+                  </button>
+                  <button
+                    onClick={handleDownloadRecoveryFile}
+                    className="px-3 py-1.5 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+                  >
+                    Download backup
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 text-sm text-[var(--text-muted)]">
+                Unable to create a recovery code right now.
+              </div>
+            )}
+
+            {recoveryError && (
+              <div className="mt-4 p-3 bg-[var(--error)]/10 border border-[var(--error)]/20 rounded-lg">
+                <p className="text-sm text-[var(--error)]">{recoveryError}</p>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </>
   )

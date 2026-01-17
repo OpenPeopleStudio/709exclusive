@@ -172,7 +172,7 @@ export default function AccountPage() {
                 </div>
                 <h3 className="font-medium text-[var(--text-primary)]">Messages</h3>
                 <p className="text-xs text-[var(--text-muted)] mt-1 hidden md:block">
-                  {featureFlags.e2e_encryption !== false && hasKeys ? 'Encrypted chat' : 'Chat with seller'}
+                  {featureFlags.e2e_encryption !== false && hasKeys ? 'Secure chat' : 'Chat with seller'}
                 </p>
                 </Surface>
               </Link>

@@ -39,12 +39,20 @@ interface DecryptedMessage extends EncryptedMessage {
 
 export function useE2EEncryption(userId: string | null) {
   const [isInitialized, setIsInitialized] = useState(false)
+  const [isInitializing, setIsInitializing] = useState(false)
   const [keyPair, setKeyPair] = useState<StoredKeyPair | null>(null)
   const [keyPairs, setKeyPairs] = useState<StoredKeyPair[]>([])
   const [isLocked, setIsLocked] = useState(false)
   const [fingerprint, setFingerprint] = useState<string | null>(null)
   const [shortFingerprint, setShortFingerprint] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const generateRecoveryCode = () => {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    const bytes = crypto.getRandomValues(new Uint8Array(16))
+    const chars = Array.from(bytes, (b) => alphabet[b % alphabet.length])
+    return `${chars.slice(0, 4).join('')}-${chars.slice(4, 8).join('')}-${chars.slice(8, 12).join('')}-${chars.slice(12, 16).join('')}`
+  }
 
   const refreshKeyPairs = useCallback(async () => {
     const allKeys = await getAllKeyPairs()
@@ -58,6 +66,8 @@ export function useE2EEncryption(userId: string | null) {
 
     const init = async () => {
       try {
+        setIsInitializing(true)
+        setError(null)
         const keys = await initializeIdentityKeys()
         const hydratedKeys = keys.deviceLabel
           ? keys
@@ -97,6 +107,8 @@ export function useE2EEncryption(userId: string | null) {
       } catch (err) {
         console.error('E2E initialization error:', err)
         setError(err instanceof Error ? err.message : 'Failed to initialize encryption')
+      } finally {
+        setIsInitializing(false)
       }
     }
 
@@ -127,11 +139,9 @@ export function useE2EEncryption(userId: string | null) {
     messageIndex: number
   } | null> => {
     if (!keyPair) {
-      setError('Encryption keys not initialized')
       return null
     }
     if (!keyPair.privateKey) {
-      setError('Keys are locked. Unlock to send encrypted messages.')
       return null
     }
 
@@ -141,13 +151,19 @@ export function useE2EEncryption(userId: string | null) {
       return null
     }
 
-    const encrypted = await encryptMessage(
-      plaintext,
-      keyPair.privateKey,
-      keyPair.publicKey,
-      recipientPublicKey,
-      recipientId
-    )
+    let encrypted
+    try {
+      encrypted = await encryptMessage(
+        plaintext,
+        keyPair.privateKey,
+        keyPair.publicKey,
+        recipientPublicKey,
+        recipientId
+      )
+    } catch (err) {
+      console.error('Encryption failed:', err)
+      return null
+    }
 
     if (!encrypted) {
       return null
@@ -239,6 +255,16 @@ export function useE2EEncryption(userId: string | null) {
     const backup = await exportKeysForBackup(password, keyPair)
     localStorage.setItem('709e2e:lastBackupAt', new Date().toISOString())
     return backup
+  }, [keyPair])
+
+  const createRecoveryBackup = useCallback(async (): Promise<{ code: string; backup: string }> => {
+    if (!keyPair || !keyPair.privateKey) {
+      throw new Error('Keys are not ready for backup')
+    }
+    const code = generateRecoveryCode()
+    const backup = await exportKeysForBackup(code, keyPair)
+    localStorage.setItem('709e2e:lastBackupAt', new Date().toISOString())
+    return { code, backup }
   }, [keyPair])
 
   // Restore keys from backup
@@ -376,6 +402,7 @@ export function useE2EEncryption(userId: string | null) {
 
   return {
     isInitialized,
+    isInitializing,
     publicKey: keyPair?.publicKey || null,
     keyPairs,
     isLocked,
@@ -387,6 +414,7 @@ export function useE2EEncryption(userId: string | null) {
     decryptMessages,
     getRecipientPublicKey,
     backupKeys,
+    createRecoveryBackup,
     restoreKeys,
     lockKeys,
     unlockKeys,

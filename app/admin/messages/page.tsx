@@ -71,7 +71,11 @@ export default function AdminMessagesPage() {
   const [adminId, setAdminId] = useState<string | null>(null)
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null)
   const [attachmentError, setAttachmentError] = useState<string | null>(null)
-  const [encryptionHint, setEncryptionHint] = useState<string | null>(null)
+  const [sendNotice, setSendNotice] = useState<string | null>(null)
+  const [recoveryData, setRecoveryData] = useState<{ code: string; backup: string } | null>(null)
+  const [recoveryError, setRecoveryError] = useState<string | null>(null)
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false)
+  const [showAdvancedActions, setShowAdvancedActions] = useState(false)
   const [retentionEnabled, setRetentionEnabled] = useState(false)
   const [retentionDays, setRetentionDays] = useState(90)
   const [showRetentionSettings, setShowRetentionSettings] = useState(false)
@@ -97,6 +101,7 @@ export default function AdminMessagesPage() {
 
   const {
     isInitialized,
+    isInitializing,
     fingerprint,
     shortFingerprint,
     publicKey,
@@ -106,6 +111,7 @@ export default function AdminMessagesPage() {
     decryptMessages,
     getRecipientPublicKey,
     backupKeys,
+    createRecoveryBackup,
     restoreKeys,
     verifyUserKey,
     error: encryptionError,
@@ -231,7 +237,7 @@ export default function AdminMessagesPage() {
         last_message: lastMsg.deleted_at
           ? '[Message deleted]'
           : lastMsg.encrypted
-            ? '🔐 Encrypted message'
+            ? 'Secure message'
             : lastMsg.content,
         last_message_at: lastMsg.created_at,
         unread_count: data.unread,
@@ -289,7 +295,7 @@ export default function AdminMessagesPage() {
       // Not initialized yet, show encrypted indicator
       const unencrypted = data.filter(msg => !msg.deleted_at).map(msg => ({
         ...msg,
-        decryptedContent: msg.encrypted ? '🔐 Encrypted message' : msg.content
+        decryptedContent: msg.encrypted ? 'Secure message' : msg.content
       }))
       const combined = [...(deletedMessages as DecryptedMessage[]), ...(unencrypted as DecryptedMessage[])]
       combined.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
@@ -337,7 +343,7 @@ export default function AdminMessagesPage() {
 
   // Re-decrypt when encryption is initialized
   useEffect(() => {
-    if (isInitialized && selectedCustomer && messages.some(m => m.encrypted && m.decryptedContent === '🔐 Encrypted message')) {
+    if (isInitialized && selectedCustomer && messages.some(m => m.encrypted && m.decryptedContent === 'Secure message')) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       loadMessages(selectedCustomer)
     }
@@ -403,8 +409,9 @@ export default function AdminMessagesPage() {
 
     setSending(true)
     setAttachmentError(null)
-    setEncryptionHint(null)
+    setSendNotice(null)
     const plaintext = newMessage.trim()
+    let didEncrypt = false
 
     try {
       if (!tenantId) {
@@ -413,7 +420,7 @@ export default function AdminMessagesPage() {
         return
       }
       if (attachmentFile && !(selectedConvo?.has_encryption && isInitialized)) {
-        setAttachmentError('Attachments require encrypted chat setup.')
+        setAttachmentError('Attachments require secure chat to be ready.')
         setSending(false)
         return
       }
@@ -455,9 +462,7 @@ export default function AdminMessagesPage() {
       // Attempt encryption if E2EE is initialized
       if (isInitialized) {
         const recipientPublicKey = await getRecipientPublicKey(selectedCustomer)
-        if (!recipientPublicKey) {
-          setEncryptionHint('Customer has not enabled encryption yet. Sending unencrypted.')
-        } else {
+        if (recipientPublicKey) {
           const encrypted = await encrypt(plaintext, selectedCustomer)
           if (encrypted) {
             messageData = {
@@ -468,6 +473,7 @@ export default function AdminMessagesPage() {
               sender_public_key: encrypted.senderPublicKey,
               message_index: encrypted.messageIndex,
             }
+            didEncrypt = true
           }
         }
       }
@@ -475,7 +481,7 @@ export default function AdminMessagesPage() {
       if (attachmentFile) {
         const recipientPublicKey = await getRecipientPublicKey(selectedCustomer)
         if (!recipientPublicKey) {
-          setAttachmentError('Attachments require encryption to be enabled by the customer.')
+          setAttachmentError('Attachments require secure chat with the customer.')
           setSending(false)
           return
         }
@@ -501,9 +507,13 @@ export default function AdminMessagesPage() {
         // Update conversation
         setConversations(prev => prev.map(c => 
           c.customer_id === selectedCustomer 
-            ? { ...c, last_message: data.encrypted ? '🔐 Encrypted message' : plaintext, last_message_at: data.created_at }
+            ? { ...c, last_message: data.encrypted ? 'Secure message' : plaintext, last_message_at: data.created_at }
             : c
         ))
+        if (!didEncrypt) {
+          setSendNotice('Sent standard')
+          setTimeout(() => setSendNotice(null), 4000)
+        }
       }
     } catch (err) {
       console.error('Failed to send message:', err)
@@ -626,6 +636,40 @@ export default function AdminMessagesPage() {
       attachment_key_sender_public_key: encryptedKey.senderPublicKey,
       attachment_key_message_index: encryptedKey.messageIndex,
     }
+  }
+
+  const handleCreateRecovery = async () => {
+    setRecoveryError(null)
+    try {
+      const data = await createRecoveryBackup()
+      setRecoveryData(data)
+      setLastBackupAt(new Date().toISOString())
+      setShowRecoveryModal(true)
+    } catch (err) {
+      setRecoveryError(err instanceof Error ? err.message : 'Unable to create recovery code')
+      setShowRecoveryModal(true)
+    }
+  }
+
+  const handleCopyRecoveryCode = async () => {
+    if (!recoveryData?.code) return
+    try {
+      await navigator.clipboard.writeText(recoveryData.code)
+    } catch (err) {
+      setRecoveryError(err instanceof Error ? err.message : 'Failed to copy recovery code')
+    }
+  }
+
+  const handleDownloadRecoveryFile = () => {
+    if (!recoveryData) return
+    const contents = `Recovery code: ${recoveryData.code}\n\nBackup:\n${recoveryData.backup}\n`
+    const blob = new Blob([contents], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = '709exclusive-recovery.txt'
+    link.click()
+    URL.revokeObjectURL(url)
   }
 
   const handleDownloadAttachment = async (msg: DecryptedMessage) => {
@@ -774,29 +818,17 @@ export default function AdminMessagesPage() {
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
               </svg>
-              Encrypted
+              Secure
+            </span>
+          ) : encryptionError ? (
+            <span className="text-sm text-[var(--warning)]">
+              Secure chat unavailable
             </span>
           ) : (
             <span className="text-sm text-[var(--text-muted)]">
-              Setting up encryption...
+              {isInitializing ? 'Securing your chat...' : 'Securing your chat...'}
             </span>
           )}
-          
-          <Button
-            onClick={() => setShowKeyVerification(true)}
-            variant="ghost"
-            size="sm"
-          >
-            Verify keys
-          </Button>
-          
-          <Button
-            onClick={() => setShowKeyBackup(true)}
-            variant="ghost"
-            size="sm"
-          >
-            Backup
-          </Button>
 
           <Button
             onClick={() => setShowEncryptionSettings(true)}
@@ -806,20 +838,63 @@ export default function AdminMessagesPage() {
             Security
           </Button>
           <Button
+            onClick={handleCreateRecovery}
+            variant="secondary"
+            size="sm"
+            disabled={!isInitialized || isLocked}
+          >
+            Save recovery code
+          </Button>
+          <Button
             onClick={() => setShowNewMessage(true)}
             variant="secondary"
             size="sm"
           >
             New message
           </Button>
+          <Button
+            onClick={() => setShowAdvancedActions((prev) => !prev)}
+            variant="ghost"
+            size="sm"
+          >
+            Advanced
+          </Button>
         </div>
       </div>
 
+      {showAdvancedActions && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          <Button
+            onClick={() => setShowKeyVerification(true)}
+            variant="ghost"
+            size="sm"
+          >
+            Verify contact
+          </Button>
+          <Button
+            onClick={() => setShowKeyBackup(true)}
+            variant="ghost"
+            size="sm"
+          >
+            Manual backup
+          </Button>
+        </div>
+      )}
+
       <Surface padding="md" className="mb-4">
-        <p className="text-sm text-[var(--text-primary)] font-medium">Encrypted support inbox</p>
-        <p className="text-xs text-[var(--text-muted)] mt-1">
-          Messages are end-to-end encrypted on this device. Verify customer keys and back up your keys to avoid lockouts.
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm text-[var(--text-primary)] font-medium">Secure support inbox</p>
+            <p className="text-xs text-[var(--text-muted)] mt-1">
+              Messages are protected on this device. Save a recovery code to keep access if you switch browsers.
+            </p>
+            {isLocked && (
+              <p className="text-xs text-[var(--warning)] mt-2">
+                Unlock security to save a recovery code.
+              </p>
+            )}
+          </div>
+        </div>
       </Surface>
 
       {selectedCustomer && (
@@ -872,7 +947,7 @@ export default function AdminMessagesPage() {
 
       {encryptionError && (
         <div className="mb-4 p-3 bg-[var(--warning)]/10 border border-[var(--warning)]/20 rounded-lg text-sm text-[var(--text-secondary)]">
-          Encryption is unavailable on this device. Messages will send normally. {encryptionError}
+          Secure chat is unavailable on this device. Messages will send standard. {encryptionError}
         </div>
       )}
 
@@ -1021,8 +1096,8 @@ export default function AdminMessagesPage() {
                     </div>
                   )}
                 </div>
-                {encryptionHint && (
-                  <p className="px-4 pb-2 text-xs text-[var(--warning)]">{encryptionHint}</p>
+                {sendNotice && (
+                  <p className="px-4 pb-2 text-xs text-[var(--text-muted)]">{sendNotice}</p>
                 )}
 
                 {/* Messages */}
@@ -1094,11 +1169,7 @@ export default function AdminMessagesPage() {
                       <textarea
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder={
-                          selectedConvo?.has_encryption && isInitialized
-                            ? "Type an encrypted message..."
-                            : "Type a message..."
-                        }
+                        placeholder="Type a message..."
                         className="flex-1 resize-none w-full"
                         rows={2}
                         disabled={sending}
@@ -1172,6 +1243,70 @@ export default function AdminMessagesPage() {
             setVerifyCustomer(null)
           }}
         />
+      )}
+
+      {showRecoveryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--text-primary)]">Recovery code</h2>
+                <p className="text-sm text-[var(--text-muted)] mt-1">
+                  Save this code to restore secure chat if you switch devices.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRecoveryModal(false)
+                  setRecoveryData(null)
+                }}
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              >
+                ✕
+              </button>
+            </div>
+
+            {recoveryData ? (
+              <div className="mt-4 space-y-3">
+                <div className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] p-3 font-mono text-sm text-[var(--text-primary)]">
+                  {recoveryData.code}
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="secondary" size="sm" onClick={handleCopyRecoveryCode}>
+                    Copy code
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={handleDownloadRecoveryFile}>
+                    Download backup
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 text-sm text-[var(--text-muted)]">
+                Unable to create a recovery code right now.
+              </div>
+            )}
+
+            {recoveryError && (
+              <div className="mt-4 p-3 bg-[var(--error)]/10 border border-[var(--error)]/20 rounded-lg">
+                <p className="text-sm text-[var(--error)]">{recoveryError}</p>
+              </div>
+            )}
+
+            <div className="mt-5 flex justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowRecoveryModal(false)
+                  setRecoveryData(null)
+                }}
+              >
+                Done
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Key Backup Modal */}

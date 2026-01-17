@@ -21,6 +21,7 @@ interface EncryptionContextType {
   shortFingerprint: string | null
   error: string | null
   backupKeys: (password: string) => Promise<string>
+  createRecoveryBackup: () => Promise<{ code: string; backup: string }>
   restoreKeys: (backupData: string, password: string) => Promise<void>
   dismissBackupReminder: () => void
 }
@@ -40,6 +41,7 @@ export function useEncryption(): EncryptionContextType {
       shortFingerprint: null,
       error: null,
       backupKeys: async () => { throw new Error('Encryption not available') },
+      createRecoveryBackup: async () => { throw new Error('Encryption not available') },
       restoreKeys: async () => { throw new Error('Encryption not available') },
       dismissBackupReminder: () => {},
     }
@@ -60,6 +62,13 @@ export default function EncryptionProvider({ children }: EncryptionProviderProps
   const [shortFingerprint, setShortFingerprint] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [keyPair, setKeyPair] = useState<StoredKeyPair | null>(null)
+
+  const generateRecoveryCode = () => {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    const bytes = crypto.getRandomValues(new Uint8Array(16))
+    const chars = Array.from(bytes, (b) => alphabet[b % alphabet.length])
+    return `${chars.slice(0, 4).join('')}-${chars.slice(4, 8).join('')}-${chars.slice(8, 12).join('')}-${chars.slice(12, 16).join('')}`
+  }
 
   // Initialize encryption on mount if user is authenticated
   useEffect(() => {
@@ -156,10 +165,23 @@ export default function EncryptionProvider({ children }: EncryptionProviderProps
     if (!keyPair) {
       throw new Error('No keys to backup')
     }
-    const backup = await exportKeysForBackup(password)
+    const backup = await exportKeysForBackup(password, keyPair)
     localStorage.setItem('e2e_backup_created', new Date().toISOString())
+    localStorage.setItem('709e2e:lastBackupAt', new Date().toISOString())
     setNeedsBackup(false)
     return backup
+  }, [keyPair])
+
+  const createRecoveryBackup = useCallback(async (): Promise<{ code: string; backup: string }> => {
+    if (!keyPair) {
+      throw new Error('No keys to backup')
+    }
+    const code = generateRecoveryCode()
+    const backup = await exportKeysForBackup(code, keyPair)
+    localStorage.setItem('e2e_backup_created', new Date().toISOString())
+    localStorage.setItem('709e2e:lastBackupAt', new Date().toISOString())
+    setNeedsBackup(false)
+    return { code, backup }
   }, [keyPair])
 
   const restoreKeys = useCallback(async (backupData: string, password: string): Promise<void> => {
@@ -206,6 +228,7 @@ export default function EncryptionProvider({ children }: EncryptionProviderProps
         shortFingerprint,
         error,
         backupKeys,
+        createRecoveryBackup,
         restoreKeys,
         dismissBackupReminder,
       }}
