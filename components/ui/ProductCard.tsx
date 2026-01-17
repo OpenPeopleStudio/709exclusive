@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import Badge from './Badge'
+import { useTenant } from '@/context/TenantContext'
 
 export interface ProductCardData {
   id: string
@@ -40,6 +41,9 @@ export default function ProductCard({
   compact = false,
   size = 'default'
 }: ProductCardProps) {
+  const { settings } = useTenant()
+  const typography = settings?.theme?.typography?.product_card
+  
   // Calculate badge states
   const isDropEnding = product.is_drop && product.drop_ends_at && 
     new Date(product.drop_ends_at).getTime() - currentTime < 24 * 60 * 60 * 1000
@@ -50,6 +54,49 @@ export default function ProductCard({
   const isNew = product.created_at && 
     new Date(product.created_at).getTime() > currentTime - 7 * 24 * 60 * 60 * 1000
 
+  // Typography mappings
+  const spacingMap = {
+    compact: 'gap-1',
+    default: 'gap-1.5',
+    comfortable: 'gap-2',
+    spacious: 'gap-3'
+  }
+  
+  const brandSizeMap = {
+    xs: 'text-[9px]',
+    default: 'text-[10px]',
+    sm: 'text-[11px]',
+    md: 'text-xs'
+  }
+  
+  const nameSizeMap = {
+    xs: 'text-[10px] leading-[12px]',
+    default: 'text-[11px] leading-[13px]',
+    sm: 'text-xs leading-[14px]',
+    md: 'text-[13px] leading-[15px]',
+    lg: 'text-sm leading-4'
+  }
+  
+  const priceSizeMap = {
+    sm: 'text-sm',
+    default: 'text-base',
+    md: 'text-lg',
+    lg: 'text-xl'
+  }
+  
+  const fontFamilyMap = {
+    default: 'font-sans',
+    system: 'font-system',
+    serif: 'font-serif',
+    mono: 'font-mono'
+  }
+  
+  const spacing = spacingMap[typography?.spacing as keyof typeof spacingMap] || spacingMap.default
+  const brandSize = brandSizeMap[typography?.brand_size as keyof typeof brandSizeMap] || (size === 'small' ? brandSizeMap.xs : brandSizeMap.default)
+  const nameSize = nameSizeMap[typography?.name_size as keyof typeof nameSizeMap] || (size === 'small' ? nameSizeMap.xs : nameSizeMap.default)
+  const priceSize = priceSizeMap[typography?.price_size as keyof typeof priceSizeMap] || (size === 'small' ? priceSizeMap.sm : priceSizeMap.default)
+  const fontFamily = fontFamilyMap[typography?.font_family as keyof typeof fontFamilyMap] || fontFamilyMap.default
+
   const handleWishlistClick = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -57,9 +104,9 @@ export default function ProductCard({
   }
 
   return (
-    <Link href={`/product/${product.slug}`} className="group block">
+    <Link href={`/product/${product.slug}`} className="group block h-full flex flex-col">
       {/* Image Container */}
-      <div className="relative aspect-square bg-[var(--bg-secondary)] rounded-2xl overflow-hidden mb-3 border border-[var(--glass-border)] group-hover:border-[var(--border-glow)] transition-all duration-300">
+      <div className="relative aspect-square bg-[var(--bg-secondary)] rounded-2xl overflow-hidden mb-5 border border-[var(--glass-border)] group-hover:border-[var(--border-glow)] transition-all duration-300 flex-shrink-0">
         {product.primary_image ? (
           <Image
             src={product.primary_image}
@@ -120,40 +167,39 @@ export default function ProductCard({
       </div>
 
       {/* Product Info */}
-      <div className="flex flex-col gap-1.5">
-        {/* Brand */}
-        <p className={`font-semibold uppercase tracking-wide text-[var(--text-muted)] ${size === 'small' ? 'text-[9px] leading-tight' : 'text-[10px] leading-tight'}`}>
-          {product.brand}
-        </p>
+      <div className={`flex flex-col ${spacing} ${fontFamily} flex-shrink-0`}>
+        {/* Brand and Price - Same Row */}
+        <div className="flex items-center justify-between gap-2 min-h-[20px]">
+          <p className={`font-semibold uppercase tracking-wide text-[var(--text-muted)] ${brandSize} leading-tight`}>
+            {product.brand}
+          </p>
+          <span className={`font-bold bg-gradient-to-r from-[var(--neon-magenta)] to-[var(--neon-cyan)] bg-clip-text text-transparent ${priceSize} flex-shrink-0`}>
+            ${(product.lowest_price_cents / 100).toFixed(0)}
+          </span>
+        </div>
         
-        {/* Name - Fixed height container */}
-        <div className={size === 'small' ? 'h-7' : 'h-8'}>
-          <h3 className={`font-medium text-[var(--text-primary)] group-hover:text-gradient transition-all duration-300 line-clamp-2 ${
-            size === 'small' ? 'text-xs leading-[14px]' : 'text-sm leading-4'
-          }`}>
+        {/* Name - Increased height for better 2-line support */}
+        <div className={size === 'small' ? 'min-h-[28px] max-h-[28px]' : 'min-h-[32px] max-h-[32px]'}>
+          <h3 className={`font-medium text-[var(--text-primary)] group-hover:text-gradient transition-all duration-300 line-clamp-2 ${nameSize}`}>
             {product.name}
           </h3>
         </div>
         
-        {/* Price - Fixed height to ensure alignment */}
-        <div className="flex items-center gap-1.5 h-5 mt-0.5">
-          <span className={`font-bold bg-gradient-to-r from-[var(--neon-magenta)] to-[var(--neon-cyan)] bg-clip-text text-transparent ${size === 'small' ? 'text-sm' : 'text-base'}`}>
-            ${(product.lowest_price_cents / 100).toFixed(0)}
-          </span>
-          {product.last_sold_cents && product.last_sold_cents !== product.lowest_price_cents && (
+        {/* Old Price (if applicable) */}
+        {product.last_sold_cents && product.last_sold_cents !== product.lowest_price_cents && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide">Was:</span>
             <span className="text-xs text-[var(--text-muted)] line-through">
               ${(product.last_sold_cents / 100).toFixed(0)}
             </span>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Secondary info (sizes, conditions) - hidden in compact mode and on mobile */}
-        {!compact && product.sizes_available && product.sizes_available.length > 0 ? (
-          <p className="text-[10px] text-[var(--text-muted)] hidden md:block h-3.5 leading-tight">
-            {product.sizes_available.length} sizes available
+        {/* Secondary info - Only show on desktop in non-compact mode */}
+        {!compact && product.sizes_available && product.sizes_available.length > 0 && (
+          <p className="text-[10px] text-[var(--text-muted)] hidden md:block leading-tight">
+            {product.sizes_available.length} sizes
           </p>
-        ) : (
-          !compact && <div className="h-3.5 hidden md:block" />
         )}
       </div>
     </Link>
@@ -163,12 +209,12 @@ export default function ProductCard({
 // Skeleton loader for ProductCard
 export function ProductCardSkeleton({ size = 'default' }: { size?: 'default' | 'small' }) {
   return (
-    <div className="animate-pulse">
-      <div className="aspect-square bg-[var(--bg-secondary)] rounded-2xl mb-3 border border-[var(--glass-border)]" />
-      <div className="space-y-1.5">
-        <div className={`bg-gradient-to-r from-[var(--bg-secondary)] via-[var(--bg-tertiary)] to-[var(--bg-secondary)] bg-[length:200%_100%] animate-[skeleton-pulse_1.5s_ease-in-out_infinite] rounded w-1/3 ${size === 'small' ? 'h-2.5' : 'h-3'}`} />
-        <div className={`bg-gradient-to-r from-[var(--bg-secondary)] via-[var(--bg-tertiary)] to-[var(--bg-secondary)] bg-[length:200%_100%] animate-[skeleton-pulse_1.5s_ease-in-out_infinite] rounded w-2/3 ${size === 'small' ? 'h-3.5' : 'h-4'}`} />
-        <div className={`bg-gradient-to-r from-[var(--bg-secondary)] via-[var(--bg-tertiary)] to-[var(--bg-secondary)] bg-[length:200%_100%] animate-[skeleton-pulse_1.5s_ease-in-out_infinite] rounded w-1/4 ${size === 'small' ? 'h-3' : 'h-4'}`} />
+    <div className="animate-pulse flex flex-col h-full">
+      <div className="aspect-square bg-[var(--bg-secondary)] rounded-2xl mb-5 border border-[var(--glass-border)] flex-shrink-0" />
+      <div className="space-y-1.5 flex-shrink-0">
+        <div className={`bg-gradient-to-r from-[var(--bg-secondary)] via-[var(--bg-tertiary)] to-[var(--bg-secondary)] bg-[length:200%_100%] animate-[skeleton-pulse_1.5s_ease-in-out_infinite] rounded w-1/3 ${size === 'small' ? 'h-2.5' : 'h-2.5'}`} />
+        <div className={`bg-gradient-to-r from-[var(--bg-secondary)] via-[var(--bg-tertiary)] to-[var(--bg-secondary)] bg-[length:200%_100%] animate-[skeleton-pulse_1.5s_ease-in-out_infinite] rounded w-2/3 ${size === 'small' ? 'h-3' : 'h-3.5'}`} />
+        <div className={`bg-gradient-to-r from-[var(--bg-secondary)] via-[var(--bg-tertiary)] to-[var(--bg-secondary)] bg-[length:200%_100%] animate-[skeleton-pulse_1.5s_ease-in-out_infinite] rounded w-1/4 ${size === 'small' ? 'h-3' : 'h-3.5'}`} />
       </div>
     </div>
   )

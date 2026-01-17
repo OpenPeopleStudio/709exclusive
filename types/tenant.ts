@@ -32,10 +32,27 @@ export type TenantThemeColors = {
   error?: string
 }
 
+export type TenantTypography = {
+  product_card?: {
+    font_family?: string
+    brand_size?: string
+    name_size?: string
+    price_size?: string
+    spacing?: string
+  }
+  headings?: {
+    font_family?: string
+  }
+  body?: {
+    font_family?: string
+  }
+}
+
 export type TenantTheme = {
   brand_name?: string
   logo_url?: string | null
   colors?: TenantThemeColors
+  typography?: TenantTypography
 }
 
 export type TenantHeroContent = {

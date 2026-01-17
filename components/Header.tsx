@@ -26,7 +26,9 @@ function HeaderContent() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
+  const [isExploreOpen, setIsExploreOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const exploreRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -71,11 +73,20 @@ function HeaderContent() {
       }
     })
 
+    // Close explore dropdown when clicking outside
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exploreRef.current && !exploreRef.current.contains(event.target as Node)) {
+        setIsExploreOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+
     return () => {
       window.removeEventListener('scroll', handleScroll)
       subscription.unsubscribe()
+      document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [])
+  }, [tenantId])
 
   // Close menu with animation
   const closeMobileMenu = () => {
@@ -167,122 +178,137 @@ function HeaderContent() {
         <div className="container">
           <div className="flex items-center justify-between h-20">
             {/* Logo */}
-            <Link href="/" className="group flex items-center gap-2">
-              {settings?.theme?.logo_url ? (
-                <Image
-                  src={settings.theme.logo_url}
-                  alt={brandName}
-                  width={160}
-                  height={48}
-                  className="h-12 w-auto transition-all duration-300 group-hover:opacity-80"
-                  priority
-                />
-              ) : (
-                <Image
-                  src="/logo.svg"
-                  alt={brandName}
-                  width={160}
-                  height={48}
-                  className="h-12 w-auto transition-all duration-300 group-hover:opacity-80"
-                  priority
-                />
-              )}
+            <Link href="/" className="group flex flex-col gap-1">
+              <span className="text-2xl font-black tracking-tighter text-gradient transition-all duration-300">
+                709exclusive
+              </span>
+              <div className="flex items-center gap-2">
+                {/* Lock Icon */}
+                <svg className="w-3.5 h-3.5 text-white transition-all duration-300 delay-0 group-hover:text-green-400 group-active:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                {/* Cart Icon */}
+                <svg className="w-3.5 h-3.5 text-white transition-all duration-300 delay-75 group-hover:text-green-400 group-active:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                {/* Credit Card Icon */}
+                <svg className="w-3.5 h-3.5 text-white transition-all duration-300 delay-150 group-hover:text-green-400 group-active:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+                {/* Bitcoin Icon */}
+                <svg className="w-3.5 h-3.5 text-white transition-all duration-300 delay-[225ms] group-hover:text-green-400 group-active:text-green-400" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M23.638 14.904c-1.602 6.43-8.113 10.34-14.542 8.736C2.67 22.05-1.244 15.525.362 9.105 1.962 2.67 8.475-1.243 14.9.358c6.43 1.605 10.342 8.115 8.738 14.548v-.002zm-6.35-4.613c.24-1.59-.974-2.45-2.64-3.03l.54-2.153-1.315-.33-.525 2.107c-.345-.087-.705-.167-1.064-.25l.526-2.127-1.32-.33-.54 2.165c-.285-.067-.565-.132-.84-.2l-1.815-.45-.35 1.407s.975.225.955.236c.535.136.63.486.615.766l-1.477 5.92c-.075.166-.24.406-.614.314.015.02-.96-.24-.96-.24l-.66 1.51 1.71.426.93.242-.54 2.19 1.32.327.54-2.17c.36.1.705.19 1.05.273l-.51 2.154 1.32.33.545-2.19c2.24.427 3.93.257 4.64-1.774.57-1.637-.03-2.58-1.217-3.196.854-.193 1.5-.76 1.68-1.93h.01zm-3.01 4.22c-.404 1.64-3.157.75-4.05.53l.72-2.9c.896.23 3.757.67 3.33 2.37zm.41-4.24c-.37 1.49-2.662.735-3.405.55l.654-2.64c.744.18 3.137.524 2.75 2.084v.006z"/>
+                </svg>
+              </div>
             </Link>
 
             {/* Center Navigation - Desktop */}
             <nav className="hidden md:flex items-center gap-6">
-              <div className="relative group">
+              <div ref={exploreRef} className="relative">
                 <button
                   type="button"
+                  onClick={() => setIsExploreOpen(!isExploreOpen)}
+                  onMouseEnter={() => setIsExploreOpen(true)}
                   className={`flex items-center gap-2 text-sm font-semibold transition-all duration-300 ${
                     isShopActive
                       ? 'text-[var(--text-primary)]'
                       : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                   aria-haspopup="true"
-                  aria-expanded="false"
+                  aria-expanded={isExploreOpen}
                 >
                   Explore
-                  <svg className="w-4 h-4 transition-transform duration-300 group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <svg className={`w-4 h-4 transition-transform duration-300 ${isExploreOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
                 {isShopActive && (
                   <span className="absolute -bottom-2 left-0 right-0 h-0.5 bg-gradient-to-r from-[var(--neon-magenta)] to-[var(--neon-cyan)] rounded-full" />
                 )}
-                <div className="absolute left-0 top-full mt-3 min-w-[220px] rounded-2xl bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] border border-[var(--glass-border)] shadow-[0_0_30px_rgba(0,0,0,0.5)] opacity-0 translate-y-2 pointer-events-none transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto">
-                  <div className="py-2">
-                    <div className="px-3 py-2">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2">
-                        Quick Actions
+                {isExploreOpen && (
+                  <div 
+                    className="absolute left-0 top-full mt-2 min-w-[220px] rounded-2xl bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] border border-[var(--glass-border)] shadow-[0_0_30px_rgba(0,0,0,0.5)] animate-in fade-in slide-in-from-top-2 duration-200 z-50"
+                    onMouseLeave={() => setIsExploreOpen(false)}
+                  >
+                    <div className="py-2">
+                      <div className="px-3 py-2">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2">
+                          Quick Actions
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href="/shop?sort=newest"
+                            onClick={() => setIsExploreOpen(false)}
+                            className="flex-1 text-center text-xs font-semibold px-3 py-2 rounded-full bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/10 transition-colors"
+                          >
+                            New
+                          </Link>
+                          <Link
+                            href="/cart"
+                            onClick={() => setIsExploreOpen(false)}
+                            className="flex-1 text-center text-xs font-semibold px-3 py-2 rounded-full bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/10 transition-colors"
+                          >
+                            Cart
+                          </Link>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Link
-                          href="/shop?sort=newest"
-                          className="flex-1 text-center text-xs font-semibold px-3 py-2 rounded-full bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/10 transition-colors"
-                        >
-                          New
-                        </Link>
-                        <Link
-                          href="/cart"
-                          className="flex-1 text-center text-xs font-semibold px-3 py-2 rounded-full bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/10 transition-colors"
-                        >
-                          Cart
-                        </Link>
-                      </div>
-                    </div>
-                    <div className="h-px bg-[var(--glass-border)] my-1" />
-                    <Link
-                      href="/shop"
-                      className={`block px-4 py-2.5 text-sm font-semibold transition-colors ${
-                        pathname === '/shop' || pathname?.startsWith('/product')
-                          ? 'text-[var(--text-primary)] bg-white/5'
-                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5'
-                      }`}
-                    >
-                      Shop all
-                    </Link>
-                    {featureFlags.drops !== false && (
+                      <div className="h-px bg-[var(--glass-border)] my-1" />
                       <Link
-                        href="/shop?drops=true"
+                        href="/shop"
+                        onClick={() => setIsExploreOpen(false)}
                         className={`block px-4 py-2.5 text-sm font-semibold transition-colors ${
-                          isDropsActive
+                          pathname === '/shop' || pathname?.startsWith('/product')
                             ? 'text-[var(--text-primary)] bg-white/5'
                             : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5'
                         }`}
                       >
-                        Drops
+                        Shop all
                       </Link>
-                    )}
-                    {(featureFlags.local_delivery || featureFlags.pickup) && (
+                      {featureFlags.drops !== false && (
+                        <Link
+                          href="/shop?drops=true"
+                          onClick={() => setIsExploreOpen(false)}
+                          className={`block px-4 py-2.5 text-sm font-semibold transition-colors ${
+                            isDropsActive
+                              ? 'text-[var(--text-primary)] bg-white/5'
+                              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5'
+                          }`}
+                        >
+                          Drops
+                        </Link>
+                      )}
+                      {(featureFlags.local_delivery || featureFlags.pickup) && (
+                        <Link
+                          href="/policies/shipping"
+                          onClick={() => setIsExploreOpen(false)}
+                          className={`block px-4 py-2.5 text-sm font-semibold transition-colors ${
+                            pathname === '/policies/shipping'
+                              ? 'text-[var(--text-primary)] bg-white/5'
+                              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5'
+                          }`}
+                        >
+                          Delivery & Pickup
+                        </Link>
+                      )}
+                      <div className="h-px bg-[var(--glass-border)] my-1" />
+                      <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                        Account
+                      </div>
                       <Link
-                        href="/policies/shipping"
+                        href={accountLink}
+                        onClick={() => setIsExploreOpen(false)}
                         className={`block px-4 py-2.5 text-sm font-semibold transition-colors ${
-                          pathname === '/policies/shipping'
+                          pathname?.startsWith('/account') ||
+                          (isAdmin && canAccessAdmin && pathname?.startsWith('/admin'))
                             ? 'text-[var(--text-primary)] bg-white/5'
                             : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5'
                         }`}
                       >
-                        Delivery & Pickup
+                        {accountLabel}
                       </Link>
-                    )}
-                    <div className="h-px bg-[var(--glass-border)] my-1" />
-                    <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                      Account
                     </div>
-                    <Link
-                      href={accountLink}
-                      className={`block px-4 py-2.5 text-sm font-semibold transition-colors ${
-                        pathname?.startsWith('/account') ||
-                        (isAdmin && canAccessAdmin && pathname?.startsWith('/admin'))
-                          ? 'text-[var(--text-primary)] bg-white/5'
-                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5'
-                      }`}
-                    >
-                      {accountLabel}
-                    </Link>
                   </div>
-                </div>
+                )}
               </div>
             </nav>
 

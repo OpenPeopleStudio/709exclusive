@@ -108,7 +108,7 @@ export default function WishlistPage() {
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8">
               {items.map(item => (
                 <div key={item.id} className="group relative">
                   <Link href={`/product/${item.product.slug}`} className="block">

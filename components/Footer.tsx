@@ -178,7 +178,7 @@ export default function Footer() {
         <div className="mt-12 pt-8 border-t border-[var(--glass-border)]">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-xs text-[var(--text-muted)] font-medium">
-              © {new Date().getFullYear()} 709exclusive. Built with AI in 2026.
+              709exclusive - built by open_people
             </p>
             <div className="flex items-center gap-6">
               <span className="text-xs text-[var(--text-muted)] cursor-pointer hover:text-[var(--text-primary)] transition-all duration-300 font-medium">

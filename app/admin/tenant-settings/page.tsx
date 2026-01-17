@@ -66,6 +66,7 @@ export default function TenantSettingsPage() {
   const [heroPrimaryCTA, setHeroPrimaryCTA] = useState({ label: '', href: '' })
   const [heroSecondaryCTA, setHeroSecondaryCTA] = useState({ label: '', href: '' })
   const [colors, setColors] = useState<Record<string, string>>({})
+  const [typography, setTypography] = useState<Record<string, any>>({})
   const [features, setFeatures] = useState<TenantFeatureFlags>({})
   const [integrations, setIntegrations] = useState<TenantIntegrations>({})
   const [domainInput, setDomainInput] = useState('')
@@ -99,6 +100,7 @@ export default function TenantSettingsPage() {
           setHeroPrimaryCTA(data.tenant?.settings?.content?.hero?.primary_cta || { label: '', href: '' })
           setHeroSecondaryCTA(data.tenant?.settings?.content?.hero?.secondary_cta || { label: '', href: '' })
           setColors(data.tenant?.settings?.theme?.colors || {})
+          setTypography(data.tenant?.settings?.theme?.typography || {})
           setFeatures(data.tenant?.settings?.features || {})
           setIntegrations(data.tenant?.settings?.integrations || {})
           
@@ -147,6 +149,16 @@ export default function TenantSettingsPage() {
     setColors((prev) => ({ ...prev, [key]: value }))
   }
 
+  const updateTypography = (section: string, key: string, value: string) => {
+    setTypography((prev) => ({
+      ...prev,
+      [section]: {
+        ...prev?.[section],
+        [key]: value,
+      },
+    }))
+  }
+
   const updateCryptoProvider = (value: CryptoProvider) => {
     setIntegrations((prev) => ({
       ...prev,
@@ -172,6 +184,7 @@ export default function TenantSettingsPage() {
               brand_name: brandName,
               logo_url: logoUrl || null,
               colors: Object.keys(colors).length > 0 ? colors : undefined,
+              typography: Object.keys(typography).length > 0 ? typography : undefined,
             },
             content: {
               hero: heroEyebrow || heroHeadline || heroSubhead || heroPrimaryCTA.label || heroSecondaryCTA.label
@@ -739,6 +752,97 @@ export default function TenantSettingsPage() {
                 <button
                   type="button"
                   onClick={() => setColors({})}
+                  className="text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                >
+                  Reset to defaults
+                </button>
+              )}
+            </section>
+
+            {/* Typography */}
+            <section className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-6 space-y-5">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--text-primary)]">Typography</h2>
+                <p className="text-sm text-[var(--text-muted)] mt-1">Customize fonts and text sizes</p>
+              </div>
+
+              {/* Product Card Typography */}
+              <div>
+                <p className="text-sm font-medium text-[var(--text-secondary)] mb-3">Product Cards</p>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="block text-xs text-[var(--text-muted)] mb-2">Font Family</label>
+                    <select
+                      className="w-full rounded-lg border border-[var(--border-primary)] bg-[var(--bg-elevated)] px-3 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent"
+                      value={typography?.product_card?.font_family || 'default'}
+                      onChange={(e) => updateTypography('product_card', 'font_family', e.target.value)}
+                    >
+                      <option value="default">Default (Inter)</option>
+                      <option value="system">System</option>
+                      <option value="serif">Serif</option>
+                      <option value="mono">Monospace</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-[var(--text-muted)] mb-2">Card Spacing</label>
+                    <select
+                      className="w-full rounded-lg border border-[var(--border-primary)] bg-[var(--bg-elevated)] px-3 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent"
+                      value={typography?.product_card?.spacing || 'default'}
+                      onChange={(e) => updateTypography('product_card', 'spacing', e.target.value)}
+                    >
+                      <option value="compact">Compact (1px)</option>
+                      <option value="default">Default (1.5px)</option>
+                      <option value="comfortable">Comfortable (2px)</option>
+                      <option value="spacious">Spacious (3px)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-[var(--text-muted)] mb-2">Brand Text Size</label>
+                    <select
+                      className="w-full rounded-lg border border-[var(--border-primary)] bg-[var(--bg-elevated)] px-3 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent"
+                      value={typography?.product_card?.brand_size || 'default'}
+                      onChange={(e) => updateTypography('product_card', 'brand_size', e.target.value)}
+                    >
+                      <option value="xs">Extra Small (9px)</option>
+                      <option value="default">Default (10px)</option>
+                      <option value="sm">Small (11px)</option>
+                      <option value="md">Medium (12px)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-[var(--text-muted)] mb-2">Product Name Size</label>
+                    <select
+                      className="w-full rounded-lg border border-[var(--border-primary)] bg-[var(--bg-elevated)] px-3 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent"
+                      value={typography?.product_card?.name_size || 'default'}
+                      onChange={(e) => updateTypography('product_card', 'name_size', e.target.value)}
+                    >
+                      <option value="xs">Extra Small (11px)</option>
+                      <option value="default">Default (12px)</option>
+                      <option value="sm">Small (13px)</option>
+                      <option value="md">Medium (14px)</option>
+                      <option value="lg">Large (15px)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-[var(--text-muted)] mb-2">Price Size</label>
+                    <select
+                      className="w-full rounded-lg border border-[var(--border-primary)] bg-[var(--bg-elevated)] px-3 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent"
+                      value={typography?.product_card?.price_size || 'default'}
+                      onChange={(e) => updateTypography('product_card', 'price_size', e.target.value)}
+                    >
+                      <option value="sm">Small (14px)</option>
+                      <option value="default">Default (16px)</option>
+                      <option value="md">Medium (18px)</option>
+                      <option value="lg">Large (20px)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {Object.keys(typography).length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setTypography({})}
                   className="text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                 >
                   Reset to defaults
