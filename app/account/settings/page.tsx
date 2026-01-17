@@ -12,6 +12,7 @@ import KeyVerification from '@/components/KeyVerification'
 
 export default function AccountSettingsPage() {
   const router = useRouter()
+  const eligibleOrderStatuses = ['pending', 'paid', 'fulfilled', 'shipped']
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
@@ -23,6 +24,8 @@ export default function AccountSettingsPage() {
   const [pageLoading, setPageLoading] = useState(true)
   const [showKeyBackup, setShowKeyBackup] = useState(false)
   const [showKeyVerification, setShowKeyVerification] = useState(false)
+  const [hasPurchase, setHasPurchase] = useState(false)
+  const [purchaseLoaded, setPurchaseLoaded] = useState(false)
 
   const {
     isInitialized: encryptionReady,
@@ -43,6 +46,18 @@ export default function AccountSettingsPage() {
       }
       setEmail(user.email || '')
       setFullName(user.user_metadata?.full_name || '')
+
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('id, status')
+        .eq('customer_id', user.id)
+
+      const hasEligible = (orders || []).some((order) =>
+        eligibleOrderStatuses.includes(order.status)
+      )
+      setHasPurchase(hasEligible)
+      setPurchaseLoaded(true)
+
       setPageLoading(false)
     }
     loadUser()
@@ -173,6 +188,41 @@ export default function AccountSettingsPage() {
                   {loading ? 'Saving...' : 'Save Changes'}
                 </button>
               </form>
+            </div>
+
+            {/* Account Status */}
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6">
+              <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Account Status</h2>
+              {!purchaseLoaded ? (
+                <p className="text-sm text-[var(--text-muted)]">Checking order history…</p>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                      hasPurchase
+                        ? 'bg-[var(--success)]/15 text-[var(--success)]'
+                        : 'bg-[var(--warning)]/15 text-[var(--warning)]'
+                    }`}>
+                      {hasPurchase ? 'Buyer' : 'Window shopper'}
+                    </span>
+                    <span className="text-[var(--text-secondary)]">
+                      {hasPurchase
+                        ? 'Messaging is unlocked.'
+                        : 'Messaging unlocks after your first order (pending counts).'}
+                    </span>
+                  </div>
+                  {!hasPurchase && (
+                    <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[var(--text-muted)]">
+                      <Link href="/shop" className="text-[var(--accent)] hover:text-[var(--accent-hover)]">
+                        Browse products →
+                      </Link>
+                      <Link href="/account/orders" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                        View orders
+                      </Link>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
             {/* Change Password */}

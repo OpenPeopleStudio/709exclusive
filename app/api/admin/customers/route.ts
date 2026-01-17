@@ -22,6 +22,7 @@ export async function GET() {
   }
 
   try {
+    const eligibleOrderStatuses = ['pending', 'paid', 'fulfilled', 'shipped']
     // Fetch customers from Stripe
     const customers = await stripe.customers.list({
       limit: 100,
@@ -36,6 +37,7 @@ export async function GET() {
           .from('orders')
           .select('id, total_cents, status, created_at')
           .eq('customer_id', customer.metadata?.supabase_user_id || '')
+          .order('created_at', { ascending: false })
 
         const totalSpent = orders?.reduce((sum, order) => {
           if (order.status !== 'cancelled' && order.status !== 'refunded') {
@@ -43,6 +45,10 @@ export async function GET() {
           }
           return sum
         }, 0) || 0
+
+        const eligibleOrders = (orders || []).filter((order) =>
+          eligibleOrderStatuses.includes(order.status)
+        )
 
         return {
           id: customer.id,
@@ -52,6 +58,8 @@ export async function GET() {
           created: customer.created,
           metadata: customer.metadata,
           orderCount: orders?.length || 0,
+          eligibleOrderCount: eligibleOrders.length,
+          hasPurchase: eligibleOrders.length > 0,
           totalSpent,
           lastOrder: orders?.[0]?.created_at || null
         }

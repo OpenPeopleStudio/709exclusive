@@ -13,6 +13,7 @@ import {
   deactivateAllKeys,
   storeSession,
   getSession,
+  getSessionById,
   updateSessionIndex,
   deleteExpiredSessions,
   type StoredKeyPair,
@@ -190,6 +191,16 @@ async function deriveMessageKey(
   )
 }
 
+async function createSessionId(recipientId: string, recipientPublicKey: string): Promise<string> {
+  const keyBuffer = base64ToBuffer(recipientPublicKey)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', keyBuffer)
+  const hashArray = new Uint8Array(hashBuffer)
+  const hash = Array.from(hashArray.slice(0, 8))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+  return `session-${recipientId}-${hash}`
+}
+
 // Get or create session with a recipient
 async function getOrCreateSession(
   myPrivateKey: string,
@@ -197,18 +208,26 @@ async function getOrCreateSession(
   recipientId: string
 ): Promise<{ sharedSecret: string; messageIndex: number; sessionId: string }> {
   // Check for existing session
-  let session = await getSession(recipientId)
+  const sessionId = await createSessionId(recipientId, recipientPublicKey)
+  let session = await getSessionById(sessionId)
+  if (!session) {
+    const legacySession = await getSession(recipientId)
+    if (legacySession?.recipientPublicKey === recipientPublicKey) {
+      session = { ...legacySession, id: sessionId }
+      await storeSession(session)
+    }
+  }
   
   if (!session) {
     // Create new session
     const sharedKey = await deriveSharedSecret(myPrivateKey, recipientPublicKey)
     const sharedSecretBuffer = await crypto.subtle.exportKey('raw', sharedKey)
     const sharedSecret = bufferToBase64(sharedSecretBuffer)
-    
-    const sessionId = `session-${recipientId}-${Date.now()}`
+  
     session = {
       id: sessionId,
       recipientId,
+      recipientPublicKey,
       sharedSecret,
       messageIndex: 0,
       createdAt: Date.now(),

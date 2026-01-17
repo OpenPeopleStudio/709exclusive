@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabaseClient'
 import PWAInstallButton from './PWAInstallButton'
 
 interface NavItem {
@@ -19,7 +20,22 @@ interface AdminShellProps {
 
 export default function AdminShell({ children, userEmail, navItems }: AdminShellProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isSigningOut, setIsSigningOut] = useState(false)
   const pathname = usePathname()
+  const router = useRouter()
+
+  const handleSignOut = async () => {
+    if (isSigningOut) return
+    setIsSigningOut(true)
+    try {
+      await supabase.auth.signOut()
+      setIsSidebarOpen(false)
+      router.push('/')
+      router.refresh()
+    } finally {
+      setIsSigningOut(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
@@ -50,6 +66,16 @@ export default function AdminShell({ children, userEmail, navItems }: AdminShell
         <div className="flex items-center gap-4">
           <PWAInstallButton />
           <span className="text-sm text-[var(--text-muted)]">{userEmail}</span>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            disabled={isSigningOut}
+            className={`text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors ${
+              isSigningOut ? 'opacity-60 cursor-not-allowed' : ''
+            }`}
+          >
+            Sign out
+          </button>
           <Link 
             href="/" 
             className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
@@ -127,12 +153,24 @@ export default function AdminShell({ children, userEmail, navItems }: AdminShell
                <p className="text-sm font-medium text-[var(--text-primary)] truncate">{userEmail}</p>
              </div>
            </div>
-           <Link 
-            href="/" 
-            className="block w-full text-center px-4 py-2 border border-[var(--border-primary)] rounded-md text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
-          >
-            View Store
-          </Link>
+          <div className="grid gap-2">
+            <button
+              type="button"
+              onClick={handleSignOut}
+              disabled={isSigningOut}
+              className={`block w-full text-center px-4 py-2 border border-[var(--border-primary)] rounded-md text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors ${
+                isSigningOut ? 'opacity-60 cursor-not-allowed' : ''
+              }`}
+            >
+              Sign out
+            </button>
+            <Link 
+             href="/" 
+             className="block w-full text-center px-4 py-2 border border-[var(--border-primary)] rounded-md text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+            >
+              View Store
+            </Link>
+          </div>
         </div>
       </aside>
 

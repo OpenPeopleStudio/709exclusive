@@ -9,6 +9,8 @@ interface Customer {
   phone: string | null
   created: number
   orderCount: number
+  eligibleOrderCount: number
+  hasPurchase: boolean
   totalSpent: number
   lastOrder: string | null
 }
@@ -18,6 +20,7 @@ export default function AdminCustomersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [purchaseFilter, setPurchaseFilter] = useState<'all' | 'buyers' | 'window'>('all')
 
   useEffect(() => {
     const fetchCustomers = async () => {
@@ -43,16 +46,22 @@ export default function AdminCustomersPage() {
 
   const filteredCustomers = customers.filter(customer => {
     const search = searchTerm.toLowerCase()
-    return (
+    const matchesSearch = (
       customer.email?.toLowerCase().includes(search) ||
       customer.name?.toLowerCase().includes(search) ||
       customer.phone?.includes(search)
     )
+    if (!matchesSearch) return false
+    if (purchaseFilter === 'buyers') return customer.hasPurchase
+    if (purchaseFilter === 'window') return !customer.hasPurchase
+    return true
   })
 
   const totalRevenue = customers.reduce((sum, c) => sum + c.totalSpent, 0)
   const totalOrders = customers.reduce((sum, c) => sum + c.orderCount, 0)
   const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
+  const buyerCount = customers.filter((c) => c.hasPurchase).length
+  const windowShopperCount = customers.length - buyerCount
 
   if (loading) {
     return (
@@ -113,7 +122,7 @@ export default function AdminCustomersPage() {
       </div>
 
       {/* Search */}
-      <div className="mb-6">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <input
           type="text"
           placeholder="Search by name, email, or phone..."
@@ -121,6 +130,41 @@ export default function AdminCustomersPage() {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="max-w-md"
         />
+        <div className="flex items-center gap-2 text-xs">
+          <button
+            type="button"
+            onClick={() => setPurchaseFilter('all')}
+            className={`px-3 py-1 rounded-full border ${
+              purchaseFilter === 'all'
+                ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
+                : 'border-[var(--border-primary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+            }`}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            onClick={() => setPurchaseFilter('buyers')}
+            className={`px-3 py-1 rounded-full border ${
+              purchaseFilter === 'buyers'
+                ? 'border-[var(--success)] bg-[var(--success)]/10 text-[var(--success)]'
+                : 'border-[var(--border-primary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+            }`}
+          >
+            Buyers ({buyerCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setPurchaseFilter('window')}
+            className={`px-3 py-1 rounded-full border ${
+              purchaseFilter === 'window'
+                ? 'border-[var(--warning)] bg-[var(--warning)]/10 text-[var(--warning)]'
+                : 'border-[var(--border-primary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+            }`}
+          >
+            Window shoppers ({windowShopperCount})
+          </button>
+        </div>
       </div>
 
       {/* Customers Table */}
@@ -142,6 +186,9 @@ export default function AdminCustomersPage() {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                   Orders
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
+                  Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                   Total Spent
@@ -184,6 +231,15 @@ export default function AdminCustomersPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4">
+                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${
+                      customer.hasPurchase
+                        ? 'bg-[var(--success)]/20 text-[var(--success)]'
+                        : 'bg-[var(--warning)]/15 text-[var(--warning)]'
+                    }`}>
+                      {customer.hasPurchase ? 'Buyer' : 'Window shopper'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
                     <span className="font-medium text-[var(--text-primary)]">
                       ${(customer.totalSpent / 100).toFixed(2)}
                     </span>
@@ -195,7 +251,7 @@ export default function AdminCustomersPage() {
               ))}
               {filteredCustomers.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-[var(--text-muted)]">
+                  <td colSpan={6} className="px-6 py-12 text-center text-[var(--text-muted)]">
                     {searchTerm ? 'No customers match your search.' : 'No customers yet.'}
                   </td>
                 </tr>

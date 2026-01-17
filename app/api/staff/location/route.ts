@@ -7,6 +7,8 @@ const RETENTION_HOURS = 48
 const MAX_WINDOW_HOURS = 72
 const MAX_POINTS_PER_STAFF = 200
 const MAX_ROWS = 5000
+const MAX_RECORDING_PAST_MINUTES = 15
+const MAX_RECORDING_FUTURE_MINUTES = 5
 
 type LocationEvent = 'start' | 'stop'
 
@@ -67,6 +69,15 @@ export async function POST(request: Request) {
   if (recordedAt && (!parsedRecordedAt || Number.isNaN(parsedRecordedAt.getTime()))) {
     return NextResponse.json({ error: 'Invalid recordedAt' }, { status: 400 })
   }
+  if (parsedRecordedAt) {
+    const diffMs = parsedRecordedAt.getTime() - now.getTime()
+    if (
+      diffMs > MAX_RECORDING_FUTURE_MINUTES * 60 * 1000 ||
+      diffMs < -MAX_RECORDING_PAST_MINUTES * 60 * 1000
+    ) {
+      return NextResponse.json({ error: 'recordedAt out of range' }, { status: 400 })
+    }
+  }
 
   try {
     if (event) {
@@ -93,16 +104,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, recorded: false })
     }
 
-    const expiresAt = new Date(now.getTime() + RETENTION_HOURS * 60 * 60 * 1000)
+    const effectiveRecordedAt = parsedRecordedAt ?? now
+    const expiresAt = new Date(effectiveRecordedAt.getTime() + RETENTION_HOURS * 60 * 60 * 1000)
+    const normalizedAccuracy = accuracy !== null ? Math.max(0, accuracy) : null
 
     const { data, error } = await supabase
       .from('staff_locations')
       .insert({
         user_id: user.id,
-        recorded_at: parsedRecordedAt ? parsedRecordedAt.toISOString() : now.toISOString(),
+        recorded_at: effectiveRecordedAt.toISOString(),
         latitude: lat,
         longitude: lng,
-        accuracy_m: accuracy,
+        accuracy_m: normalizedAccuracy,
         task_id: taskId,
         source: 'web',
         expires_at: expiresAt.toISOString(),

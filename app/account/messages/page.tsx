@@ -54,6 +54,8 @@ export default function MessagesPage() {
   const [retentionEnabled, setRetentionEnabled] = useState(false)
   const [retentionDays, setRetentionDays] = useState(90)
   const [showRetentionSettings, setShowRetentionSettings] = useState(false)
+  const [canMessage, setCanMessage] = useState(false)
+  const [eligibilityLoaded, setEligibilityLoaded] = useState(false)
   const [showKeyVerification, setShowKeyVerification] = useState(false)
   const [showKeyBackup, setShowKeyBackup] = useState(false)
   const [showEncryptionSettings, setShowEncryptionSettings] = useState(false)
@@ -65,6 +67,10 @@ export default function MessagesPage() {
   const attachmentInputRef = useRef<HTMLInputElement>(null)
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null)
   const [attachmentError, setAttachmentError] = useState<string | null>(null)
+  const [encryptionHint, setEncryptionHint] = useState<string | null>(null)
+  const [sendError, setSendError] = useState<string | null>(null)
+
+  const eligibleOrderStatuses = ['pending', 'paid', 'fulfilled', 'shipped']
 
   const {
     isInitialized,
@@ -74,6 +80,7 @@ export default function MessagesPage() {
     encrypt,
     decrypt,
     decryptMessages,
+    getRecipientPublicKey,
     backupKeys,
     restoreKeys,
     verifyUserKey,
@@ -189,6 +196,17 @@ export default function MessagesPage() {
         })
       }
 
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('id, status')
+        .eq('customer_id', user.id)
+
+      const eligibleOrders = (orders || []).filter((order) =>
+        eligibleOrderStatuses.includes(order.status)
+      )
+      setCanMessage(eligibleOrders.length > 0)
+      setEligibilityLoaded(true)
+
       // Fetch messages
       const { data } = await supabase
         .from('messages')
@@ -264,9 +282,15 @@ export default function MessagesPage() {
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newMessage.trim() || !userId) return
+    if (!canMessage) {
+      setSendError('Messaging is available after you place an order.')
+      return
+    }
 
     setSending(true)
     setAttachmentError(null)
+    setSendError(null)
+    setEncryptionHint(null)
     const plaintext = newMessage.trim()
 
     try {
@@ -309,20 +333,31 @@ export default function MessagesPage() {
 
       // Try to encrypt if admin has E2EE set up
       if (adminId && isInitialized) {
-        const encrypted = await encrypt(plaintext, adminId)
-        if (encrypted) {
-          messageData = {
-            ...messageData,
-            content: encrypted.content,
-            encrypted: true,
-            iv: encrypted.iv,
-            sender_public_key: encrypted.senderPublicKey,
-            message_index: encrypted.messageIndex,
+        const recipientPublicKey = await getRecipientPublicKey(adminId)
+        if (!recipientPublicKey) {
+          setEncryptionHint('Support has not enabled encryption yet. Sending unencrypted.')
+        } else {
+          const encrypted = await encrypt(plaintext, adminId)
+          if (encrypted) {
+            messageData = {
+              ...messageData,
+              content: encrypted.content,
+              encrypted: true,
+              iv: encrypted.iv,
+              sender_public_key: encrypted.senderPublicKey,
+              message_index: encrypted.messageIndex,
+            }
           }
         }
       }
 
       if (attachmentFile) {
+        const recipientPublicKey = adminId ? await getRecipientPublicKey(adminId) : null
+        if (!recipientPublicKey) {
+          setAttachmentError('Attachments require encryption to be enabled by support.')
+          setSending(false)
+          return
+        }
         const attachmentData = await uploadEncryptedAttachment(attachmentFile)
         messageData = { ...messageData, ...attachmentData }
       }
@@ -340,12 +375,15 @@ export default function MessagesPage() {
         }])
         setNewMessage('')
         setAttachmentFile(null)
+      } else if (error) {
+        setSendError(error.message || 'Unable to send message')
       }
     } catch (err) {
       console.error('Failed to send message:', err)
       if (attachmentFile) {
         setAttachmentError('Failed to send attachment.')
       }
+      setSendError('Unable to send message')
     }
 
     setSending(false)
@@ -550,6 +588,9 @@ export default function MessagesPage() {
                 )}
               </div>
             </div>
+            {encryptionHint && (
+              <p className="mt-3 text-xs text-[var(--warning)]">{encryptionHint}</p>
+            )}
           </div>
 
           {/* E2EE Action Buttons */}
@@ -629,6 +670,21 @@ export default function MessagesPage() {
               </div>
             )}
           </Surface>
+
+          {!canMessage && eligibilityLoaded && (
+            <Surface padding="md" className="mb-4 border border-[var(--warning)]/30 bg-[var(--warning)]/10">
+              <p className="text-sm text-[var(--text-primary)] font-medium">Window shopper mode</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">
+                Messaging unlocks after your first order. Pending orders can message support about the product.
+              </p>
+              <Link
+                href="/shop"
+                className="inline-flex mt-3 text-xs text-[var(--accent)] hover:text-[var(--accent-hover)]"
+              >
+                Browse products →
+              </Link>
+            </Surface>
+          )}
 
           <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg overflow-hidden flex flex-col" style={{ height: 'calc(100vh - 380px)', minHeight: '400px' }}>
             {/* Messages */}
@@ -718,7 +774,7 @@ export default function MessagesPage() {
                     placeholder={isInitialized && adminId ? "Type an encrypted message..." : "Type a message..."}
                     className="flex-1 resize-none w-full"
                     rows={2}
-                    disabled={sending}
+                    disabled={sending || !canMessage}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault()
@@ -730,7 +786,10 @@ export default function MessagesPage() {
                     <button
                       type="button"
                       onClick={() => attachmentInputRef.current?.click()}
-                      className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                      className={`text-[var(--text-secondary)] hover:text-[var(--text-primary)] ${
+                        !canMessage ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                      disabled={!canMessage}
                     >
                       Attach file
                     </button>
@@ -747,13 +806,13 @@ export default function MessagesPage() {
                       </div>
                     )}
                   </div>
-                  {attachmentError && (
-                    <p className="text-xs text-[var(--error)]">{attachmentError}</p>
+                  {(attachmentError || sendError) && (
+                    <p className="text-xs text-[var(--error)]">{attachmentError || sendError}</p>
                   )}
                 </div>
                 <button
                   type="submit"
-                  disabled={!newMessage.trim() || sending}
+                  disabled={!newMessage.trim() || sending || !canMessage}
                   className="btn-primary px-6"
                 >
                   {sending ? (

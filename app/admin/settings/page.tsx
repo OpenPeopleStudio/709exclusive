@@ -182,14 +182,21 @@ export default function AdminSettingsPage() {
 
   const updateUserRole = async (userId: string, role: string) => {
     try {
-      await fetch('/api/admin/settings/users', {
+      const response = await fetch('/api/admin/settings/users', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, role })
       })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to update role')
+      }
+
       fetchData()
     } catch (error) {
       console.error('Error updating role:', error)
+      alert(error instanceof Error ? error.message : 'Failed to update role')
     }
   }
 
@@ -306,6 +313,7 @@ export default function AdminSettingsPage() {
           {activeTab === 'users' && (
             <UsersTab
               users={users}
+              isOwner={isOwner}
               onUpdateRole={updateUserRole}
               onAddUser={() => setShowAddUser(true)}
               onDeleteUser={setDeleteConfirm}
@@ -565,12 +573,15 @@ export default function AdminSettingsPage() {
 }
 
 // Users Tab Component
-function UsersTab({ users, onUpdateRole, onAddUser, onDeleteUser }: {
+function UsersTab({ users, isOwner, onUpdateRole, onAddUser, onDeleteUser }: {
   users: User[]
+  isOwner: boolean
   onUpdateRole: (userId: string, role: string) => void
   onAddUser: () => void
   onDeleteUser: (user: User) => void
 }) {
+  const [roleFilter, setRoleFilter] = useState<'all' | User['role']>('all')
+
   const getRoleBadge = (role: string) => {
     const styles: Record<string, string> = {
       owner: 'bg-purple-500/20 text-purple-400',
@@ -587,6 +598,10 @@ function UsersTab({ users, onUpdateRole, onAddUser, onDeleteUser }: {
     staff: ['View orders', 'Update inventory', 'Process shipments'],
     customer: ['View own orders', 'Make purchases', 'Manage own account'],
   }
+
+  const filteredUsers = roleFilter === 'all'
+    ? users
+    : users.filter((user) => user.role === roleFilter)
 
   return (
     <div className="space-y-6">
@@ -614,10 +629,35 @@ function UsersTab({ users, onUpdateRole, onAddUser, onDeleteUser }: {
       {/* Users List */}
       <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg overflow-hidden">
         <div className="p-4 border-b border-[var(--border-primary)] flex justify-between items-center">
-          <h2 className="font-semibold text-[var(--text-primary)]">Team Members</h2>
-          <button onClick={onAddUser} className="btn-primary text-sm">
-            Invite User
-          </button>
+          <div>
+            <h2 className="font-semibold text-[var(--text-primary)]">
+              Profiles ({filteredUsers.length})
+            </h2>
+            <p className="text-xs text-[var(--text-muted)]">
+              Filter to preview roles during demos.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="text-xs text-[var(--text-muted)]">Role</label>
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value as 'all' | User['role'])}
+              className="text-sm bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded px-2 py-1"
+            >
+              <option value="all">All roles</option>
+              <option value="owner">Owner</option>
+              <option value="admin">Admin</option>
+              <option value="staff">Staff</option>
+              <option value="customer">Customer</option>
+            </select>
+            {isOwner ? (
+              <button onClick={onAddUser} className="btn-primary text-sm">
+                Invite User
+              </button>
+            ) : (
+              <span className="text-xs text-[var(--text-muted)]">Owner required</span>
+            )}
+          </div>
         </div>
         
         <table className="w-full">
@@ -630,7 +670,7 @@ function UsersTab({ users, onUpdateRole, onAddUser, onDeleteUser }: {
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border-primary)]">
-            {users.map((user) => (
+            {filteredUsers.map((user) => (
               <tr key={user.id} className="hover:bg-[var(--bg-tertiary)]">
                 <td className="px-4 py-4">
                   <p className="text-sm font-medium text-[var(--text-primary)]">
@@ -650,7 +690,7 @@ function UsersTab({ users, onUpdateRole, onAddUser, onDeleteUser }: {
                   {user.last_sign_in ? new Date(user.last_sign_in).toLocaleString() : 'Never'}
                 </td>
                 <td className="px-4 py-4">
-                  {user.role !== 'owner' && (
+                  {isOwner && user.role !== 'owner' ? (
                     <div className="flex items-center gap-2">
                       <select
                         value={user.role}
@@ -660,6 +700,7 @@ function UsersTab({ users, onUpdateRole, onAddUser, onDeleteUser }: {
                         <option value="customer">Customer</option>
                         <option value="staff">Staff</option>
                         <option value="admin">Admin</option>
+                        <option value="owner">Owner</option>
                       </select>
                       <button
                         onClick={() => onDeleteUser(user)}
@@ -671,10 +712,19 @@ function UsersTab({ users, onUpdateRole, onAddUser, onDeleteUser }: {
                         </svg>
                       </button>
                     </div>
+                  ) : (
+                    <span className="text-xs text-[var(--text-muted)]">—</span>
                   )}
                 </td>
               </tr>
             ))}
+            {filteredUsers.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-4 py-10 text-center text-[var(--text-muted)]">
+                  No profiles match this role.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

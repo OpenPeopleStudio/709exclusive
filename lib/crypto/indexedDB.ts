@@ -25,6 +25,7 @@ export interface StoredKeyPair {
 interface SessionKey {
   id: string
   recipientId: string
+  recipientPublicKey?: string
   sharedSecret: string // Derived key for this session
   messageIndex: number // For forward secrecy - increments per message
   createdAt: number
@@ -185,6 +186,24 @@ export async function getSession(recipientId: string): Promise<SessionKey | null
     request.onsuccess = () => {
       const session = request.result
       // Check if expired
+      if (session && session.expiresAt < Date.now()) {
+        resolve(null)
+      } else {
+        resolve(session || null)
+      }
+    }
+  })
+}
+
+export async function getSessionById(sessionId: string): Promise<SessionKey | null> {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([SESSIONS_STORE], 'readonly')
+    const store = transaction.objectStore(SESSIONS_STORE)
+    const request = store.get(sessionId)
+    request.onerror = () => reject(request.error)
+    request.onsuccess = () => {
+      const session = request.result
       if (session && session.expiresAt < Date.now()) {
         resolve(null)
       } else {

@@ -281,7 +281,14 @@ export function useE2EEncryption(userId: string | null) {
       encryptedPrivateKeyIterations: encrypted.iterations,
       privateKey: undefined,
     })
-    setKeyPair({ ...keyPair, ...encrypted, privateKey: undefined })
+    setKeyPair({
+      ...keyPair,
+      encryptedPrivateKey: encrypted.encryptedPrivateKey,
+      encryptedPrivateKeyIv: encrypted.iv,
+      encryptedPrivateKeySalt: encrypted.salt,
+      encryptedPrivateKeyIterations: encrypted.iterations,
+      privateKey: undefined,
+    })
     setIsLocked(true)
     await refreshKeyPairs()
   }, [keyPair, refreshKeyPairs])

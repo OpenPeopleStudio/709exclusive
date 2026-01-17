@@ -18,6 +18,7 @@ interface Conversation {
   last_message_at: string
   unread_count: number
   has_encryption: boolean
+  has_purchase: boolean
 }
 
 interface Message {
@@ -49,6 +50,7 @@ interface DecryptedMessage extends Message {
 }
 
 export default function AdminMessagesPage() {
+  const eligibleOrderStatuses = ['pending', 'paid', 'fulfilled', 'shipped']
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null)
   const [messages, setMessages] = useState<DecryptedMessage[]>([])
@@ -60,6 +62,7 @@ export default function AdminMessagesPage() {
   const [adminId, setAdminId] = useState<string | null>(null)
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null)
   const [attachmentError, setAttachmentError] = useState<string | null>(null)
+  const [encryptionHint, setEncryptionHint] = useState<string | null>(null)
   const [retentionEnabled, setRetentionEnabled] = useState(false)
   const [retentionDays, setRetentionDays] = useState(90)
   const [showRetentionSettings, setShowRetentionSettings] = useState(false)
@@ -86,6 +89,7 @@ export default function AdminMessagesPage() {
     encrypt,
     decrypt,
     decryptMessages,
+    getRecipientPublicKey,
     backupKeys,
     restoreKeys,
     verifyUserKey,
@@ -164,6 +168,18 @@ export default function AdminMessagesPage() {
       console.error('Failed to fetch users:', error)
     }
 
+    const { data: orders } = await supabase
+      .from('orders')
+      .select('customer_id, status')
+      .in('customer_id', customerIds)
+
+    const buyersByCustomer = new Map<string, boolean>()
+    for (const order of orders || []) {
+      if (eligibleOrderStatuses.includes(order.status)) {
+        buyersByCustomer.set(order.customer_id, true)
+      }
+    }
+
     // Get encryption status from profiles
     const { data: profiles } = await supabase
       .from('709_profiles')
@@ -187,6 +203,7 @@ export default function AdminMessagesPage() {
         last_message_at: lastMsg.created_at,
         unread_count: data.unread,
         has_encryption: !!profile?.public_key,
+        has_purchase: buyersByCustomer.get(customerId) ?? false,
       })
     })
 
@@ -328,6 +345,7 @@ export default function AdminMessagesPage() {
 
     setSending(true)
     setAttachmentError(null)
+    setEncryptionHint(null)
     const plaintext = newMessage.trim()
 
     try {
@@ -371,20 +389,31 @@ export default function AdminMessagesPage() {
 
       // Attempt encryption if E2EE is initialized
       if (isInitialized) {
-        const encrypted = await encrypt(plaintext, selectedCustomer)
-        if (encrypted) {
-          messageData = {
-            ...messageData,
-            content: encrypted.content,
-            encrypted: true,
-            iv: encrypted.iv,
-            sender_public_key: encrypted.senderPublicKey,
-            message_index: encrypted.messageIndex,
+        const recipientPublicKey = await getRecipientPublicKey(selectedCustomer)
+        if (!recipientPublicKey) {
+          setEncryptionHint('Customer has not enabled encryption yet. Sending unencrypted.')
+        } else {
+          const encrypted = await encrypt(plaintext, selectedCustomer)
+          if (encrypted) {
+            messageData = {
+              ...messageData,
+              content: encrypted.content,
+              encrypted: true,
+              iv: encrypted.iv,
+              sender_public_key: encrypted.senderPublicKey,
+              message_index: encrypted.messageIndex,
+            }
           }
         }
       }
 
       if (attachmentFile) {
+        const recipientPublicKey = await getRecipientPublicKey(selectedCustomer)
+        if (!recipientPublicKey) {
+          setAttachmentError('Attachments require encryption to be enabled by the customer.')
+          setSending(false)
+          return
+        }
         const attachmentData = await uploadEncryptedAttachment(attachmentFile)
         messageData = { ...messageData, ...attachmentData }
       }
@@ -771,6 +800,13 @@ export default function AdminMessagesPage() {
                               <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
                             </svg>
                           )}
+                          <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
+                            convo.has_purchase
+                              ? 'bg-[var(--success)]/15 text-[var(--success)]'
+                              : 'bg-[var(--warning)]/15 text-[var(--warning)]'
+                          }`}>
+                            {convo.has_purchase ? 'Buyer' : 'Window shopper'}
+                          </span>
                         </div>
                         <p className="text-sm text-[var(--text-muted)] truncate mt-1">
                           {convo.last_message}
@@ -817,6 +853,15 @@ export default function AdminMessagesPage() {
                     )}
                     </div>
                   </div>
+                  {selectedConvo && (
+                    <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
+                      selectedConvo.has_purchase
+                        ? 'bg-[var(--success)]/15 text-[var(--success)]'
+                        : 'bg-[var(--warning)]/15 text-[var(--warning)]'
+                    }`}>
+                      {selectedConvo.has_purchase ? 'Buyer' : 'Window shopper'}
+                    </span>
+                  )}
                   {selectedConvo?.has_encryption && (
                     <div className="flex items-center gap-2">
                       <button
@@ -839,6 +884,9 @@ export default function AdminMessagesPage() {
                     </div>
                   )}
                 </div>
+                {encryptionHint && (
+                  <p className="px-4 pb-2 text-xs text-[var(--warning)]">{encryptionHint}</p>
+                )}
 
                 {/* Messages */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
