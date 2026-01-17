@@ -4,7 +4,8 @@ import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
 import BottomNav from "@/components/BottomNav";
 import { getTenantFromRequest } from "@/lib/tenant";
-import { TenantProvider, getThemeStyleVars } from "@/context/TenantContext";
+import { getThemeStyleVars } from "@/lib/theme";
+import { TenantProvider } from "@/context/TenantContext";
 
 const inter = Inter({
   subsets: ["latin"],
