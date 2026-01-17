@@ -6,6 +6,8 @@ import { useE2EEncryption } from '@/hooks/useE2EEncryption'
 import KeyVerification from '@/components/KeyVerification'
 import KeyBackup from '@/components/KeyBackup'
 import EncryptionSettings from '@/components/EncryptionSettings'
+import EncryptionStatusBanner from '@/components/admin/EncryptionStatusBanner'
+import EncryptionSetupPanel from '@/components/admin/EncryptionSetupPanel'
 import Button from '@/components/ui/Button'
 import Surface from '@/components/ui/Surface'
 import { generateFileKey, encryptFileWithKey, decryptFileWithKey } from '@/lib/crypto/e2e'
@@ -291,8 +293,22 @@ export default function AdminMessagesPage() {
 
     if (isInitialized) {
       const activeMessages = data.filter(msg => !msg.deleted_at)
+      
+      // Fix old encrypted messages missing sender_public_key
+      const fixedMessages = activeMessages.map(msg => {
+        if (msg.encrypted && !msg.sender_public_key) {
+          console.warn('Found encrypted message without sender_public_key:', msg.id)
+          return {
+            ...msg,
+            encrypted: false,
+            decryptedContent: msg.content, // Show raw content
+          }
+        }
+        return msg
+      })
+      
       const decrypted = await decryptMessages(
-        activeMessages,
+        fixedMessages as Message[],
         (msg) => msg.sender_type === 'customer' ? msg.customer_id : adminId!
       )
       
@@ -491,8 +507,15 @@ export default function AdminMessagesPage() {
       // Attempt encryption if E2EE is initialized
       if (isInitialized) {
         const recipientPublicKey = await getRecipientPublicKey(selectedCustomer)
+        console.log('Recipient public key:', recipientPublicKey ? 'Found' : 'Missing')
         if (recipientPublicKey) {
           const encrypted = await encrypt(plaintext, selectedCustomer)
+          console.log('Encryption result:', encrypted ? {
+            hasContent: !!encrypted.content,
+            hasSenderKey: !!encrypted.senderPublicKey,
+            hasIv: !!encrypted.iv,
+            messageIndex: encrypted.messageIndex
+          } : 'null')
           if (encrypted) {
             messageData = {
               ...messageData,
@@ -502,9 +525,15 @@ export default function AdminMessagesPage() {
               sender_public_key: encrypted.senderPublicKey,
               message_index: encrypted.messageIndex,
             }
+            console.log('Message data prepared with encryption:', {
+              encrypted: true,
+              hasSenderKey: !!messageData.sender_public_key
+            })
             didEncrypt = true
           }
         }
+      } else {
+        console.log('Encryption not initialized, sending unencrypted')
       }
 
       if (attachmentFile) {
@@ -518,13 +547,29 @@ export default function AdminMessagesPage() {
         messageData = { ...messageData, ...attachmentData }
       }
 
+      console.log('Inserting message with data:', {
+        encrypted: messageData.encrypted,
+        hasSenderKey: !!messageData.sender_public_key,
+        hasIv: !!messageData.iv,
+        messageIndex: messageData.message_index
+      })
+
       const { data, error } = await supabase
         .from('messages')
         .insert(messageData)
         .select()
         .single()
 
+      if (error) {
+        console.error('Message insert error:', error)
+      }
+
       if (!error && data) {
+        console.log('Message inserted successfully:', {
+          id: data.id,
+          encrypted: data.encrypted,
+          senderKeyInDB: !!data.sender_public_key
+        })
         // Add to local state with decrypted content
         setMessages(prev => [...prev, { 
           ...data, 
@@ -908,6 +953,31 @@ export default function AdminMessagesPage() {
             Manual backup
           </Button>
         </div>
+      )}
+
+      {/* Prominent Encryption Status Banner */}
+      <EncryptionStatusBanner
+        isInitialized={isInitialized}
+        isInitializing={isInitializing}
+        publicKey={publicKey}
+        fingerprint={fingerprint}
+        shortFingerprint={shortFingerprint}
+        error={encryptionError}
+        recipientHasKey={selectedCustomer ? (filteredConversations.find(c => c.customer_id === selectedCustomer)?.has_encryption || false) : false}
+        recipientId={selectedCustomer}
+        onBackupKeys={() => setShowKeyBackup(true)}
+        onVerifyKeys={() => setShowKeyVerification(true)}
+      />
+
+      {/* Encryption Setup Panel for selected conversation */}
+      {selectedCustomer && (
+        <EncryptionSetupPanel
+          onInitialize={() => window.location.reload()}
+          onViewKeys={() => setShowEncryptionSettings(true)}
+          currentUserKey={publicKey}
+          recipientKey={filteredConversations.find(c => c.customer_id === selectedCustomer)?.has_encryption ? 'has-key' : null}
+          recipientName={filteredConversations.find(c => c.customer_id === selectedCustomer)?.customer_name || 'User'}
+        />
       )}
 
       <Surface padding="md" className="mb-4">
