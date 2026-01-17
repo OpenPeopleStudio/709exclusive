@@ -156,8 +156,9 @@ export default function ConsignmentsPage() {
                   No consignors yet. Add your first consignor to start tracking payouts.
                 </div>
               ) : (
-                <table className="w-full">
-                  <thead className="bg-[var(--bg-tertiary)]">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-[var(--bg-tertiary)]">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Name</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Contact</th>
@@ -202,6 +203,7 @@ export default function ConsignmentsPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           )}
@@ -221,8 +223,9 @@ export default function ConsignmentsPage() {
                   No consignment items yet.
                 </div>
               ) : (
-                <table className="w-full">
-                  <thead className="bg-[var(--bg-tertiary)]">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-[var(--bg-tertiary)]">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Item</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Consignor</th>
@@ -263,6 +266,7 @@ export default function ConsignmentsPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           )}
@@ -279,8 +283,9 @@ export default function ConsignmentsPage() {
                   No payouts recorded yet.
                 </div>
               ) : (
-                <table className="w-full">
-                  <thead className="bg-[var(--bg-tertiary)]">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-[var(--bg-tertiary)]">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Date</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Consignor</th>
@@ -317,6 +322,7 @@ export default function ConsignmentsPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           )}

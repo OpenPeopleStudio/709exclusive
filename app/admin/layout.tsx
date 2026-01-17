@@ -1,8 +1,7 @@
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { isAdmin } from '@/lib/roles'
-import PWAInstallButton from '@/components/admin/PWAInstallButton'
+import AdminShell from '@/components/admin/AdminShell'
 
 export const metadata = {
   title: '709 Admin',
@@ -45,61 +44,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!isAdmin(profile?.role)) redirect('/')
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)]">
-      {/* Top Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)]">
-        <div className="h-full px-6 flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <Link href="/admin/products" className="flex items-center gap-2">
-              <span className="text-xl font-black tracking-tighter text-[var(--text-primary)]">709</span>
-              <span className="text-sm font-medium text-[var(--text-muted)]">Admin</span>
-            </Link>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <PWAInstallButton />
-            <span className="text-sm text-[var(--text-muted)]">{user.email}</span>
-            <Link 
-              href="/" 
-              className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-            >
-              View Store →
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <div className="flex pt-16">
-        {/* Sidebar */}
-        <aside className="fixed left-0 top-16 bottom-0 w-64 bg-[var(--bg-secondary)] border-r border-[var(--border-primary)] overflow-y-auto">
-          <nav className="p-4 space-y-1">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-md text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors group"
-              >
-                <svg 
-                  className="w-5 h-5 text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} />
-                </svg>
-                <span className="font-medium">{item.label}</span>
-              </Link>
-            ))}
-          </nav>
-        </aside>
-
-        {/* Main Content */}
-        <main className="flex-1 ml-64 p-8">
-          <div className="max-w-7xl">
-            {children}
-          </div>
-        </main>
-      </div>
-    </div>
+    <AdminShell userEmail={user.email} navItems={navItems}>
+      {children}
+    </AdminShell>
   )
 }

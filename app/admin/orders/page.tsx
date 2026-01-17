@@ -198,8 +198,9 @@ export default function AdminOrdersPage() {
             No orders found
           </div>
         ) : (
-          <table className="w-full">
-            <thead className="bg-[var(--bg-tertiary)]">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-[var(--bg-tertiary)]">
               <tr>
                 <th className="px-4 py-3 text-left">
                   <input
@@ -287,6 +288,7 @@ export default function AdminOrdersPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

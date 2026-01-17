@@ -144,8 +144,9 @@ export default function ReturnsPage() {
             No returns found
           </div>
         ) : (
-          <table className="w-full">
-            <thead className="bg-[var(--bg-tertiary)]">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-[var(--bg-tertiary)]">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Return ID</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Order</th>
@@ -230,6 +231,7 @@ export default function ReturnsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 
 interface Variant {
   id: string
@@ -94,8 +95,10 @@ export default function AdminInventoryPage() {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-2xl font-bold text-[var(--text-primary)]">Inventory Management</h1>
         </div>
-        <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-8 text-center">
-          <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin mx-auto"></div>
+        <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6">
+          <div className="flex items-center justify-center py-12">
+            <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin"></div>
+          </div>
         </div>
       </div>
     )
@@ -105,70 +108,70 @@ export default function AdminInventoryPage() {
     <div>
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">Inventory Management</h1>
-        <a href="/admin/inventory/intake" className="btn-primary">
+        <Link href="/admin/inventory/intake" className="btn-primary">
           + Add Inventory
-        </a>
+        </Link>
       </div>
 
       {/* Current Inventory */}
-      <div className="bg-white shadow rounded-lg overflow-hidden mb-8">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Current Inventory ({variants.length} variants)</h2>
+      <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg overflow-hidden mb-8">
+        <div className="px-6 py-4 border-b border-[var(--border-primary)]">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Current Inventory ({variants.length} variants)</h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-[var(--border-primary)]">
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                   SKU
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                   Details
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                   Stock
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                   Reserved
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                   Available
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-[var(--border-primary)]">
               {variants.map((variant) => (
-                <tr key={variant.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
+                <tr key={variant.id} className="hover:bg-[var(--bg-tertiary)] transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-[var(--text-primary)]">
                     {variant.sku}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
+                    <div className="text-sm text-[var(--text-primary)]">
                       {variant.brand} {variant.model}
                     </div>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-[var(--text-muted)]">
                       Size: {variant.size} • {variant.condition_code}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-secondary)]">
                     {variant.stock}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-secondary)]">
                     {variant.reserved}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      variant.available > 10 ? 'bg-green-100 text-green-800' :
-                      variant.available > 0 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
+                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${
+                      variant.available > 10 ? 'bg-[var(--success)]/20 text-[var(--success)]' :
+                      variant.available > 0 ? 'bg-[var(--warning)]/20 text-[var(--warning)]' :
+                      'bg-[var(--error)]/20 text-[var(--error)]'
                     }`}>
                       {variant.available}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-secondary)]">
                     <div className="flex space-x-2">
                       <button
                         onClick={() => {
@@ -178,7 +181,7 @@ export default function AdminInventoryPage() {
                           }
                         }}
                         disabled={adjusting === variant.id}
-                        className="text-green-600 hover:text-green-900 disabled:opacity-50"
+                        className="text-[var(--success)] hover:text-[var(--success)]/80 disabled:opacity-50 font-medium"
                       >
                         +1
                       </button>
@@ -190,7 +193,7 @@ export default function AdminInventoryPage() {
                           }
                         }}
                         disabled={adjusting === variant.id}
-                        className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                        className="text-[var(--error)] hover:text-[var(--error)]/80 disabled:opacity-50 font-medium"
                       >
                         -1
                       </button>
@@ -204,51 +207,51 @@ export default function AdminInventoryPage() {
       </div>
 
       {/* Audit History */}
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Inventory Audit History</h2>
+      <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-[var(--border-primary)]">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Inventory Audit History</h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-[var(--border-primary)]">
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                   Time
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                   SKU
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                   Change
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                   Reason
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                   Actor
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-[var(--border-primary)]">
               {auditHistory.slice(0, 50).map((entry) => (
-                <tr key={entry.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <tr key={entry.id} className="hover:bg-[var(--bg-tertiary)] transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-muted)]">
                     {new Date(entry.created_at).toLocaleString()}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-[var(--text-primary)]">
                     {entry.product_variants.sku}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      entry.delta > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${
+                      entry.delta > 0 ? 'bg-[var(--success)]/20 text-[var(--success)]' : 'bg-[var(--error)]/20 text-[var(--error)]'
                     }`}>
                       {entry.delta > 0 ? '+' : ''}{entry.delta}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
+                  <td className="px-6 py-4 text-sm text-[var(--text-secondary)] max-w-xs truncate">
                     {entry.reason}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-muted)]">
                     {entry.actor.slice(0, 8)}...
                   </td>
                 </tr>
