@@ -30,6 +30,14 @@ interface EmailData {
   carrier?: string
 }
 
+interface InviteEmailData {
+  inviteeEmail: string
+  inviteLink: string
+  tenantName: string
+  role: string
+  inviterEmail?: string | null
+}
+
 function formatCurrency(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`
 }
@@ -178,6 +186,30 @@ export async function sendAdminOrderNotification(orderId: string, customerEmail:
       </ul>
 
       <p><a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/admin/orders/${orderId}">View Order</a></p>
+    `
+  }
+
+  await sendgrid.send(msg)
+}
+
+export async function sendInviteEmail(data: InviteEmailData): Promise<void> {
+  const roleLabel = data.role.charAt(0).toUpperCase() + data.role.slice(1)
+  const inviterLine = data.inviterEmail ? `<p>Invited by: ${data.inviterEmail}</p>` : ''
+
+  const msg = {
+    to: data.inviteeEmail,
+    from: {
+      email: 'orders@709exclusive.com',
+      name: '709exclusive'
+    },
+    subject: `You're invited to ${data.tenantName}`,
+    text: `You've been invited to join ${data.tenantName} as ${roleLabel}.\n${data.inviterEmail ? `Invited by: ${data.inviterEmail}\n` : ''}Accept invite: ${data.inviteLink}`,
+    html: `
+      <h1>You're invited to ${data.tenantName}</h1>
+      <p>Role: ${roleLabel}</p>
+      ${inviterLine}
+      <p><a href="${data.inviteLink}">Accept your invite</a></p>
+      <p>If you did not expect this invite, you can ignore this email.</p>
     `
   }
 

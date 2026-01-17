@@ -49,13 +49,13 @@ BEGIN
     IF EXISTS (SELECT 1 FROM "709_profiles" WHERE id = user_id) THEN
       -- Update existing profile to owner role
       UPDATE "709_profiles"
-      SET role = 'owner'
+      SET role = 'staff'
       WHERE id = user_id;
       RAISE NOTICE 'Updated existing profile to owner role for user: %', user_id;
     ELSE
       -- Insert new profile with owner role
       INSERT INTO "709_profiles" (id, role, full_name)
-      VALUES (user_id, 'owner', 'Site Administrator');
+      VALUES (user_id, 'staff', 'Site Administrator');
       RAISE NOTICE 'Created owner profile for user: %', user_id;
     END IF;
   END IF;
@@ -72,5 +72,5 @@ SELECT
   u.created_at
 FROM auth.users u
 LEFT JOIN "709_profiles" p ON p.id = u.id
-WHERE p.role IN ('admin', 'owner')
+WHERE p.role IN ('staff')
 ORDER BY u.created_at DESC;

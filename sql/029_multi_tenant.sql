@@ -289,7 +289,8 @@ begin
 end $$;
 
 -- Update helper view to include tenant context
-create or replace view variant_availability as
+drop view if exists variant_availability;
+create view variant_availability as
 select
   id,
   tenant_id,
@@ -299,7 +300,8 @@ select
 from product_variants;
 
 -- Update admin analytics view for tenant scope
-create or replace view admin_variant_analytics as
+drop view if exists admin_variant_analytics;
+create view admin_variant_analytics as
 select
   pv.id,
   pv.tenant_id,

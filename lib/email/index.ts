@@ -7,13 +7,15 @@ import {
   sendOrderShipped as sendOrderShippedSG,
   sendOrderCancelled as sendOrderCancelledSG,
   sendOrderRefunded as sendOrderRefundedSG,
-  sendAdminOrderNotification
+  sendAdminOrderNotification,
+  sendInviteEmail as sendInviteEmailSG
 } from './sendgrid'
 import {
   sendOrderConfirmation as sendOrderConfirmationPM,
   sendOrderShipped as sendOrderShippedPM,
   sendOrderCancelled as sendOrderCancelledPM,
   sendOrderRefunded as sendOrderRefundedPM,
+  sendInviteEmail as sendInviteEmailPM,
 } from './postmark'
 
 interface OrderEmailData {
@@ -42,6 +44,15 @@ interface OrderEmailData {
   }
   trackingNumber?: string
   carrier?: string
+  emailProvider: EmailProvider
+}
+
+interface InviteEmailData {
+  inviteeEmail: string
+  inviteLink: string
+  tenantName: string
+  role: string
+  inviterEmail?: string | null
   emailProvider: EmailProvider
 }
 
@@ -198,3 +209,14 @@ export async function sendOrderRefunded(orderId: string): Promise<void> {
 }
 
 export { sendAdminOrderNotification }
+
+export async function sendInviteEmail(data: InviteEmailData): Promise<void> {
+  if (data.emailProvider === 'disabled') {
+    return
+  }
+  if (data.emailProvider === 'postmark') {
+    await sendInviteEmailPM(data)
+    return
+  }
+  await sendInviteEmailSG(data)
+}

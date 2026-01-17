@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/supabaseServer'
 import { createClient } from '@supabase/supabase-js'
 import { getTenantFromRequest } from '@/lib/tenant'
+import { resolveEmailProvider } from '@/lib/integrations'
+import { sendInviteEmail } from '@/lib/email'
 
 // Delete user and all associated data
 export async function DELETE(request: Request) {
@@ -188,28 +190,67 @@ export async function POST(request: Request) {
     )
 
     const origin = new URL(request.url).origin
+    const inviteOptions = {
+      redirectTo: `${origin}/auth/callback?type=invite`,
+      data: {
+        role,
+        tenant_id: tenant?.id,
+        tenant_slug: tenant?.slug,
+      },
+    }
+    const emailProvider = resolveEmailProvider(tenant?.settings)
+    let invitedUserId: string | null = null
+
     const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
       normalizedEmail,
-      {
-        redirectTo: `${origin}/auth/callback?type=invite`,
-        data: {
-          role,
-          tenant_id: tenant?.id,
-          tenant_slug: tenant?.slug,
-        },
-      }
+      inviteOptions
     )
 
     if (inviteError) {
-      console.error('Invite user error:', inviteError)
-      return NextResponse.json({ error: inviteError.message }, { status: 500 })
+      const errorMessage = inviteError.message?.toLowerCase() ?? ''
+      const shouldFallback = errorMessage.includes('error sending email')
+      if (!shouldFallback) {
+        console.error('Invite user error:', inviteError)
+        return NextResponse.json({ error: inviteError.message }, { status: 500 })
+      }
+
+      if (emailProvider === 'disabled') {
+        return NextResponse.json({
+          error: 'Email provider disabled. Configure email integration or Supabase SMTP to send invites.'
+        }, { status: 500 })
+      }
+
+      console.warn('Supabase invite email failed. Using app email provider.', inviteError)
+      const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+        type: 'invite',
+        email: normalizedEmail,
+        options: inviteOptions,
+      })
+
+      if (linkError || !linkData?.action_link) {
+        console.error('Invite link generation error:', linkError)
+        return NextResponse.json({ error: linkError?.message || 'Failed to generate invite link' }, { status: 500 })
+      }
+
+      await sendInviteEmail({
+        inviteeEmail: normalizedEmail,
+        inviteLink: linkData.action_link,
+        tenantName: tenant?.name || '709exclusive',
+        role,
+        inviterEmail: user.email,
+        emailProvider,
+      })
+
+      invitedUserId = linkData?.user?.id ?? null
+    } else {
+      invitedUserId = inviteData?.user?.id ?? null
     }
 
-    if (inviteData?.user?.id) {
+    if (invitedUserId) {
       const { error: updateError } = await adminClient
         .from('709_profiles')
         .update({ role, tenant_id: tenant?.id })
-        .eq('id', inviteData.user.id)
+        .eq('id', invitedUserId)
       if (updateError) {
         console.error('Error updating invited user role:', updateError)
       }

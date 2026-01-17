@@ -35,6 +35,14 @@ interface EmailData {
   carrier?: string
 }
 
+interface InviteEmailData {
+  inviteeEmail: string
+  inviteLink: string
+  tenantName: string
+  role: string
+  inviterEmail?: string | null
+}
+
 function formatCurrency(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`
 }
@@ -149,6 +157,27 @@ export async function sendOrderRefunded(data: EmailData): Promise<void> {
       <p>Please allow 5-7 business days for the refund to appear on your account.</p>
       <p>Questions? Contact us at support@709exclusive.com</p>
     `,
+    MessageStream: 'outbound'
+  })
+}
+
+export async function sendInviteEmail(data: InviteEmailData): Promise<void> {
+  const client = getClient()
+  const roleLabel = data.role.charAt(0).toUpperCase() + data.role.slice(1)
+  const inviterLine = data.inviterEmail ? `<p>Invited by: ${data.inviterEmail}</p>` : ''
+
+  await client.sendEmail({
+    From: 'orders@709exclusive.com',
+    To: data.inviteeEmail,
+    Subject: `You're invited to ${data.tenantName}`,
+    HtmlBody: `
+      <h1>You're invited to ${data.tenantName}</h1>
+      <p>Role: ${roleLabel}</p>
+      ${inviterLine}
+      <p><a href="${data.inviteLink}">Accept your invite</a></p>
+      <p>If you did not expect this invite, you can ignore this email.</p>
+    `,
+    TextBody: `You've been invited to join ${data.tenantName} as ${roleLabel}.\n${data.inviterEmail ? `Invited by: ${data.inviterEmail}\n` : ''}Accept invite: ${data.inviteLink}`,
     MessageStream: 'outbound'
   })
 }

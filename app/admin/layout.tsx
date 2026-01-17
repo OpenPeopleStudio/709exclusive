@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createSupabaseServer } from '@/lib/supabaseServer'
-import { isAdmin, isOwner } from '@/lib/roles'
+import { hasAdminAccess, isAdmin, isOwner } from '@/lib/roles'
 import AdminShell from '@/components/admin/AdminShell'
 import { getTenantFromRequest } from '@/lib/tenant'
 
@@ -37,6 +37,13 @@ const navItems = [
   { href: '/admin/tenants', label: 'Super Admin', icon: 'M7 7h10M7 12h10M7 17h10M4 4h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2z' },
 ]
 
+const staffNavHrefs = new Set([
+  '/admin/inventory',
+  '/admin/orders',
+  '/admin/messages',
+  '/admin/staff-location',
+])
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createSupabaseServer()
   const tenant = await getTenantFromRequest()
@@ -68,11 +75,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const isSuperAdmin = isOwner(superProfile?.role)
 
-  if (!isAdmin(profile?.role) && !isSuperAdmin) redirect('/')
+  if (!hasAdminAccess(profile?.role) && !isSuperAdmin) redirect('/')
 
   const scopedNavItems = isSuperAdmin
     ? navItems
-    : navItems.filter((item) => item.href !== '/admin/tenants')
+    : isAdmin(profile?.role)
+      ? navItems.filter((item) => item.href !== '/admin/tenants')
+      : navItems.filter((item) => staffNavHrefs.has(item.href))
 
   return (
     <AdminShell userEmail={user.email} navItems={scopedNavItems}>
