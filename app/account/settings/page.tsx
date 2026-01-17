@@ -17,17 +17,23 @@ export default function AccountSettingsPage() {
   const eligibleOrderStatuses = ['pending', 'paid', 'fulfilled', 'shipped']
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
+  const [userId, setUserId] = useState<string | null>(null)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [locationMessage, setLocationMessage] = useState<string | null>(null)
+  const [locationError, setLocationError] = useState<string | null>(null)
   const [pageLoading, setPageLoading] = useState(true)
   const [showKeyBackup, setShowKeyBackup] = useState(false)
   const [showKeyVerification, setShowKeyVerification] = useState(false)
   const [hasPurchase, setHasPurchase] = useState(false)
   const [purchaseLoaded, setPurchaseLoaded] = useState(false)
+  const [isStaffUser, setIsStaffUser] = useState(false)
+  const [locationOptIn, setLocationOptIn] = useState(false)
+  const [savingLocation, setSavingLocation] = useState(false)
 
   const {
     isInitialized: encryptionReady,
@@ -46,6 +52,7 @@ export default function AccountSettingsPage() {
         router.push('/account/login')
         return
       }
+      setUserId(user.id)
       setEmail(user.email || '')
       setFullName(user.user_metadata?.full_name || '')
 
@@ -65,6 +72,21 @@ export default function AccountSettingsPage() {
       )
       setHasPurchase(hasEligible)
       setPurchaseLoaded(true)
+
+      let profileQuery = supabase
+        .from('709_profiles')
+        .select('role, staff_location_opt_in')
+        .eq('id', user.id)
+
+      if (tenantId) {
+        profileQuery = profileQuery.eq('tenant_id', tenantId)
+      }
+
+      const { data: profile } = await profileQuery.single()
+
+      const role = profile?.role || null
+      setIsStaffUser(['staff', 'admin', 'owner'].includes(role || ''))
+      setLocationOptIn(Boolean(profile?.staff_location_opt_in))
 
       setPageLoading(false)
     }
@@ -146,6 +168,41 @@ export default function AccountSettingsPage() {
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push('/')
+  }
+
+  const toggleLocationSharing = async () => {
+    setSavingLocation(true)
+    setLocationError(null)
+    setLocationMessage(null)
+
+    try {
+      if (!userId) {
+        setLocationError('Unable to resolve user')
+        setSavingLocation(false)
+        return
+      }
+      const updates = { staff_location_opt_in: !locationOptIn }
+      let query = supabase
+        .from('709_profiles')
+        .update(updates)
+        .eq('id', userId)
+
+      if (tenantId) {
+        query = query.eq('tenant_id', tenantId)
+      }
+
+      const { error } = await query
+      if (error) {
+        setLocationError(error.message)
+      } else {
+        setLocationOptIn(!locationOptIn)
+        setLocationMessage(!locationOptIn ? 'Location sharing enabled.' : 'Location sharing disabled.')
+      }
+    } catch {
+      setLocationError('Unable to update location sharing preference')
+    } finally {
+      setSavingLocation(false)
+    }
   }
 
   if (pageLoading) {
@@ -286,6 +343,42 @@ export default function AccountSettingsPage() {
                 </button>
               </form>
             </div>
+
+            {isStaffUser && (
+              <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6">
+                <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Location Sharing</h2>
+                <p className="text-sm text-[var(--text-muted)] mb-4">
+                  Opt in to share your delivery location with admins. You can disable anytime.
+                </p>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={toggleLocationSharing}
+                    disabled={savingLocation}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      locationOptIn
+                        ? 'bg-[var(--success)] text-white hover:bg-[var(--success)]/90'
+                        : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-primary)]'
+                    } ${savingLocation ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  >
+                    {locationOptIn ? 'Sharing enabled' : 'Enable sharing'}
+                  </button>
+                  <span className="text-xs text-[var(--text-muted)]">
+                    {locationOptIn ? 'Your location can be shared when tracked.' : 'Not sharing location.'}
+                  </span>
+                </div>
+                {locationError && (
+                  <div className="mt-4 p-3 bg-[var(--error)]/10 border border-[var(--error)]/20 rounded-md">
+                    <p className="text-sm text-[var(--error)]">{locationError}</p>
+                  </div>
+                )}
+                {locationMessage && (
+                  <div className="mt-4 p-3 bg-[var(--success)]/10 border border-[var(--success)]/20 rounded-md">
+                    <p className="text-sm text-[var(--success)]">{locationMessage}</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {featureFlags.messages !== false && featureFlags.e2e_encryption !== false && (
               <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6">

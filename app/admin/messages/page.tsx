@@ -50,6 +50,13 @@ interface DecryptedMessage extends Message {
   decryptedContent: string
 }
 
+interface UserSummary {
+  id: string
+  email: string
+  full_name: string | null
+  role: string | null
+}
+
 export default function AdminMessagesPage() {
   const { id: tenantId, featureFlags } = useTenant()
   const eligibleOrderStatuses = ['pending', 'paid', 'fulfilled', 'shipped']
@@ -78,6 +85,12 @@ export default function AdminMessagesPage() {
     fingerprint: string
     shortFingerprint: string
   } | null>(null)
+  const [showNewMessage, setShowNewMessage] = useState(false)
+  const [directoryUsers, setDirectoryUsers] = useState<UserSummary[]>([])
+  const [directorySearch, setDirectorySearch] = useState('')
+  const [newRecipient, setNewRecipient] = useState<string | null>(null)
+  const [newMessageText, setNewMessageText] = useState('')
+  const [newMessageError, setNewMessageError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [selectedCustomerVerified, setSelectedCustomerVerified] = useState(false)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
@@ -234,6 +247,13 @@ export default function AdminMessagesPage() {
     setLoading(false)
   }, [tenantId])
 
+  const loadDirectoryUsers = useCallback(async () => {
+    const response = await fetch('/api/admin/messages/users')
+    if (!response.ok) return
+    const data = await response.json()
+    setDirectoryUsers(data.users || [])
+  }, [])
+
   const loadMessages = useCallback(async (customerId: string) => {
     let messagesQuery = supabase
       .from('messages')
@@ -328,6 +348,12 @@ export default function AdminMessagesPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadConversations()
   }, [loadConversations])
+
+  useEffect(() => {
+    if (showNewMessage) {
+      loadDirectoryUsers()
+    }
+  }, [showNewMessage, loadDirectoryUsers])
 
   useEffect(() => {
     if (selectedCustomer) {
@@ -487,6 +513,71 @@ export default function AdminMessagesPage() {
     }
 
     setSending(false)
+  }
+
+  const startNewConversation = async () => {
+    if (!newRecipient || !newMessageText.trim()) return
+    setNewMessageError(null)
+
+    try {
+      if (!tenantId) {
+        setNewMessageError('Tenant not resolved')
+        return
+      }
+
+      let messageData: {
+        tenant_id: string
+        customer_id: string
+        content: string
+        sender_type: 'admin'
+        read: boolean
+        encrypted?: boolean
+        iv?: string
+        sender_public_key?: string
+        message_index?: number
+      } = {
+        tenant_id: tenantId,
+        customer_id: newRecipient,
+        content: newMessageText.trim(),
+        sender_type: 'admin',
+        read: false,
+      }
+
+      if (isInitialized) {
+        const recipientPublicKey = await getRecipientPublicKey(newRecipient)
+        if (recipientPublicKey) {
+          const encrypted = await encrypt(newMessageText.trim(), newRecipient)
+          if (encrypted) {
+            messageData = {
+              ...messageData,
+              content: encrypted.content,
+              encrypted: true,
+              iv: encrypted.iv,
+              sender_public_key: encrypted.senderPublicKey,
+              message_index: encrypted.messageIndex,
+            }
+          }
+        }
+      }
+
+      const { data, error } = await supabase
+        .from('messages')
+        .insert(messageData)
+        .select()
+        .single()
+
+      if (error || !data) {
+        throw error || new Error('Failed to start conversation')
+      }
+
+      setShowNewMessage(false)
+      setNewMessageText('')
+      setNewRecipient(null)
+      await loadConversations()
+      setSelectedCustomer(newRecipient)
+    } catch (err) {
+      setNewMessageError(err instanceof Error ? err.message : 'Failed to start conversation')
+    }
   }
 
   const sanitizeFilename = (name: string) =>
@@ -713,6 +804,13 @@ export default function AdminMessagesPage() {
             size="sm"
           >
             Security
+          </Button>
+          <Button
+            onClick={() => setShowNewMessage(true)}
+            variant="secondary"
+            size="sm"
+          >
+            New message
           </Button>
         </div>
       </div>
@@ -1099,6 +1197,88 @@ export default function AdminMessagesPage() {
           onUpdateDeviceLabel={updateDeviceLabel}
           lastBackupAt={lastBackupAt}
         />
+      )}
+
+      {showNewMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-lg rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--text-primary)]">Start a new conversation</h2>
+                <p className="text-sm text-[var(--text-muted)] mt-1">Message staff or customers.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNewMessage(false)}
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="text-xs text-[var(--text-muted)]">Recipient</label>
+                <input
+                  value={directorySearch}
+                  onChange={(e) => setDirectorySearch(e.target.value)}
+                  placeholder="Search by name or email"
+                  className="mt-2 w-full"
+                />
+                <div className="mt-3 max-h-56 overflow-y-auto space-y-2">
+                  {directoryUsers
+                    .filter((user) => {
+                      const q = directorySearch.trim().toLowerCase()
+                      if (!q) return true
+                      return (
+                        user.email.toLowerCase().includes(q) ||
+                        (user.full_name || '').toLowerCase().includes(q)
+                      )
+                    })
+                    .map((user) => (
+                      <label key={user.id} className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
+                        <input
+                          type="radio"
+                          name="new-recipient"
+                          checked={newRecipient === user.id}
+                          onChange={() => setNewRecipient(user.id)}
+                        />
+                        <span>{user.full_name || user.email}</span>
+                        {user.role && (
+                          <span className="text-xs text-[var(--text-muted)]">({user.role})</span>
+                        )}
+                      </label>
+                    ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-[var(--text-muted)]">Message</label>
+                <textarea
+                  value={newMessageText}
+                  onChange={(e) => setNewMessageText(e.target.value)}
+                  rows={3}
+                  className="mt-2 w-full"
+                />
+              </div>
+
+              {newMessageError && (
+                <div className="p-3 bg-[var(--error)]/10 border border-[var(--error)]/20 rounded-lg">
+                  <p className="text-sm text-[var(--error)]">{newMessageError}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <Button variant="secondary" onClick={() => setShowNewMessage(false)} className="flex-1">
+                Cancel
+              </Button>
+              <Button onClick={startNewConversation} className="flex-1">
+                Send message
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

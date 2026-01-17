@@ -35,13 +35,17 @@ export async function POST(request: Request) {
 
   const { data: profile } = await supabase
     .from('709_profiles')
-    .select('role, full_name')
+    .select('role, full_name, staff_location_opt_in')
     .eq('id', user.id)
     .eq('tenant_id', tenant?.id)
     .single()
 
   if (!isStaff(profile?.role)) {
     return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+  }
+
+  if (!profile?.staff_location_opt_in) {
+    return NextResponse.json({ error: 'Location sharing is disabled' }, { status: 403 })
   }
 
   let payload: Record<string, unknown> = {}

@@ -46,9 +46,10 @@ export async function GET(request: Request) {
 
     const { data: tenantProfiles } = await supabase
       .from('709_profiles')
-      .select('id')
+      .select('id, role, full_name')
       .eq('tenant_id', tenant?.id)
 
+    const profileById = new Map((tenantProfiles || []).map(p => [p.id, p]))
     const allowedIds = new Set((tenantProfiles || []).map(p => p.id))
 
     // Map users to a simpler format
@@ -57,8 +58,9 @@ export async function GET(request: Request) {
       .map(u => ({
       id: u.id,
       email: u.email || '',
-      full_name: u.user_metadata?.full_name || null,
-      created_at: u.created_at
+      full_name: profileById.get(u.id)?.full_name || u.user_metadata?.full_name || null,
+      role: profileById.get(u.id)?.role || null,
+      created_at: u.created_at,
     }))
 
     return NextResponse.json({ users })
