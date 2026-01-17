@@ -343,7 +343,11 @@ export default function AdminMessagesPage() {
 
   // Re-decrypt when encryption is initialized
   useEffect(() => {
-    if (isInitialized && selectedCustomer && messages.some(m => m.encrypted && m.decryptedContent === 'Secure message')) {
+    if (!isInitialized || !selectedCustomer) return
+    const needsRetry = messages.some(m =>
+      m.encrypted && (m.decryptedContent === 'Secure message' || m.decryptedContent === '[Unable to decrypt]')
+    )
+    if (needsRetry) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       loadMessages(selectedCustomer)
     }

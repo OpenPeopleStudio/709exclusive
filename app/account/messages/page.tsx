@@ -161,7 +161,8 @@ export default function MessagesPage() {
   }, [adminId])
 
   const loadAndDecryptMessages = useCallback(async (rawMessages: Message[]) => {
-    if (!isInitialized || !userId) {
+    const needsAdminSender = rawMessages.some(msg => msg.sender_type === 'admin' && msg.encrypted)
+    if (!isInitialized || !userId || (needsAdminSender && !adminId)) {
       return rawMessages.map(msg => ({
         ...msg,
         decryptedContent: msg.deleted_at
@@ -277,7 +278,11 @@ export default function MessagesPage() {
 
   // Re-decrypt when encryption is initialized
   useEffect(() => {
-    if (isInitialized && messages.some(m => m.encrypted && m.decryptedContent === 'Secure message')) {
+    if (!isInitialized) return
+    const needsRetry = messages.some(m =>
+      m.encrypted && (m.decryptedContent === 'Secure message' || m.decryptedContent === '[Unable to decrypt]')
+    )
+    if (needsRetry) {
       const redecrypt = async () => {
         const decrypted = await loadAndDecryptMessages(messages)
         setMessages(decrypted as DecryptedMessage[])
