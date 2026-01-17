@@ -168,25 +168,25 @@ function ShopContent() {
       <main className="flex-1 pt-24 pb-16">
         <div className="container">
           {/* Page Header */}
-          <div className="mb-8 md:mb-10">
-            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">
+          <div className="mb-10 md:mb-14">
+            <p className="text-xs uppercase tracking-[0.2em] font-bold text-gradient mb-3">
               {pageMode === 'drops' ? 'Drops' : pageMode === 'new' ? 'New' : 'Shop'}
             </p>
-            <h1 className="text-2xl md:text-3xl font-semibold text-[var(--text-primary)] mt-2">
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-[var(--text-primary)] mt-2 mb-4">
               {pageMode === 'drops'
                 ? 'Active drops'
                 : pageMode === 'new'
                   ? 'New arrivals'
                   : 'All inventory'}
             </h1>
-            <p className="text-[var(--text-secondary)] mt-2 max-w-2xl">
+            <p className="text-[var(--text-secondary)] text-lg max-w-2xl leading-relaxed">
               {pageMode === 'drops'
                 ? 'Limited releases with local delivery and pickup options.'
                 : pageMode === 'new'
                   ? 'The most recent additions to the marketplace.'
                   : 'Browse verified sneakers and streetwear across all sizes and conditions.'}
             </p>
-            <div className="flex flex-wrap gap-3 mt-5">
+            <div className="flex flex-wrap gap-3 mt-6">
               <Button href="/shop" variant="secondary" size="sm">All inventory</Button>
               <Button href="/shop?sort=newest" variant="secondary" size="sm">New arrivals</Button>
               <Button href="/shop?drops=true" variant="secondary" size="sm">Drops</Button>
@@ -320,23 +320,23 @@ function ShopContent() {
               </div>
 
               {/* Sticky Sort/Filter Bar */}
-              <div className="sticky top-20 z-30 -mx-4 px-4 py-3 bg-[var(--bg-primary)]/95 backdrop-blur-sm border-b border-[var(--border-primary)] mb-6">
+              <div className="sticky top-20 z-30 -mx-4 px-4 py-4 bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] border-b border-[var(--glass-border)] mb-8">
                 <div className="flex items-center justify-between gap-4">
                   {/* Mobile Filter Button */}
                   <button
                     onClick={() => setShowMobileFilters(true)}
-                    className={`lg:hidden flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors ${
+                    className={`lg:hidden flex items-center gap-2 px-5 py-3 rounded-full font-semibold transition-all duration-300 ${
                       activeFilterCount > 0
-                        ? 'bg-[var(--accent)] text-white'
-                        : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                        ? 'bg-gradient-to-r from-[var(--neon-magenta)] to-[var(--neon-cyan)] text-white shadow-[0_0_20px_rgba(255,0,255,0.4)]'
+                        : 'bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] text-[var(--text-secondary)] hover:border-[var(--border-glow)]'
                     }`}
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                     </svg>
                     Filters
                     {activeFilterCount > 0 && (
-                      <span className="ml-1 px-1.5 py-0.5 bg-white/20 rounded text-xs">
+                      <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs font-bold">
                         {activeFilterCount}
                       </span>
                     )}
@@ -377,14 +377,14 @@ function ShopContent() {
                   ))}
                 </div>
               ) : products.length === 0 ? (
-                <div className="text-center py-16">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--bg-secondary)] flex items-center justify-center">
-                    <svg className="w-8 h-8 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                <div className="text-center py-20">
+                  <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] flex items-center justify-center">
+                    <svg className="w-10 h-10 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                   </div>
-                  <p className="text-[var(--text-secondary)] mb-2">No products found</p>
-                  <p className="text-sm text-[var(--text-muted)] mb-6">Try adjusting your filters</p>
+                  <p className="text-[var(--text-secondary)] mb-2 text-lg font-semibold">No products found</p>
+                  <p className="text-sm text-[var(--text-muted)] mb-8">Try adjusting your filters</p>
                   <button onClick={clearFilters} className="btn-primary">
                     Clear Filters
                   </button>

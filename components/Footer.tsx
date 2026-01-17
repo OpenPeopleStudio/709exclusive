@@ -54,26 +54,26 @@ export default function Footer() {
     'Authentic sneakers and streetwear with local delivery and pickup.'
 
   return (
-    <footer className="bg-[var(--bg-primary)]">
-      <div className="container py-8 md:py-16">
+    <footer className="bg-[var(--bg-primary)] border-t border-[var(--glass-border)]">
+      <div className="container py-12 md:py-20">
         {/* Mobile: Brand at top */}
-        <div className="mb-6 pb-6 border-b border-[var(--border-primary)] md:hidden">
+        <div className="mb-8 pb-8 border-b border-[var(--glass-border)] md:hidden">
           <Link href="/" className="inline-block">
-            <span className="text-2xl font-black tracking-tighter text-[var(--text-primary)]">
+            <span className="text-2xl font-black tracking-tighter text-gradient">
               {brandName}
             </span>
           </Link>
-          <p className="mt-3 text-sm text-[var(--text-muted)]">
+          <p className="mt-3 text-sm text-[var(--text-secondary)]">
             {tagline}
           </p>
           
           {/* Social links for mobile */}
-          <div className="flex items-center gap-4 mt-4">
+          <div className="flex items-center gap-4 mt-5">
             <a 
               href="https://instagram.com/709_exclusive" 
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+              className="flex items-center justify-center w-12 h-12 rounded-full bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-glow)] hover:shadow-[0_0_15px_rgba(255,0,255,0.3)] transition-all duration-300"
               aria-label="Instagram"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -86,12 +86,12 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-0 md:gap-12">
           {/* Brand - Desktop only */}
           <div className="hidden md:block md:col-span-1">
-            <Link href="/" className="inline-block">
-              <span className="text-2xl font-black tracking-tighter text-[var(--text-primary)]">
+            <Link href="/" className="inline-block group">
+              <span className="text-2xl font-black tracking-tighter text-gradient">
                 {brandName}
               </span>
             </Link>
-            <p className="mt-4 text-sm text-[var(--text-muted)]">
+            <p className="mt-4 text-sm text-[var(--text-secondary)] leading-relaxed">
               {settings?.content?.hero?.subhead || 'Modern resale marketplace for verified sneakers and streetwear.'}
             </p>
           </div>
@@ -175,16 +175,16 @@ export default function Footer() {
         </div>
 
         {/* Bottom */}
-        <div className="mt-8 pt-6 border-t border-[var(--border-primary)]">
+        <div className="mt-12 pt-8 border-t border-[var(--glass-border)]">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-xs text-[var(--text-muted)]">
-              © {new Date().getFullYear()} 709exclusive. All rights reserved.
+            <p className="text-xs text-[var(--text-muted)] font-medium">
+              © {new Date().getFullYear()} 709exclusive. Built with AI in 2026.
             </p>
             <div className="flex items-center gap-6">
-              <span className="text-xs text-[var(--text-muted)] cursor-pointer hover:text-[var(--text-secondary)] transition-colors">
+              <span className="text-xs text-[var(--text-muted)] cursor-pointer hover:text-[var(--text-primary)] transition-all duration-300 font-medium">
                 Privacy Policy
               </span>
-              <span className="text-xs text-[var(--text-muted)] cursor-pointer hover:text-[var(--text-secondary)] transition-colors">
+              <span className="text-xs text-[var(--text-muted)] cursor-pointer hover:text-[var(--text-primary)] transition-all duration-300 font-medium">
                 Terms of Service
               </span>
             </div>

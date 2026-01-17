@@ -49,6 +49,7 @@ export type TenantHeroContent = {
 export type TenantFeatureCard = {
   title: string
   description: string
+  icon?: string
 }
 
 export type TenantContent = {

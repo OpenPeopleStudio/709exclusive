@@ -153,47 +153,53 @@ function HeaderContent() {
       <header 
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
           isScrolled 
-            ? 'bg-[var(--bg-primary)]/90 backdrop-blur-xl border-b border-[var(--border-primary)]' 
-            : 'bg-[var(--bg-primary)]/60 backdrop-blur-xl'
+            ? 'bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] border-b border-[var(--glass-border)]' 
+            : 'bg-transparent'
         }`}
       >
         <div className="container">
           <div className="flex items-center justify-between h-20">
             {/* Logo */}
             <Link href="/" className="group flex items-center gap-2">
-              <span className="text-2xl font-semibold tracking-tight text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent)]">
+              <span className="text-2xl font-bold tracking-tight text-[var(--text-primary)] transition-all duration-300 group-hover:text-gradient">
                 {brandName}
               </span>
             </Link>
 
             {/* Center Navigation - Desktop */}
-            <nav className="hidden md:flex items-center gap-6">
+            <nav className="hidden md:flex items-center gap-8">
               <Link 
                 href="/shop" 
-                className={`text-sm font-medium transition-colors ${
+                className={`relative text-sm font-semibold transition-all duration-300 ${
                   pathname === '/shop' || pathname?.startsWith('/product')
                     ? 'text-[var(--text-primary)]'
                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
                 Shop
+                {(pathname === '/shop' || pathname?.startsWith('/product')) && (
+                  <span className="absolute -bottom-2 left-0 right-0 h-0.5 bg-gradient-to-r from-[var(--neon-magenta)] to-[var(--neon-cyan)] rounded-full" />
+                )}
               </Link>
               {featureFlags.drops !== false && (
                 <Link 
                   href="/shop?drops=true" 
-                  className={`text-sm font-medium transition-colors ${
+                  className={`relative text-sm font-semibold transition-all duration-300 ${
                     isDropsActive
                       ? 'text-[var(--text-primary)]'
                       : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
                   Drops
+                  {isDropsActive && (
+                    <span className="absolute -bottom-2 left-0 right-0 h-0.5 bg-gradient-to-r from-[var(--neon-magenta)] to-[var(--neon-cyan)] rounded-full" />
+                  )}
                 </Link>
               )}
               {(featureFlags.local_delivery || featureFlags.pickup) && (
                 <Link 
                   href="/policies/shipping" 
-                  className="text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                  className="text-sm font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all duration-300"
                 >
                   Delivery & Pickup
                 </Link>
@@ -205,10 +211,10 @@ function HeaderContent() {
               {/* Search */}
               <button
                 onClick={() => setIsSearchOpen(true)}
-                className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-white/5 transition-colors"
+                className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-white/10 transition-all duration-300 hover:shadow-[0_0_15px_rgba(255,0,255,0.3)]"
                 aria-label="Search"
               >
-                <svg className="w-5 h-5 text-[var(--text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                <svg className="w-5 h-5 text-[var(--text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
                 </svg>
               </button>
@@ -216,14 +222,14 @@ function HeaderContent() {
               {/* Cart */}
               <Link 
                 href="/cart" 
-                className="relative flex items-center justify-center w-10 h-10 rounded-full hover:bg-white/5 transition-colors"
+                className="relative flex items-center justify-center w-10 h-10 rounded-full hover:bg-white/10 transition-all duration-300 hover:shadow-[0_0_15px_rgba(0,240,255,0.3)]"
               >
                 <svg 
                   className="w-[22px] h-[22px] text-[var(--text-primary)]" 
                   fill="none" 
                   stroke="currentColor" 
                   viewBox="0 0 24 24"
-                  strokeWidth={1.5}
+                  strokeWidth={2}
                 >
                   <path 
                     strokeLinecap="round" 
@@ -232,7 +238,7 @@ function HeaderContent() {
                   />
                 </svg>
                 {isHydrated && itemCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center bg-[var(--accent)] text-white text-[10px] font-bold rounded-full px-1">
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[20px] h-[20px] flex items-center justify-center bg-gradient-to-r from-[var(--neon-magenta)] to-[var(--neon-cyan)] text-white text-[10px] font-bold rounded-full px-1 shadow-[0_0_10px_rgba(255,0,255,0.5)]">
                     {itemCount > 99 ? '99+' : itemCount}
                   </span>
                 )}
@@ -312,20 +318,20 @@ function HeaderContent() {
           {/* Menu Panel */}
           <div 
             ref={menuRef}
-            className={`fixed top-0 right-0 bottom-0 z-40 w-full max-w-sm bg-[var(--bg-primary)] md:hidden shadow-2xl transition-transform duration-300 ease-out ${
+            className={`fixed top-0 right-0 bottom-0 z-40 w-full max-w-sm bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] md:hidden shadow-2xl border-l border-[var(--glass-border)] transition-transform duration-300 ease-out ${
               isClosing ? 'translate-x-full' : 'translate-x-0'
             }`}
             style={{ paddingTop: 'var(--safe-area-top, 0px)' }}
           >
             {/* Menu Header */}
-            <div className="flex items-center justify-between h-20 px-6 border-b border-[var(--border-primary)]">
-              <span className="text-lg font-semibold text-[var(--text-primary)]">Menu</span>
+            <div className="flex items-center justify-between h-20 px-6 border-b border-[var(--glass-border)]">
+              <span className="text-lg font-bold text-gradient">Menu</span>
               <button
-                className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-white/5 transition-colors"
+                className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-white/10 transition-all duration-300"
                 onClick={closeMobileMenu}
                 aria-label="Close menu"
               >
-                <svg className="w-5 h-5 text-[var(--text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                <svg className="w-5 h-5 text-[var(--text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -337,17 +343,17 @@ function HeaderContent() {
               <div className="space-y-1">
                 <Link 
                   href="/" 
-                  className={`flex items-center gap-4 px-4 py-4 rounded-xl transition-colors ${
+                  className={`flex items-center gap-4 px-4 py-4 rounded-2xl transition-all duration-300 ${
                     pathname === '/' 
-                      ? 'bg-[var(--accent)]/10 text-[var(--accent)]' 
-                      : 'text-[var(--text-primary)] hover:bg-white/5'
+                      ? 'bg-gradient-to-r from-[var(--neon-magenta)]/20 to-[var(--neon-cyan)]/20 text-[var(--text-primary)] border border-[var(--border-glow)]' 
+                      : 'text-[var(--text-primary)] hover:bg-white/10'
                   }`}
                   onClick={closeMobileMenu}
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />
                   </svg>
-                  <span className="text-lg font-medium">Shop</span>
+                  <span className="text-lg font-semibold">Shop</span>
                 </Link>
 
                 {featureFlags.drops !== false && (

@@ -162,8 +162,8 @@ export default function Home() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-[var(--text-secondary)]">Signing you in...</p>
+          <div className="w-12 h-12 border-3 border-transparent border-t-[var(--neon-magenta)] border-r-[var(--neon-cyan)] rounded-full animate-spin mx-auto mb-4 shadow-[0_0_30px_rgba(255,0,255,0.5)]"></div>
+          <p className="text-[var(--text-secondary)] font-medium">Signing you in...</p>
         </div>
       </div>
     )
@@ -174,22 +174,33 @@ export default function Home() {
       <Header />
 
       {/* Hero Section */}
-      <section className="pt-28 pb-16 md:pt-40 md:pb-24">
-        <div className="container">
-          <div className="max-w-3xl space-y-6">
-            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">
+      <section className="relative pt-32 pb-20 md:pt-48 md:pb-32 overflow-hidden">
+        {/* Background gradient */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[var(--neon-magenta)]/5 to-transparent pointer-events-none" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-[var(--neon-cyan)]/10 rounded-full blur-[120px] pointer-events-none" />
+        
+        <div className="container relative">
+          <div className="max-w-4xl space-y-8">
+            <p className="text-xs uppercase tracking-[0.2em] font-bold text-gradient animate-pulse">
               {hero?.eyebrow || brandName}
             </p>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-semibold text-[var(--text-primary)] leading-tight">
-              {hero?.headline || 'Authentic sneakers with local delivery and pickup.'}
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-black text-[var(--text-primary)] leading-[1.05] tracking-tight">
+              {hero?.headline || (
+                <>
+                  Authentic sneakers <span className="text-gradient">with local delivery</span>
+                </>
+              )}
             </h1>
-            <p className="text-base md:text-lg text-[var(--text-secondary)] max-w-xl">
+            <p className="text-lg md:text-xl text-[var(--text-secondary)] max-w-2xl leading-relaxed">
               {hero?.subhead ||
                 "A modern resale marketplace built for Newfoundland. Shop verified inventory, pay with card or crypto, and track every order in one place."}
             </p>
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col sm:flex-row gap-4 pt-4">
               <Button href={hero?.primary_cta?.href || "/shop"} variant="primary">
                 {hero?.primary_cta?.label || "Browse inventory"}
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
               </Button>
               <Button href={hero?.secondary_cta?.href || "/shop?sort=newest"} variant="secondary">
                 {hero?.secondary_cta?.label || "New arrivals"}
@@ -200,16 +211,21 @@ export default function Home() {
       </section>
 
       {/* Products Section */}
-      <section className="py-12 md:py-20 flex-1">
+      <section className="py-16 md:py-24 flex-1">
         <div className="container">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-10">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">Latest</p>
-              <h2 className="text-2xl md:text-3xl font-semibold text-[var(--text-primary)]">
+              <p className="text-xs uppercase tracking-[0.2em] font-bold text-gradient mb-2">Latest</p>
+              <h2 className="text-3xl md:text-4xl font-black text-[var(--text-primary)]">
                 Recently added inventory
               </h2>
             </div>
-            <Button href="/shop" variant="ghost">View all</Button>
+            <Button href="/shop" variant="ghost">
+              View all
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </Button>
           </div>
 
           {loading ? (
@@ -219,13 +235,13 @@ export default function Home() {
               ))}
             </div>
           ) : products.length === 0 ? (
-            <div className="text-center py-20">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--bg-secondary)] flex items-center justify-center">
-                <svg className="w-8 h-8 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            <div className="text-center py-24">
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] flex items-center justify-center">
+                <svg className="w-10 h-10 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
               </div>
-              <p className="text-[var(--text-muted)] mb-2">No products available yet</p>
+              <p className="text-[var(--text-secondary)] mb-2 text-lg font-semibold">No products available yet</p>
               <p className="text-sm text-[var(--text-muted)]">Check back soon for new arrivals</p>
             </div>
           ) : (
@@ -239,17 +255,30 @@ export default function Home() {
       </section>
 
       {/* Features Section */}
-      <section className="py-12 md:py-20 border-t border-[var(--border-primary)]">
+      <section className="py-16 md:py-24 border-t border-[var(--glass-border)]">
         <div className="container">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
             {(featureCards && featureCards.length > 0 ? featureCards : [
-              { title: 'Local delivery', description: "Same-day in St. John's with real-time order updates." },
-              { title: 'Pickup ready', description: "Skip the wait and pick up in-store as soon as it's verified." },
-              { title: 'Card + crypto', description: 'Pay with Stripe cards or NOWPayments crypto at checkout.' },
+              { 
+                title: 'Local delivery', 
+                description: "Same-day in St. John's with real-time order updates.",
+                icon: '🚀'
+              },
+              { 
+                title: 'Pickup ready', 
+                description: "Skip the wait and pick up in-store as soon as it's verified.",
+                icon: '⚡'
+              },
+              { 
+                title: 'Card + crypto', 
+                description: 'Pay with Stripe cards or NOWPayments crypto at checkout.',
+                icon: '💎'
+              },
             ]).map((feature) => (
-              <Surface key={feature.title} padding="lg">
-                <h3 className="font-semibold text-[var(--text-primary)] mb-2">{feature.title}</h3>
-                <p className="text-sm text-[var(--text-secondary)]">{feature.description}</p>
+              <Surface key={feature.title} padding="lg" className="group">
+                <div className="mb-4 text-3xl">{feature.icon || '✨'}</div>
+                <h3 className="font-bold text-xl text-[var(--text-primary)] mb-3 group-hover:text-gradient transition-all duration-300">{feature.title}</h3>
+                <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{feature.description}</p>
               </Surface>
             ))}
           </div>

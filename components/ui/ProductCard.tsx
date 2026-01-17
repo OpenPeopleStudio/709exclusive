@@ -59,13 +59,13 @@ export default function ProductCard({
   return (
     <Link href={`/product/${product.slug}`} className="group block">
       {/* Image Container */}
-      <div className="relative aspect-square bg-[var(--bg-secondary)] rounded-lg overflow-hidden mb-3">
+      <div className="relative aspect-square bg-[var(--bg-secondary)] rounded-2xl overflow-hidden mb-4 border border-[var(--glass-border)] group-hover:border-[var(--border-glow)] transition-all duration-300">
         {product.primary_image ? (
           <Image
             src={product.primary_image}
             alt={product.name}
             fill
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
+            className="object-cover transition-all duration-500 group-hover:scale-110"
             sizes={size === 'small' ? '(max-width: 768px) 40vw, 200px' : '(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw'}
             unoptimized
           />
@@ -76,6 +76,9 @@ export default function ProductCard({
             </svg>
           </div>
         )}
+        
+        {/* Gradient overlay on hover */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
         {/* Badges - Top Left */}
         <div className="absolute top-2 left-2 flex flex-col gap-1">
@@ -92,10 +95,10 @@ export default function ProductCard({
         {showWishlist && (
           <button
             onClick={handleWishlistClick}
-            className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+            className={`absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 backdrop-blur-xl ${
               isWishlisted 
-                ? 'bg-[var(--accent)] opacity-100' 
-                : 'bg-black/50 opacity-0 group-hover:opacity-100'
+                ? 'bg-gradient-to-r from-[var(--neon-magenta)] to-[var(--neon-cyan)] opacity-100 shadow-[0_0_20px_rgba(255,0,255,0.5)]' 
+                : 'bg-black/30 border border-white/20 opacity-0 group-hover:opacity-100'
             }`}
             aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
           >
@@ -104,11 +107,11 @@ export default function ProductCard({
               fill={isWishlisted ? 'currentColor' : 'none'} 
               stroke="currentColor" 
               viewBox="0 0 24 24"
+              strokeWidth={2}
             >
               <path 
                 strokeLinecap="round" 
                 strokeLinejoin="round" 
-                strokeWidth={2} 
                 d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
               />
             </svg>
@@ -117,23 +120,23 @@ export default function ProductCard({
       </div>
 
       {/* Product Info */}
-      <div className={size === 'small' ? 'space-y-0.5' : 'space-y-1'}>
+      <div className={size === 'small' ? 'space-y-1' : 'space-y-2'}>
         {/* Brand */}
-        <p className={`text-[var(--text-muted)] ${size === 'small' ? 'text-xs' : 'text-sm'}`}>
+        <p className={`font-bold uppercase tracking-wider text-[var(--text-muted)] ${size === 'small' ? 'text-[10px]' : 'text-xs'}`}>
           {product.brand}
         </p>
         
         {/* Name */}
-        <h3 className={`font-medium text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors line-clamp-2 ${
-          size === 'small' ? 'text-sm' : ''
+        <h3 className={`font-semibold text-[var(--text-primary)] group-hover:text-gradient transition-all duration-300 line-clamp-2 ${
+          size === 'small' ? 'text-sm' : 'text-base'
         }`}>
           {product.name}
         </h3>
         
         {/* Price */}
         <div className="flex items-center gap-2">
-          <span className={`font-semibold text-[var(--text-primary)] ${size === 'small' ? 'text-sm' : ''}`}>
-            From ${(product.lowest_price_cents / 100).toFixed(0)}
+          <span className={`font-bold bg-gradient-to-r from-[var(--neon-magenta)] to-[var(--neon-cyan)] bg-clip-text text-transparent ${size === 'small' ? 'text-base' : 'text-lg'}`}>
+            ${(product.lowest_price_cents / 100).toFixed(0)}
           </span>
           {product.last_sold_cents && product.last_sold_cents !== product.lowest_price_cents && (
             <span className="text-sm text-[var(--text-muted)] line-through">
@@ -157,10 +160,10 @@ export default function ProductCard({
 export function ProductCardSkeleton({ size = 'default' }: { size?: 'default' | 'small' }) {
   return (
     <div className="animate-pulse">
-      <div className="aspect-square bg-[var(--bg-secondary)] rounded-lg mb-3" />
-      <div className={`bg-[var(--bg-secondary)] rounded w-1/3 mb-2 ${size === 'small' ? 'h-3' : 'h-4'}`} />
-      <div className={`bg-[var(--bg-secondary)] rounded w-2/3 mb-2 ${size === 'small' ? 'h-4' : 'h-5'}`} />
-      <div className={`bg-[var(--bg-secondary)] rounded w-1/4 ${size === 'small' ? 'h-3' : 'h-4'}`} />
+      <div className="aspect-square bg-[var(--bg-secondary)] rounded-2xl mb-4 border border-[var(--glass-border)]" />
+      <div className={`bg-gradient-to-r from-[var(--bg-secondary)] via-[var(--bg-tertiary)] to-[var(--bg-secondary)] bg-[length:200%_100%] animate-[skeleton-pulse_1.5s_ease-in-out_infinite] rounded w-1/3 mb-2 ${size === 'small' ? 'h-3' : 'h-4'}`} />
+      <div className={`bg-gradient-to-r from-[var(--bg-secondary)] via-[var(--bg-tertiary)] to-[var(--bg-secondary)] bg-[length:200%_100%] animate-[skeleton-pulse_1.5s_ease-in-out_infinite] rounded w-2/3 mb-2 ${size === 'small' ? 'h-4' : 'h-5'}`} />
+      <div className={`bg-gradient-to-r from-[var(--bg-secondary)] via-[var(--bg-tertiary)] to-[var(--bg-secondary)] bg-[length:200%_100%] animate-[skeleton-pulse_1.5s_ease-in-out_infinite] rounded w-1/4 ${size === 'small' ? 'h-3' : 'h-4'}`} />
     </div>
   )
 }

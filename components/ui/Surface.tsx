@@ -4,9 +4,9 @@ type SurfaceVariant = 'default' | 'elevated' | 'outline'
 type SurfacePadding = 'none' | 'sm' | 'md' | 'lg'
 
 const variants: Record<SurfaceVariant, string> = {
-  default: 'bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-[var(--radius-xl)]',
-  elevated: 'bg-[var(--bg-tertiary)] border border-[var(--border-secondary)] rounded-[var(--radius-xl)]',
-  outline: 'border border-[var(--border-primary)] rounded-[var(--radius-xl)]',
+  default: 'bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] border border-[var(--glass-border)] rounded-[var(--radius-2xl)] transition-all duration-300 hover:border-[var(--border-glow)] hover:shadow-[0_0_20px_rgba(255,0,255,0.2)]',
+  elevated: 'bg-[var(--bg-tertiary)] border border-[var(--border-secondary)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-soft)] transition-all duration-300',
+  outline: 'border border-[var(--glass-border)] rounded-[var(--radius-2xl)] transition-all duration-300 hover:border-[var(--border-glow)]',
 }
 
 const padding: Record<SurfacePadding, string> = {
