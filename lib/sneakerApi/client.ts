@@ -11,6 +11,7 @@
 
 import type { NormalizedSneaker, SneakerSearchResult, MarketReference, SneakerApiProvider } from './types'
 import { kicksdbProvider } from './providers/kicksdb'
+import { sneaksProvider } from './providers/sneaks'
 import { manualProvider } from './providers/manual'
 
 // In-memory cache (ephemeral - cleared on restart)
@@ -20,17 +21,19 @@ const CACHE_TTL_MS = 15 * 60 * 1000 // 15 minutes
 // Provider registry
 const providers: Record<string, SneakerApiProvider> = {
   kicksdb: kicksdbProvider,
+  sneaks: sneaksProvider,
   manual: manualProvider
 }
 
 function getActiveProvider(): SneakerApiProvider {
-  // Check which provider is configured
+  // Check which provider is configured (in priority order)
   if (process.env.KICKSDB_API_KEY) {
     return providers.kicksdb
   }
   
-  // Fallback to manual (no external API)
-  return providers.manual
+  // Try sneaks-api as fallback (no API key needed)
+  // It will return empty if the package isn't available
+  return providers.sneaks
 }
 
 function getCacheKey(query: string): string {

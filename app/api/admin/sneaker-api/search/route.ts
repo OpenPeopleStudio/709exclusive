@@ -82,3 +82,49 @@ export async function POST(request: Request) {
     )
   }
 }
+
+// GET handler for simple searches (used by inventory lookup)
+export async function GET(request: Request) {
+  const supabase = await createSupabaseServer()
+  const tenant = await getTenantFromRequest(request)
+  const auth = await checkAdminAuth(supabase, tenant?.id)
+
+  if ('error' in auth) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status })
+  }
+
+  try {
+    const { searchParams } = new URL(request.url)
+    const query = searchParams.get('q')
+    const limit = parseInt(searchParams.get('limit') || '10')
+
+    if (!query) {
+      return NextResponse.json(
+        { error: 'Query parameter "q" is required' },
+        { status: 400 }
+      )
+    }
+
+    // Search sneaker API
+    const searchResult = await searchSneakers(query.trim(), Math.min(limit, 20))
+
+    // Transform to simpler format for inventory lookup
+    const results = searchResult.results.map(sneaker => ({
+      name: `${sneaker.model}${sneaker.colorway ? ` — ${sneaker.colorway}` : ''}`,
+      brand: sneaker.brand,
+      imageUrl: sneaker.externalImageUrl,
+      sku: sneaker.sku,
+      colorway: sneaker.colorway,
+      retailPrice: sneaker.retailPriceCents ? sneaker.retailPriceCents / 100 : null,
+      releaseDate: sneaker.releaseDate
+    }))
+
+    return NextResponse.json({ results })
+  } catch (error) {
+    console.error('Sneaker API search error:', error)
+    return NextResponse.json(
+      { error: 'Search failed' },
+      { status: 500 }
+    )
+  }
+}

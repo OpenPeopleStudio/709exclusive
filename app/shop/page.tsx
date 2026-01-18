@@ -30,6 +30,7 @@ function ShopContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const compactSearchRef = useRef<HTMLInputElement>(null)
   const initialSearch = searchParams.get('search') || ''
   
   const [products, setProducts] = useState<Product[]>([])
@@ -37,6 +38,7 @@ function ShopContent() {
   const [loading, setLoading] = useState(true)
   const [showFilters, setShowFilters] = useState(false)
   const [searchFocused, setSearchFocused] = useState(false)
+  const [isScrolled, setIsScrolled] = useState(false)
   const [currentTime, setCurrentTime] = useState(() => Date.now())
   const [filters, setFilters] = useState<Filters>({
     search: initialSearch,
@@ -53,6 +55,15 @@ function ShopContent() {
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(Date.now()), 60000)
     return () => clearInterval(interval)
+  }, [])
+
+  // Track scroll position for compact header
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 100)
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
   useEffect(() => {
@@ -157,93 +168,150 @@ function ShopContent() {
       <Header />
 
       <main className="flex-1 pt-20 pb-24 md:pb-16">
-        {/* Search Header - Sticky on mobile */}
-        <div className="sticky top-20 z-40 bg-[var(--bg-primary)] border-b border-[var(--border-primary)]">
+        {/* Sticky Header - Switches between full and compact */}
+        <div className={`sticky top-20 z-40 transition-all duration-300 ${
+          isScrolled 
+            ? 'bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] border-b border-[var(--glass-border)]' 
+            : 'bg-[var(--bg-primary)] border-b border-[var(--border-primary)]'
+        }`}>
           <div className="container py-4">
-            {/* Search Bar */}
-            <div className={`relative transition-all duration-200 ${searchFocused ? 'scale-[1.02]' : ''}`}>
-              <div className={`flex items-center bg-[var(--bg-secondary)] rounded-2xl border-2 transition-all duration-200 ${
-                searchFocused 
-                  ? 'border-[var(--accent)] shadow-[0_0_0_4px_rgba(225,6,0,0.1)]' 
-                  : 'border-transparent'
-              }`}>
-                <svg 
-                  className={`w-5 h-5 ml-4 transition-colors ${searchFocused ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'}`} 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={filters.search}
-                  onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-                  onFocus={() => setSearchFocused(true)}
-                  onBlur={() => setSearchFocused(false)}
-                  placeholder="Search sneakers, brands..."
-                  className="flex-1 bg-transparent px-3 py-4 text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none text-base"
-                />
-                {filters.search && (
-                  <button
-                    onClick={clearSearch}
-                    className="p-2 mr-2 rounded-full hover:bg-[var(--bg-tertiary)] transition-colors"
+            {/* Compact Search Bar (when scrolled) */}
+            <div className={`transition-all duration-300 overflow-hidden ${isScrolled ? 'max-h-14 opacity-100' : 'max-h-0 opacity-0'}`}>
+              <div className="flex items-center justify-center gap-2">
+                <div className="flex items-center w-48 md:w-64 bg-[var(--bg-secondary)]/80 rounded-full border border-[var(--glass-border)]">
+                  <svg 
+                    className="w-4 h-4 ml-3 text-[var(--text-muted)] flex-shrink-0" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
                   >
-                    <svg className="w-5 h-5 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                )}
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input
+                    ref={compactSearchRef}
+                    type="text"
+                    value={filters.search}
+                    onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                    placeholder="Search..."
+                    className="w-full bg-transparent px-2 py-2 text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none text-sm"
+                  />
+                  {filters.search && (
+                    <button
+                      onClick={clearSearch}
+                      className="p-1 mr-2 rounded-full hover:bg-[var(--bg-tertiary)] transition-colors flex-shrink-0"
+                    >
+                      <svg className="w-3.5 h-3.5 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`relative p-2 rounded-full transition-all flex-shrink-0 ${
+                    showFilters || activeFilterCount > 0
+                      ? 'bg-[var(--accent)] text-white'
+                      : 'bg-[var(--bg-secondary)]/80 border border-[var(--glass-border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                  </svg>
+                  {activeFilterCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-[var(--accent)] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
               </div>
             </div>
 
-            {/* Filter Row */}
-            <div className="flex items-center gap-3 mt-4 overflow-x-auto pb-1 scrollbar-hide">
-              {/* Filter Toggle */}
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
-                  showFilters || activeFilterCount > 0
-                    ? 'bg-[var(--accent)] text-white'
-                    : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
-                }`}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                </svg>
-                Filters
-                {activeFilterCount > 0 && (
-                  <span className="bg-white/20 px-1.5 py-0.5 rounded-full text-xs">{activeFilterCount}</span>
-                )}
-              </button>
+            {/* Full Search Bar (when at top) */}
+            <div className={`transition-all duration-300 overflow-hidden ${isScrolled ? 'max-h-0 opacity-0' : 'max-h-32 opacity-100'}`}>
+              <div className={`relative transition-all duration-200 ${searchFocused ? 'scale-[1.02]' : ''}`}>
+                <div className={`flex items-center bg-[var(--bg-secondary)] rounded-2xl border-2 transition-all duration-200 ${
+                  searchFocused 
+                    ? 'border-[var(--accent)] shadow-[0_0_0_4px_rgba(225,6,0,0.1)]' 
+                    : 'border-transparent'
+                }`}>
+                  <svg 
+                    className={`w-5 h-5 ml-4 transition-colors ${searchFocused ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'}`} 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={filters.search}
+                    onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                    onFocus={() => setSearchFocused(true)}
+                    onBlur={() => setSearchFocused(false)}
+                    placeholder="Search sneakers, brands..."
+                    className="flex-1 bg-transparent px-3 py-4 text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none text-base"
+                  />
+                  {filters.search && (
+                    <button
+                      onClick={clearSearch}
+                      className="p-2 mr-2 rounded-full hover:bg-[var(--bg-tertiary)] transition-colors"
+                    >
+                      <svg className="w-5 h-5 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </div>
 
-              {/* Sort Dropdown */}
-              <select
-                value={filters.sort}
-                onChange={(e) => setFilters(prev => ({ ...prev, sort: e.target.value as Filters['sort'] }))}
-                className="px-4 py-2.5 rounded-full text-sm font-medium bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-0 focus:ring-2 focus:ring-[var(--accent)] cursor-pointer"
-              >
-                <option value="newest">Newest</option>
-                <option value="popular">Popular</option>
-                <option value="price_low">Price: Low</option>
-                <option value="price_high">Price: High</option>
-              </select>
-
-              {/* Quick Brand Filters */}
-              {brands.slice(0, 5).map(brand => (
+              {/* Filter Row */}
+              <div className="flex items-center gap-3 mt-4 overflow-x-auto pb-1 scrollbar-hide">
+                {/* Filter Toggle */}
                 <button
-                  key={brand}
-                  onClick={() => toggleBrand(brand)}
-                  className={`px-4 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
-                    filters.brands.includes(brand)
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+                    showFilters || activeFilterCount > 0
                       ? 'bg-[var(--accent)] text-white'
                       : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
                   }`}
                 >
-                  {brand}
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                  </svg>
+                  Filters
+                  {activeFilterCount > 0 && (
+                    <span className="bg-white/20 px-1.5 py-0.5 rounded-full text-xs">{activeFilterCount}</span>
+                  )}
                 </button>
-              ))}
+
+                {/* Sort Dropdown */}
+                <select
+                  value={filters.sort}
+                  onChange={(e) => setFilters(prev => ({ ...prev, sort: e.target.value as Filters['sort'] }))}
+                  className="px-4 py-2.5 rounded-full text-sm font-medium bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-0 focus:ring-2 focus:ring-[var(--accent)] cursor-pointer"
+                >
+                  <option value="newest">Newest</option>
+                  <option value="popular">Popular</option>
+                  <option value="price_low">Price: Low</option>
+                  <option value="price_high">Price: High</option>
+                </select>
+
+                {/* Quick Brand Filters */}
+                {brands.slice(0, 5).map(brand => (
+                  <button
+                    key={brand}
+                    onClick={() => toggleBrand(brand)}
+                    className={`px-4 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+                      filters.brands.includes(brand)
+                        ? 'bg-[var(--accent)] text-white'
+                        : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                    }`}
+                  >
+                    {brand}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
