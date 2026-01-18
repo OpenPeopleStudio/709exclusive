@@ -274,12 +274,13 @@ export default function CustomerProfileModal({
                   <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Amount ($)</label>
                   <input
                     type="number"
+                    inputMode="decimal"
                     value={paymentAmount}
                     onChange={(e) => setPaymentAmount(e.target.value)}
-                    placeholder="0.00"
+                    placeholder=""
                     step="0.01"
                     min="0"
-                    className="w-full px-4 py-2 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-primary)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--neon-magenta)]"
+                    className="w-full px-4 py-3 min-h-[44px] rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-primary)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--neon-magenta)]"
                   />
                 </div>
                 <div>

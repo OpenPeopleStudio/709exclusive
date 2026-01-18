@@ -372,25 +372,27 @@ function ShopContent() {
               <div>
                 <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">Price Range</h3>
                 <div className="flex items-center gap-3 max-w-xs">
-                  <div className="relative flex-1">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">$</span>
+                  <div className="relative flex-1 min-w-0">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm pointer-events-none">$</span>
                     <input
                       type="number"
+                      inputMode="decimal"
                       value={filters.priceMin}
                       onChange={(e) => setFilters(prev => ({ ...prev, priceMin: e.target.value }))}
                       placeholder="Min"
-                      className="w-full pl-7 py-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-primary)] text-sm"
+                      className="w-full pl-8 pr-3 py-3 min-h-[44px] rounded-xl bg-[var(--bg-primary)] border border-[var(--border-primary)] text-sm"
                     />
                   </div>
-                  <span className="text-[var(--text-muted)]">–</span>
-                  <div className="relative flex-1">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">$</span>
+                  <span className="text-[var(--text-muted)] flex-shrink-0">–</span>
+                  <div className="relative flex-1 min-w-0">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm pointer-events-none">$</span>
                     <input
                       type="number"
+                      inputMode="decimal"
                       value={filters.priceMax}
                       onChange={(e) => setFilters(prev => ({ ...prev, priceMax: e.target.value }))}
                       placeholder="Max"
-                      className="w-full pl-7 py-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-primary)] text-sm"
+                      className="w-full pl-8 pr-3 py-3 min-h-[44px] rounded-xl bg-[var(--bg-primary)] border border-[var(--border-primary)] text-sm"
                     />
                   </div>
                 </div>

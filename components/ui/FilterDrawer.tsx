@@ -162,25 +162,27 @@ export default function FilterDrawer({
             <div>
               <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">Price Range</h3>
               <div className="flex items-center gap-3">
-                <div className="relative flex-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">$</span>
+                <div className="relative flex-1 min-w-0">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm pointer-events-none">$</span>
                   <input
                     type="number"
+                    inputMode="decimal"
                     value={priceMin}
                     onChange={(e) => onPriceMinChange(e.target.value)}
                     placeholder="Min"
-                    className="pl-7 py-3"
+                    className="w-full pl-8 pr-3 py-3 min-h-[44px]"
                   />
                 </div>
-                <span className="text-[var(--text-muted)]">–</span>
-                <div className="relative flex-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">$</span>
+                <span className="text-[var(--text-muted)] flex-shrink-0">–</span>
+                <div className="relative flex-1 min-w-0">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm pointer-events-none">$</span>
                   <input
                     type="number"
+                    inputMode="decimal"
                     value={priceMax}
                     onChange={(e) => onPriceMaxChange(e.target.value)}
                     placeholder="Max"
-                    className="pl-7 py-3"
+                    className="w-full pl-8 pr-3 py-3 min-h-[44px]"
                   />
                 </div>
               </div>

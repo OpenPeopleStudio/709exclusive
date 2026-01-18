@@ -1018,11 +1018,12 @@ function ShippingMethodRow({ method, onUpdate }: {
           <span className="text-sm text-[var(--text-muted)]">$</span>
           <input
             type="number"
+            inputMode="decimal"
             step="0.01"
             min="0"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="text-sm w-28"
+            className="text-sm w-full min-w-[80px] max-w-[120px] min-h-[40px] py-2"
           />
         </div>
       </td>
@@ -1039,9 +1040,10 @@ function ShippingMethodRow({ method, onUpdate }: {
       <td className="px-4 py-3">
         <input
           type="number"
+          inputMode="numeric"
           value={sortOrder}
           onChange={(e) => setSortOrder(e.target.value)}
-          className="text-sm w-20"
+          className="text-sm w-full min-w-[60px] max-w-[80px] min-h-[40px] py-2"
         />
       </td>
       <td className="px-4 py-3">

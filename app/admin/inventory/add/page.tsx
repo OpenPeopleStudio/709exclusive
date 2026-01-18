@@ -370,16 +370,17 @@ export default function AddShoePage() {
                   Price (CAD) *
                 </label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">$</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none">$</span>
                   <input
                     type="number"
+                    inputMode="decimal"
                     step="1"
                     min="0"
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
-                    placeholder="0"
+                    placeholder=""
                     required
-                    className="w-full pl-8 pr-4 py-3 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:outline-none"
+                    className="w-full pl-9 pr-4 py-3 min-h-[44px] rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:outline-none"
                   />
                 </div>
               </div>
@@ -390,10 +391,11 @@ export default function AddShoePage() {
                 </label>
                 <input
                   type="number"
+                  inputMode="numeric"
                   min="1"
                   value={stock}
                   onChange={(e) => setStock(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-primary)] text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                  className="w-full px-4 py-3 min-h-[44px] rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-primary)] text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
                 />
               </div>
             </div>

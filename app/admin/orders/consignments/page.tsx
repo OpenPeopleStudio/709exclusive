@@ -500,15 +500,16 @@ function PayoutModal({ consignor, onClose, onSuccess }: { consignor: Consignor; 
           <div>
             <label>Payout Amount</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none">$</span>
               <input
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 min="0.01"
                 max={(consignor.balance_cents / 100).toFixed(2)}
                 value={amount}
                 onChange={e => setAmount(e.target.value)}
-                className="pl-8"
+                className="pl-8 min-h-[44px]"
                 required
               />
             </div>

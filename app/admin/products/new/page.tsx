@@ -415,6 +415,7 @@ export default function NewProductPage() {
                     </label>
                     <input
                       type="number"
+                      inputMode="decimal"
                       value={variant.price_cents === null ? '' : variant.price_cents / 100}
                       onChange={(e) => {
                         const raw = e.target.value
@@ -429,9 +430,9 @@ export default function NewProductPage() {
                         }
                         updateVariant(index, 'price_cents', Math.round(parsed * 100))
                       }}
-                      placeholder="0.00"
+                      placeholder=""
                       step="0.01"
-                      className="w-full px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)] text-sm"
+                      className="w-full px-3 py-2 min-h-[44px] rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)] text-sm"
                     />
                   </div>
 
@@ -441,6 +442,7 @@ export default function NewProductPage() {
                     </label>
                     <input
                       type="number"
+                      inputMode="numeric"
                       value={variant.stock === null ? '' : variant.stock}
                       onChange={(e) => {
                         const raw = e.target.value
@@ -456,7 +458,7 @@ export default function NewProductPage() {
                         updateVariant(index, 'stock', parsed)
                       }}
                       min="0"
-                      className="w-full px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)] text-sm"
+                      className="w-full px-3 py-2 min-h-[44px] rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)] text-sm"
                     />
                   </div>
 

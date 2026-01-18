@@ -478,15 +478,16 @@ function VariantGenerator({ models, onModelsUpdate }: { models: ProductModel[]; 
           <div>
             <label>Base Price (for DS condition)</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm pointer-events-none">$</span>
               <input
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 min="0"
                 value={basePrice}
                 onChange={(e) => setBasePrice(e.target.value)}
-                placeholder="0.00"
-                className="pl-8"
+                placeholder=""
+                className="pl-8 min-h-[44px]"
               />
             </div>
           </div>
@@ -494,10 +495,12 @@ function VariantGenerator({ models, onModelsUpdate }: { models: ProductModel[]; 
             <label>Default Stock Per Variant</label>
             <input
               type="number"
+              inputMode="numeric"
               min="0"
               value={defaultStock}
               onChange={(e) => setDefaultStock(e.target.value)}
-              placeholder="1"
+              placeholder=""
+              className="min-h-[44px]"
             />
           </div>
         </div>
@@ -562,24 +565,26 @@ function VariantGenerator({ models, onModelsUpdate }: { models: ProductModel[]; 
                     <td className="px-4 py-3 font-medium text-[var(--text-primary)]">{variant.size}</td>
                     <td className="px-4 py-3 text-[var(--text-secondary)]">{variant.condition}</td>
                     <td className="px-4 py-3">
-                      <div className="relative w-24">
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm">$</span>
+                      <div className="relative w-full min-w-[80px] max-w-[120px]">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm pointer-events-none">$</span>
                         <input
                           type="number"
+                          inputMode="decimal"
                           step="0.01"
                           value={(variant.price / 100).toFixed(2)}
                           onChange={(e) => updateVariantPrice(variant.id, Math.round(parseFloat(e.target.value) * 100))}
-                          className="pl-6 py-1 text-sm"
+                          className="w-full pl-6 pr-2 py-2 text-sm min-h-[40px]"
                         />
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <input
                         type="number"
+                        inputMode="numeric"
                         min="0"
                         value={variant.stock}
                         onChange={(e) => updateVariantStock(variant.id, parseInt(e.target.value) || 0)}
-                        className="w-16 py-1 text-sm"
+                        className="w-full min-w-[60px] max-w-[80px] py-2 text-sm min-h-[40px]"
                       />
                     </td>
                     <td className="px-4 py-3">
@@ -1066,7 +1071,7 @@ function ImportPreviewTable({
                     type="text"
                     value={row.brand}
                     onChange={(e) => updateRow(row.id, 'brand', e.target.value)}
-                    className={`w-24 py-1 text-sm ${row.errors.some(e => e.includes('Brand')) ? 'border-[var(--error)]' : ''}`}
+                    className={`w-full min-w-[70px] max-w-[100px] py-2 text-sm min-h-[40px] ${row.errors.some(e => e.includes('Brand')) ? 'border-[var(--error)]' : ''}`}
                     disabled={row.status === 'imported'}
                   />
                 </td>
@@ -1075,7 +1080,7 @@ function ImportPreviewTable({
                     type="text"
                     value={row.model}
                     onChange={(e) => updateRow(row.id, 'model', e.target.value)}
-                    className={`w-32 py-1 text-sm ${row.errors.some(e => e.includes('Model')) ? 'border-[var(--error)]' : ''}`}
+                    className={`w-full min-w-[80px] max-w-[140px] py-2 text-sm min-h-[40px] ${row.errors.some(e => e.includes('Model')) ? 'border-[var(--error)]' : ''}`}
                     disabled={row.status === 'imported'}
                   />
                 </td>
@@ -1084,7 +1089,7 @@ function ImportPreviewTable({
                     type="text"
                     value={row.size}
                     onChange={(e) => updateRow(row.id, 'size', e.target.value)}
-                    className={`w-16 py-1 text-sm ${row.errors.some(e => e.includes('Size')) ? 'border-[var(--error)]' : ''}`}
+                    className={`w-full min-w-[50px] max-w-[70px] py-2 text-sm min-h-[40px] ${row.errors.some(e => e.includes('Size')) ? 'border-[var(--error)]' : ''}`}
                     disabled={row.status === 'imported'}
                   />
                 </td>
@@ -1092,7 +1097,7 @@ function ImportPreviewTable({
                   <select
                     value={row.condition}
                     onChange={(e) => updateRow(row.id, 'condition', e.target.value)}
-                    className={`w-20 py-1 text-sm ${row.errors.some(e => e.includes('condition')) ? 'border-[var(--error)]' : ''}`}
+                    className={`w-full min-w-[60px] max-w-[80px] py-2 text-sm min-h-[40px] ${row.errors.some(e => e.includes('condition')) ? 'border-[var(--error)]' : ''}`}
                     disabled={row.status === 'imported'}
                   >
                     <option value="">--</option>
@@ -1104,20 +1109,22 @@ function ImportPreviewTable({
                 <td className="px-3 py-2">
                   <input
                     type="number"
+                    inputMode="decimal"
                     step="0.01"
                     value={row.price}
                     onChange={(e) => updateRow(row.id, 'price', e.target.value)}
-                    className={`w-20 py-1 text-sm ${row.errors.some(e => e.includes('price')) ? 'border-[var(--error)]' : ''}`}
+                    className={`w-full min-w-[60px] max-w-[80px] py-2 text-sm min-h-[40px] ${row.errors.some(e => e.includes('price')) ? 'border-[var(--error)]' : ''}`}
                     disabled={row.status === 'imported'}
                   />
                 </td>
                 <td className="px-3 py-2">
                   <input
                     type="number"
+                    inputMode="numeric"
                     min="0"
                     value={row.stock}
                     onChange={(e) => updateRow(row.id, 'stock', e.target.value)}
-                    className={`w-16 py-1 text-sm ${row.errors.some(e => e.includes('stock')) ? 'border-[var(--error)]' : ''}`}
+                    className={`w-full min-w-[50px] max-w-[70px] py-2 text-sm min-h-[40px] ${row.errors.some(e => e.includes('stock')) ? 'border-[var(--error)]' : ''}`}
                     disabled={row.status === 'imported'}
                   />
                 </td>

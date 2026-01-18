@@ -362,23 +362,25 @@ export default function AdminInventoryPage() {
                         <label className="block text-xs text-[var(--text-muted)] mb-1.5">Stock</label>
                         <input
                           type="number"
+                          inputMode="numeric"
                           min="0"
                           value={editValues.stock}
                           onChange={(e) => setEditValues(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
-                          className="w-full px-3 py-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-primary)] text-sm text-center focus:border-[var(--accent)] focus:outline-none"
+                          className="w-full px-3 py-2 min-h-[44px] rounded-lg bg-[var(--bg-primary)] border border-[var(--border-primary)] text-sm text-center focus:border-[var(--accent)] focus:outline-none"
                         />
                       </div>
                       <div className="flex-1 min-w-[120px]">
                         <label className="block text-xs text-[var(--text-muted)] mb-1.5">Price (CAD)</label>
                         <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm">$</span>
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm pointer-events-none">$</span>
                           <input
                             type="number"
+                            inputMode="decimal"
                             step="1"
                             min="0"
                             value={editValues.price}
                             onChange={(e) => setEditValues(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                            className="w-full pl-7 pr-3 py-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-primary)] text-sm focus:border-[var(--accent)] focus:outline-none"
+                            className="w-full pl-8 pr-3 py-2 min-h-[44px] rounded-lg bg-[var(--bg-primary)] border border-[var(--border-primary)] text-sm focus:border-[var(--accent)] focus:outline-none"
                           />
                         </div>
                       </div>
@@ -728,20 +730,21 @@ function AddFromLookupForm({
             type="text"
             value={size}
             onChange={(e) => setSize(e.target.value)}
-            placeholder="10"
-            className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-primary)] text-sm text-center focus:border-[var(--accent)] focus:outline-none"
+            placeholder=""
+            className="w-full px-3 py-2.5 min-h-[44px] rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-primary)] text-sm text-center focus:border-[var(--accent)] focus:outline-none"
           />
         </div>
         <div>
           <label className="block text-xs text-[var(--text-muted)] mb-1.5">Your Price *</label>
           <div className="relative">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm">$</span>
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm pointer-events-none">$</span>
             <input
               type="number"
+              inputMode="decimal"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
-              placeholder={suggestedPrices ? suggestedPrices.retail.toString() : '0'}
-              className="w-full pl-6 pr-2 py-2.5 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-primary)] text-sm focus:border-[var(--accent)] focus:outline-none"
+              placeholder={suggestedPrices ? suggestedPrices.retail.toString() : ''}
+              className="w-full pl-7 pr-2 py-2.5 min-h-[44px] rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-primary)] text-sm focus:border-[var(--accent)] focus:outline-none"
             />
           </div>
         </div>
@@ -749,10 +752,11 @@ function AddFromLookupForm({
           <label className="block text-xs text-[var(--text-muted)] mb-1.5">Stock</label>
           <input
             type="number"
+            inputMode="numeric"
             min="1"
             value={stock}
             onChange={(e) => setStock(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-primary)] text-sm text-center focus:border-[var(--accent)] focus:outline-none"
+            className="w-full px-3 py-2.5 min-h-[44px] rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-primary)] text-sm text-center focus:border-[var(--accent)] focus:outline-none"
           />
         </div>
       </div>

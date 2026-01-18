@@ -258,23 +258,23 @@ export default function CartPage() {
                       </div>
 
                       {/* Quantity Controls */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 sm:gap-2">
                         <button
                           onClick={() => updateQty(item.variant_id, item.qty - 1)}
-                          className="w-8 h-8 flex items-center justify-center rounded-md bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors"
+                          className="min-w-[44px] min-h-[44px] w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center rounded-md bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors"
                           aria-label="Decrease quantity"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
                           </svg>
                         </button>
-                        <span className="w-8 text-center font-medium text-[var(--text-primary)]">
+                        <span className="min-w-[32px] w-8 text-center font-medium text-[var(--text-primary)]">
                           {item.qty}
                         </span>
                         <button
                           onClick={() => updateQty(item.variant_id, item.qty + 1)}
                           disabled={item.qty >= available}
-                          className="w-8 h-8 flex items-center justify-center rounded-md bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="min-w-[44px] min-h-[44px] w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center rounded-md bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           aria-label="Increase quantity"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
