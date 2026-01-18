@@ -331,7 +331,7 @@ function HeaderContent() {
         <>
           {/* Backdrop */}
           <div 
-            className={`fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden transition-opacity duration-300 ${
+            className={`fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm md:hidden transition-opacity duration-300 ${
               isClosing ? 'opacity-0' : 'opacity-100'
             }`}
             onClick={closeMobileMenu}
@@ -341,7 +341,7 @@ function HeaderContent() {
           {/* Menu Panel */}
           <div 
             ref={menuRef}
-            className={`fixed top-0 right-0 bottom-0 z-40 w-full max-w-sm bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] md:hidden shadow-2xl border-l border-[var(--glass-border)] transition-transform duration-300 ease-out ${
+            className={`fixed top-0 right-0 bottom-0 z-[60] w-full max-w-sm bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] md:hidden shadow-2xl border-l border-[var(--glass-border)] transition-transform duration-300 ease-out ${
               isClosing ? 'translate-x-full' : 'translate-x-0'
             }`}
             style={{ paddingTop: 'var(--safe-area-top, 0px)' }}
