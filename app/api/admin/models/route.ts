@@ -56,6 +56,19 @@ export async function GET(request: Request) {
 
     if (error) throw error
 
+    // Get models that have images
+    const { data: modelImages } = await supabase
+      .from('model_images')
+      .select('model_id')
+
+    const modelIdsWithImages = new Set(modelImages?.map(m => m.model_id) || [])
+
+    // Add hasImage flag to each model
+    const modelsWithImageFlag = models?.map(m => ({
+      ...m,
+      hasImage: modelIdsWithImages.has(m.id)
+    })) || []
+
     // Get unique brands
     let brandsQuery = supabase
       .from('product_models')
@@ -69,7 +82,7 @@ export async function GET(request: Request) {
 
     const brands = [...new Set(allModels?.map(m => m.brand) || [])].sort()
 
-    return NextResponse.json({ models, brands })
+    return NextResponse.json({ models: modelsWithImageFlag, brands })
   } catch (error) {
     console.error('Admin models fetch error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

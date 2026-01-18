@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import Badge from './Badge'
@@ -42,6 +43,7 @@ export default function ProductCard({
   size = 'default'
 }: ProductCardProps) {
   const { settings } = useTenant()
+  const [imageError, setImageError] = useState(false)
   const typography = settings?.theme?.typography?.product_card
   
   // Calculate badge states
@@ -105,9 +107,9 @@ export default function ProductCard({
 
   return (
     <Link href={`/product/${product.slug}`} className="group block h-full flex flex-col">
-      {/* Image Container */}
-      <div className="relative aspect-square bg-[var(--bg-secondary)] rounded-2xl overflow-hidden mb-5 border border-[var(--glass-border)] group-hover:border-[var(--border-glow)] transition-all duration-300 flex-shrink-0">
-        {product.primary_image ? (
+      {/* Image Container - Graceful fallback if external images break */}
+      <div className="relative aspect-square bg-[var(--bg-secondary)] rounded-xl md:rounded-2xl overflow-hidden mb-3 md:mb-5 border border-[var(--glass-border)] group-hover:border-[var(--border-glow)] transition-all duration-300 flex-shrink-0">
+        {product.primary_image && !imageError ? (
           <Image
             src={product.primary_image}
             alt={product.name}
@@ -115,11 +117,19 @@ export default function ProductCard({
             className="object-cover transition-all duration-500 group-hover:scale-110"
             sizes={size === 'small' ? '(max-width: 768px) 40vw, 200px' : '(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw'}
             unoptimized
+            onError={() => setImageError(true)}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)]">
-            <svg className="w-12 h-12 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          /* Shoe silhouette placeholder - site works even if images break */
+          <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)] bg-[var(--bg-tertiary)]">
+            <svg 
+              viewBox="0 0 100 60" 
+              className="w-1/2 h-auto opacity-30"
+              fill="currentColor"
+            >
+              <path d="M5 45 Q5 35 15 30 L25 28 Q35 25 45 25 L70 25 Q85 25 90 35 L95 45 Q95 50 90 52 L10 52 Q5 52 5 45 Z" />
+              <ellipse cx="20" cy="48" rx="8" ry="4" opacity="0.3" />
+              <ellipse cx="75" cy="48" rx="10" ry="5" opacity="0.3" />
             </svg>
           </div>
         )}
@@ -168,37 +178,33 @@ export default function ProductCard({
 
       {/* Product Info */}
       <div className={`flex flex-col ${spacing} ${fontFamily} flex-shrink-0`}>
-        {/* Brand and Price - Same Row */}
-        <div className="flex items-center justify-between gap-2 min-h-[20px]">
-          <p className={`font-semibold uppercase tracking-wide text-[var(--text-muted)] ${brandSize} leading-tight`}>
-            {product.brand}
-          </p>
-          <span className={`font-bold bg-gradient-to-r from-[var(--neon-magenta)] to-[var(--neon-cyan)] bg-clip-text text-transparent ${priceSize} flex-shrink-0`}>
+        {/* Brand */}
+        <p className={`font-semibold uppercase tracking-wide text-[var(--text-muted)] ${brandSize} leading-tight truncate`}>
+          {product.brand}
+        </p>
+        
+        {/* Name - Clean 2-line with ellipsis */}
+        <h3 className={`font-medium text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors line-clamp-2 ${nameSize}`}>
+          {product.name}
+        </h3>
+        
+        {/* Price */}
+        <div className="flex items-center gap-2 mt-0.5">
+          <span className={`font-bold text-[var(--text-primary)] ${priceSize}`}>
             ${(product.lowest_price_cents / 100).toFixed(0)}
           </span>
-        </div>
-        
-        {/* Name - Increased height for better 2-line support */}
-        <div className={size === 'small' ? 'min-h-[28px] max-h-[28px]' : 'min-h-[32px] max-h-[32px]'}>
-          <h3 className={`font-medium text-[var(--text-primary)] group-hover:text-gradient transition-all duration-300 line-clamp-2 ${nameSize}`}>
-            {product.name}
-          </h3>
-        </div>
-        
-        {/* Old Price (if applicable) */}
-        {product.last_sold_cents && product.last_sold_cents !== product.lowest_price_cents && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide">Was:</span>
+          {/* Old Price (if applicable) */}
+          {product.last_sold_cents && product.last_sold_cents !== product.lowest_price_cents && (
             <span className="text-xs text-[var(--text-muted)] line-through">
               ${(product.last_sold_cents / 100).toFixed(0)}
             </span>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Secondary info - Only show on desktop in non-compact mode */}
         {!compact && product.sizes_available && product.sizes_available.length > 0 && (
-          <p className="text-[10px] text-[var(--text-muted)] hidden md:block leading-tight">
-            {product.sizes_available.length} sizes
+          <p className="text-[10px] text-[var(--text-muted)] hidden md:block leading-tight mt-1">
+            {product.sizes_available.length} sizes available
           </p>
         )}
       </div>
@@ -210,11 +216,12 @@ export default function ProductCard({
 export function ProductCardSkeleton({ size = 'default' }: { size?: 'default' | 'small' }) {
   return (
     <div className="animate-pulse flex flex-col h-full">
-      <div className="aspect-square bg-[var(--bg-secondary)] rounded-2xl mb-5 border border-[var(--glass-border)] flex-shrink-0" />
-      <div className="space-y-1.5 flex-shrink-0">
-        <div className={`bg-gradient-to-r from-[var(--bg-secondary)] via-[var(--bg-tertiary)] to-[var(--bg-secondary)] bg-[length:200%_100%] animate-[skeleton-pulse_1.5s_ease-in-out_infinite] rounded w-1/3 ${size === 'small' ? 'h-2.5' : 'h-2.5'}`} />
-        <div className={`bg-gradient-to-r from-[var(--bg-secondary)] via-[var(--bg-tertiary)] to-[var(--bg-secondary)] bg-[length:200%_100%] animate-[skeleton-pulse_1.5s_ease-in-out_infinite] rounded w-2/3 ${size === 'small' ? 'h-3' : 'h-3.5'}`} />
-        <div className={`bg-gradient-to-r from-[var(--bg-secondary)] via-[var(--bg-tertiary)] to-[var(--bg-secondary)] bg-[length:200%_100%] animate-[skeleton-pulse_1.5s_ease-in-out_infinite] rounded w-1/4 ${size === 'small' ? 'h-3' : 'h-3.5'}`} />
+      <div className="aspect-square bg-[var(--bg-secondary)] rounded-xl md:rounded-2xl mb-3 md:mb-5 border border-[var(--glass-border)] flex-shrink-0" />
+      <div className="space-y-2 flex-shrink-0">
+        <div className="bg-[var(--bg-secondary)] rounded h-2.5 w-1/3" />
+        <div className="bg-[var(--bg-secondary)] rounded h-3.5 w-full" />
+        <div className="bg-[var(--bg-secondary)] rounded h-3.5 w-2/3" />
+        <div className="bg-[var(--bg-secondary)] rounded h-4 w-1/4 mt-1" />
       </div>
     </div>
   )

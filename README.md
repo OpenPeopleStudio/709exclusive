@@ -72,6 +72,9 @@ SENDGRID_API_KEY=SG.xxx (or POSTMARK_API_KEY)
 
 # Privacy & Cron
 CRON_SECRET=generate-random-32-byte-string
+
+# Sneaker API (optional - site works without it)
+KICKSDB_API_KEY=your-kicks-dev-api-key
 ```
 
 Generate CRON_SECRET:
@@ -95,6 +98,7 @@ Key migrations:
 - `029`: Multi-tenant tables
 - `037`: Tenant RLS policies
 - `033-036`: Privacy features
+- `042`: Sneaker API integration fields
 
 ### Development
 

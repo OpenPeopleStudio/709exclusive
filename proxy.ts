@@ -12,8 +12,55 @@ function isPublicAsset(pathname: string) {
   )
 }
 
+function isTestSubdomain(host: string): boolean {
+  const normalizedHost = host.replace(/:\d+$/, '').toLowerCase()
+  return (
+    normalizedHost === 'test.localhost' ||
+    normalizedHost.startsWith('test.709exclusive') ||
+    normalizedHost === 'test.709exclusive.shop'
+  )
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
+  const host = request.headers.get('host') || ''
+  
+  // Handle test subdomain routing
+  if (isTestSubdomain(host)) {
+    // API routes - let pass
+    if (pathname.startsWith('/api')) {
+      // Continue to normal processing
+    }
+    // Already on test routes - let it pass
+    else if (pathname.startsWith('/test')) {
+      // Continue to normal processing
+    }
+    // These routes work with the main site's layout (cart, account, product, checkout)
+    else if (pathname.startsWith('/product') || pathname.startsWith('/cart') || pathname.startsWith('/account') || pathname.startsWith('/checkout')) {
+      // Continue to normal processing
+    }
+    // Redirect root to /test
+    else if (pathname === '/') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/test'
+      return NextResponse.rewrite(url)
+    }
+    // For /shop, redirect to /test
+    else if (pathname === '/shop') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/test'
+      return NextResponse.rewrite(url)
+    }
+  }
+  
+  // Block test routes from main domain (only in production)
+  // Allow /test in development for easier testing
+  const isDevelopment = process.env.NODE_ENV === 'development'
+  if (!isDevelopment && !isTestSubdomain(host) && pathname.startsWith('/test')) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/not-found'
+    return NextResponse.rewrite(url)
+  }
   
   // Create response object
   const response = NextResponse.next({

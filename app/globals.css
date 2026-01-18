@@ -1304,14 +1304,14 @@ label {
   box-shadow: var(--shadow-glow);
 }
 
-/* Hide scrollbar on mobile for horizontal scroll areas */
-@media (max-width: 767px) {
-  .hide-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  
-  .hide-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
+/* Hide scrollbar for horizontal scroll areas */
+.hide-scrollbar,
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar,
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
