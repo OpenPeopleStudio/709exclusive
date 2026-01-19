@@ -15,11 +15,22 @@ interface KPIs {
   pendingOrders: number
 }
 
+const dateRangeOptions = [
+  { value: '0', label: 'Today', shortLabel: 'Today' },
+  { value: '1', label: 'Yesterday', shortLabel: 'Yesterday' },
+  { value: '7', label: 'Last 7 days', shortLabel: '7 days' },
+  { value: '30', label: 'Last 30 days', shortLabel: '30 days' },
+  { value: '90', label: 'Last 90 days', shortLabel: '90 days' },
+  { value: '365', label: 'Last year', shortLabel: '1 year' },
+]
+
 export default function ReportsPage() {
   const [kpis, setKpis] = useState<KPIs | null>(null)
   const [loading, setLoading] = useState(true)
   const [dateRange, setDateRange] = useState('30')
   const [exporting, setExporting] = useState<string | null>(null)
+
+  const selectedOption = dateRangeOptions.find(o => o.value === dateRange)
 
   useEffect(() => {
     fetchKPIs()
@@ -75,19 +86,55 @@ export default function ReportsPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">Reports & Analytics</h1>
-        <div className="flex items-center gap-4">
-          <select
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value)}
-            className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg px-3 py-2"
-          >
-            <option value="7">Last 7 days</option>
-            <option value="30">Last 30 days</option>
-            <option value="90">Last 90 days</option>
-            <option value="365">Last year</option>
-          </select>
+        
+        {/* Date Range Selector */}
+        <div className="flex items-center gap-2">
+          {/* Quick select buttons - hidden on mobile, shown on larger screens */}
+          <div className="hidden md:flex items-center bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl p-1">
+            {dateRangeOptions.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => setDateRange(option.value)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+                  dateRange === option.value
+                    ? 'bg-[var(--accent)] text-white shadow-sm'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
+                }`}
+              >
+                {option.shortLabel}
+              </button>
+            ))}
+          </div>
+          
+          {/* Dropdown for mobile */}
+          <div className="md:hidden relative">
+            <select
+              value={dateRange}
+              onChange={(e) => setDateRange(e.target.value)}
+              className="appearance-none bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl px-4 py-2.5 pr-10 text-sm font-medium text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent cursor-pointer"
+            >
+              {dateRangeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+              <svg className="w-4 h-4 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+          
+          {/* Calendar icon indicator */}
+          <div className="hidden sm:flex items-center gap-2 px-3 py-2 bg-[var(--bg-tertiary)] rounded-lg text-xs text-[var(--text-muted)]">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span>{selectedOption?.label}</span>
+          </div>
         </div>
       </div>
 

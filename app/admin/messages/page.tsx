@@ -6,12 +6,6 @@ import { useE2EEncryption } from '@/hooks/useE2EEncryption'
 import KeyVerification from '@/components/KeyVerification'
 import KeyBackup from '@/components/KeyBackup'
 import EncryptionSettings from '@/components/EncryptionSettings'
-import EncryptionSetupPanel from '@/components/admin/EncryptionSetupPanel'
-import MessagesLayout from '@/components/admin/MessagesLayout'
-import ConversationListItem from '@/components/admin/ConversationListItem'
-import MessageBubble from '@/components/admin/MessageBubble'
-import MessageInput from '@/components/admin/MessageInput'
-import MessageDebugPanel from '@/components/admin/MessageDebugPanel'
 import Button from '@/components/ui/Button'
 import Surface from '@/components/ui/Surface'
 import { generateFileKey, encryptFileWithKey, decryptFileWithKey } from '@/lib/crypto/e2e'
@@ -89,7 +83,6 @@ export default function AdminMessagesPage() {
   const [recoveryError, setRecoveryError] = useState<string | null>(null)
   const [showRecoveryModal, setShowRecoveryModal] = useState(false)
   const [showAdvancedActions, setShowAdvancedActions] = useState(false)
-  const [showDebugPanel, setShowDebugPanel] = useState(false)
   const [retentionEnabled, setRetentionEnabled] = useState(false)
   const [retentionDays, setRetentionDays] = useState(90)
   const [showRetentionSettings, setShowRetentionSettings] = useState(false)
@@ -298,22 +291,8 @@ export default function AdminMessagesPage() {
 
     if (isInitialized) {
       const activeMessages = data.filter(msg => !msg.deleted_at)
-      
-      // Fix old encrypted messages missing sender_public_key
-      const fixedMessages = activeMessages.map(msg => {
-        if (msg.encrypted && !msg.sender_public_key) {
-          console.warn('Found encrypted message without sender_public_key:', msg.id)
-          return {
-            ...msg,
-            encrypted: false,
-            decryptedContent: msg.content, // Show raw content
-          }
-        }
-        return msg
-      })
-      
       const decrypted = await decryptMessages(
-        fixedMessages as Message[],
+        activeMessages,
         (msg) => msg.sender_type === 'customer' ? msg.customer_id : adminId!
       )
       
@@ -394,14 +373,14 @@ export default function AdminMessagesPage() {
       m.encrypted && (m.decryptedContent === 'Secure message' || m.decryptedContent === '[Unable to decrypt]')
     )
     if (needsRetry) {
-       
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadMessages(selectedCustomer)
     }
   }, [isInitialized, selectedCustomer, messages, loadMessages])
 
   useEffect(() => {
     // Initial data fetch
-     
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadConversations()
   }, [loadConversations])
 
@@ -413,7 +392,7 @@ export default function AdminMessagesPage() {
 
   useEffect(() => {
     if (selectedCustomer) {
-       
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadMessages(selectedCustomer)
       loadRetentionSettings(selectedCustomer)
     }
@@ -429,15 +408,12 @@ export default function AdminMessagesPage() {
 
   // Realtime updates for usability: new messages appear without refresh.
   useEffect(() => {
-    console.log('🔌 Setting up realtime subscription...')
-    
     const channel = supabase
       .channel('admin-messages')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
-          console.log('📨 Realtime message received:', payload)
           const msg = payload.new as { customer_id?: string } | null
           loadConversations()
           if (selectedCustomer && msg?.customer_id === selectedCustomer) {
@@ -445,17 +421,9 @@ export default function AdminMessagesPage() {
           }
         }
       )
-      .subscribe((status) => {
-        console.log('🔌 Realtime subscription status:', status)
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ Realtime connected successfully')
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('❌ Realtime connection failed:', status)
-        }
-      })
+      .subscribe()
 
     return () => {
-      console.log('🔌 Cleaning up realtime subscription')
       supabase.removeChannel(channel)
     }
   }, [loadConversations, loadMessages, selectedCustomer])
@@ -464,32 +432,20 @@ export default function AdminMessagesPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const sendMessage = async (
-    plaintextInput: string,
-    options?: { forceStandard?: boolean; notice?: string; clearComposer?: boolean }
-  ) => {
-    const plaintext = plaintextInput.trim()
-    if (!plaintext || !selectedCustomer) return
-
-    const shouldClearComposer = options?.clearComposer ?? true
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newMessage.trim() || !selectedCustomer) return
 
     setSending(true)
     setAttachmentError(null)
     setSendNotice(null)
+    const plaintext = newMessage.trim()
     let didEncrypt = false
 
     try {
-      // Enhanced tenant validation with logging
-      if (!tenantId || tenantId === 'default') {
-        console.error('❌ Tenant validation failed:', { tenantId })
+      if (!tenantId) {
         setSending(false)
-        setAttachmentError('Tenant not properly configured. Please refresh the page.')
-        return
-      }
-      console.log('✅ Tenant validated:', tenantId)
-      if (attachmentFile && options?.forceStandard) {
-        setAttachmentError('Attachments require secure chat to be ready.')
-        setSending(false)
+        setAttachmentError('Tenant not resolved')
         return
       }
       if (attachmentFile && !(selectedConvo?.has_encryption && isInitialized)) {
@@ -533,17 +489,10 @@ export default function AdminMessagesPage() {
       }
 
       // Attempt encryption if E2EE is initialized
-      if (isInitialized && !options?.forceStandard) {
+      if (isInitialized) {
         const recipientPublicKey = await getRecipientPublicKey(selectedCustomer)
-        console.log('Recipient public key:', recipientPublicKey ? 'Found' : 'Missing')
         if (recipientPublicKey) {
           const encrypted = await encrypt(plaintext, selectedCustomer)
-          console.log('Encryption result:', encrypted ? {
-            hasContent: !!encrypted.content,
-            hasSenderKey: !!encrypted.senderPublicKey,
-            hasIv: !!encrypted.iv,
-            messageIndex: encrypted.messageIndex
-          } : 'null')
           if (encrypted) {
             messageData = {
               ...messageData,
@@ -553,15 +502,9 @@ export default function AdminMessagesPage() {
               sender_public_key: encrypted.senderPublicKey,
               message_index: encrypted.messageIndex,
             }
-            console.log('Message data prepared with encryption:', {
-              encrypted: true,
-              hasSenderKey: !!messageData.sender_public_key
-            })
             didEncrypt = true
           }
         }
-      } else if (!isInitialized) {
-        console.log('Encryption not initialized, sending unencrypted')
       }
 
       if (attachmentFile) {
@@ -575,53 +518,20 @@ export default function AdminMessagesPage() {
         messageData = { ...messageData, ...attachmentData }
       }
 
-      console.log('📤 Inserting message with data:', {
-        encrypted: messageData.encrypted,
-        hasSenderKey: !!messageData.sender_public_key,
-        hasIv: !!messageData.iv,
-        messageIndex: messageData.message_index,
-        tenantId: messageData.tenant_id,
-        customerId: messageData.customer_id,
-        senderType: messageData.sender_type
-      })
-
       const { data, error } = await supabase
         .from('messages')
         .insert(messageData)
         .select()
         .single()
 
-      if (error) {
-        console.error('❌ Message insert error:', error)
-        console.error('Failed message data:', messageData)
-        
-        // Show user-friendly error
-        if (error.code === '42501') {
-          setAttachmentError('Permission denied. Please verify your admin role.')
-        } else if (error.code === '23503') {
-          setAttachmentError('Invalid customer or tenant reference.')
-        } else {
-          setAttachmentError(`Failed to send: ${error.message}`)
-        }
-        setSending(false)
-        return
-      }
-
       if (!error && data) {
-        console.log('Message inserted successfully:', {
-          id: data.id,
-          encrypted: data.encrypted,
-          senderKeyInDB: !!data.sender_public_key
-        })
         // Add to local state with decrypted content
         setMessages(prev => [...prev, { 
           ...data, 
           decryptedContent: plaintext 
         }])
-        if (shouldClearComposer) {
-          setNewMessage('')
-          setAttachmentFile(null)
-        }
+        setNewMessage('')
+        setAttachmentFile(null)
         
         // Update conversation
         setConversations(prev => prev.map(c => 
@@ -629,9 +539,8 @@ export default function AdminMessagesPage() {
             ? { ...c, last_message: data.encrypted ? 'Secure message' : plaintext, last_message_at: data.created_at }
             : c
         ))
-        const notice = options?.notice || (!didEncrypt ? 'Sent standard' : null)
-        if (notice) {
-          setSendNotice(notice)
+        if (!didEncrypt) {
+          setSendNotice('Sent standard')
           setTimeout(() => setSendNotice(null), 4000)
         }
       }
@@ -643,20 +552,6 @@ export default function AdminMessagesPage() {
     }
 
     setSending(false)
-  }
-
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault()
-    await sendMessage(newMessage)
-  }
-
-  const handleSendSetupPrompt = async () => {
-    const prompt = 'To enable secure chat, open Messages in your account to finish encryption setup.'
-    await sendMessage(prompt, {
-      forceStandard: true,
-      notice: 'Sent encryption setup prompt',
-      clearComposer: false,
-    })
   }
 
   const startNewConversation = async () => {
@@ -716,9 +611,9 @@ export default function AdminMessagesPage() {
 
       setShowNewMessage(false)
       setNewMessageText('')
-      setNewRecipient(null)
       await loadConversations()
       setSelectedCustomer(newRecipient)
+      setNewRecipient(null)
     } catch (err) {
       setNewMessageError(err instanceof Error ? err.message : 'Failed to start conversation')
     }
@@ -930,9 +825,6 @@ export default function AdminMessagesPage() {
   }
 
   const selectedConvo = conversations.find(c => c.customer_id === selectedCustomer)
-  const recipientHasKey = selectedCustomer ? !!selectedConvo?.has_encryption : false
-  const deviceSecureReady = isInitialized && !!publicKey && !isLocked
-  const conversationSecureReady = deviceSecureReady && (!selectedCustomer || recipientHasKey)
   const filteredConversations = conversations.filter((c) => {
     if (showUnreadOnly && c.unread_count === 0) return false
     if (!search.trim()) return true
@@ -943,116 +835,60 @@ export default function AdminMessagesPage() {
     )
   })
 
-  const isDev = process.env.NODE_ENV === 'development'
-
   return (
     <div>
-      {/* Debug Panel (dev only) */}
-      {isDev && (
-        <MessageDebugPanel
-          isInitialized={isInitialized}
-          isLocked={isLocked}
-          publicKey={publicKey}
-          adminId={adminId}
-          show={showDebugPanel}
-          onShowChange={setShowDebugPanel}
-          hideTrigger
-        />
-      )}
-
-      <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Messages</h1>
-        </div>
-
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6 sm:mb-8">
+        <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">Messages</h1>
+        
         {/* E2EE Status & Actions */}
-        <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center md:gap-4">
-          <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm">
-            <details className="relative group">
-              <summary
-                className={`flex list-none items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                  encryptionError || isLocked || (selectedCustomer && !recipientHasKey)
-                    ? 'bg-[var(--warning)]/10 text-[var(--warning)]'
-                    : 'bg-[var(--success)]/10 text-[var(--success)]'
-                }`}
-              >
-                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                  <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                </svg>
-                End-to-end encrypted
-                <svg className="h-3.5 w-3.5 transition-transform duration-300 group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2} aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              </summary>
-              <div className="absolute z-20 mt-2 w-72 rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4 shadow-xl">
-                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
-                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                  </svg>
-                  Secure support inbox
-                </div>
-                <p className="mt-2 text-xs text-[var(--text-muted)]">
-                  Messages are protected on this device. Save a recovery code to keep access if you switch browsers.
-                </p>
-                {(encryptionError || isLocked || (selectedCustomer && !recipientHasKey)) && (
-                  <p className="mt-2 text-xs text-[var(--warning)]">
-                    {encryptionError
-                      ? 'Secure chat unavailable.'
-                      : isLocked
-                        ? 'Unlock security to save a recovery code.'
-                        : selectedCustomer && !recipientHasKey
-                          ? 'Recipient not secured.'
-                          : isInitializing
-                            ? 'Securing your chat...'
-                            : 'Secure chat unavailable.'}
-                  </p>
-                )}
-                {isDev && (
-                  <>
-                    <div className="mt-3 h-px bg-[var(--border-primary)]" />
-                    <button
-                      type="button"
-                      onClick={() => setShowDebugPanel((prev) => !prev)}
-                      className="mt-3 flex w-full items-center justify-between rounded-lg px-2 py-2 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5 transition-colors"
-                    >
-                      <span>Debug tools</span>
-                      <span className="text-[10px] text-[var(--text-muted)]">
-                        {showDebugPanel ? 'Hide' : 'Show'}
-                      </span>
-                    </button>
-                  </>
-                )}
-              </div>
-            </details>
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {isInitialized ? (
+            <span className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 bg-[var(--success)]/10 text-[var(--success)] text-xs sm:text-sm rounded-full">
+              <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+              </svg>
+              Secure
+            </span>
+          ) : encryptionError ? (
+            <span className="text-xs sm:text-sm text-[var(--warning)]">
+              Secure chat unavailable
+            </span>
+          ) : (
+            <span className="text-xs sm:text-sm text-[var(--text-muted)]">
+              {isInitializing ? 'Securing your chat...' : 'Securing your chat...'}
+            </span>
+          )}
 
-          <div className="flex flex-wrap items-center gap-2 md:gap-1 md:rounded-2xl md:border md:border-[var(--border-primary)] md:bg-[var(--bg-secondary)]/60 md:p-1 md:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]">
-            <Button
-              onClick={() => setShowEncryptionSettings(true)}
-              variant="ghost"
-              size="sm"
-              className="w-full sm:w-auto"
-            >
-              Security
-            </Button>
-            <Button
-              onClick={handleCreateRecovery}
-              variant="secondary"
-              size="sm"
-              disabled={!isInitialized || isLocked}
-              className="w-full sm:w-auto"
-            >
-              Save recovery code
-            </Button>
-            <Button
-              onClick={() => setShowAdvancedActions((prev) => !prev)}
-              variant="ghost"
-              size="sm"
-              className="w-full sm:w-auto"
-            >
-              Advanced
-            </Button>
-          </div>
+          <Button
+            onClick={() => setShowEncryptionSettings(true)}
+            variant="ghost"
+            size="sm"
+          >
+            Security
+          </Button>
+          <Button
+            onClick={handleCreateRecovery}
+            variant="secondary"
+            size="sm"
+            disabled={!isInitialized || isLocked}
+            className="hidden sm:inline-flex"
+          >
+            Save recovery code
+          </Button>
+          <Button
+            onClick={() => setShowNewMessage(true)}
+            variant="secondary"
+            size="sm"
+          >
+            New message
+          </Button>
+          <Button
+            onClick={() => setShowAdvancedActions((prev) => !prev)}
+            variant="ghost"
+            size="sm"
+          >
+            Advanced
+          </Button>
         </div>
       </div>
 
@@ -1075,18 +911,21 @@ export default function AdminMessagesPage() {
         </div>
       )}
 
-      {/* Prominent Encryption Status Banner removed in favor of top bar dropdown */}
-
-      {/* Encryption Setup Panel for selected conversation */}
-      {selectedCustomer && (
-        <EncryptionSetupPanel
-          onInitialize={() => window.location.reload()}
-          onViewKeys={() => setShowEncryptionSettings(true)}
-          currentUserKey={publicKey}
-          recipientKey={filteredConversations.find(c => c.customer_id === selectedCustomer)?.has_encryption ? 'has-key' : null}
-          recipientName={filteredConversations.find(c => c.customer_id === selectedCustomer)?.customer_name || 'User'}
-        />
-      )}
+      <Surface padding="md" className="mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm text-[var(--text-primary)] font-medium">Secure support inbox</p>
+            <p className="text-xs text-[var(--text-muted)] mt-1">
+              Messages are protected on this device. Save a recovery code to keep access if you switch browsers.
+            </p>
+            {isLocked && (
+              <p className="text-xs text-[var(--warning)] mt-2">
+                Unlock security to save a recovery code.
+              </p>
+            )}
+          </div>
+        </div>
+      </Surface>
 
       {selectedCustomer && (
         <Surface padding="md" className="mb-4">
@@ -1157,29 +996,17 @@ export default function AdminMessagesPage() {
             <div className="p-4 border-b border-[var(--border-primary)] space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="font-semibold text-[var(--text-primary)]">Inbox</h2>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowUnreadOnly((v) => !v)}
-                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                      showUnreadOnly
-                        ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
-                        : 'border-[var(--border-primary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-                    }`}
-                  >
-                    Unread
-                  </button>
-                  <Button
-                    onClick={() => setShowNewMessage(true)}
-                    variant="secondary"
-                    size="sm"
-                    aria-label="New message"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                    </svg>
-                  </Button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowUnreadOnly((v) => !v)}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                    showUnreadOnly
+                      ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
+                      : 'border-[var(--border-primary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                  }`}
+                >
+                  Unread
+                </button>
               </div>
               <input
                 type="text"
@@ -1247,195 +1074,194 @@ export default function AdminMessagesPage() {
             {selectedCustomer ? (
               <>
                 {/* Header */}
-                <div className="p-4 border-b border-[var(--border-primary)] flex justify-between items-center gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
+                <div className="p-3 sm:p-4 border-b border-[var(--border-primary)]">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <button
                       type="button"
                       onClick={() => setSelectedCustomer(null)}
-                      className="md:hidden p-2 -ml-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+                      className="md:hidden p-2 -ml-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors flex-shrink-0"
                       aria-label="Back to inbox"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
                       </svg>
                     </button>
-                    <div className="min-w-0">
-                    <p className="font-medium text-[var(--text-primary)]">
-                      {selectedConvo?.customer_name || selectedConvo?.customer_email}
-                    </p>
-                    {selectedConvo?.customer_name && (
-                      <p className="text-sm text-[var(--text-muted)]">{selectedConvo.customer_email}</p>
-                    )}
-                    </div>
-                  </div>
-                  {selectedConvo && (
-                    <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
-                      selectedConvo.has_purchase
-                        ? 'bg-[var(--success)]/15 text-[var(--success)]'
-                        : 'bg-[var(--warning)]/15 text-[var(--warning)]'
-                    }`}>
-                      {selectedConvo.has_purchase ? 'Buyer' : 'Window shopper'}
-                    </span>
-                  )}
-                  {selectedConvo?.has_encryption && (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleVerifyCustomer(
-                          selectedCustomer,
-                          selectedConvo?.customer_name || selectedConvo?.customer_email || 'Customer'
-                        )}
-                        className="text-sm text-[var(--success)] hover:underline flex items-center gap-2"
-                      >
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                        </svg>
-                        Verify key
-                      </button>
-                      {selectedCustomerVerified && (
-                        <span className="inline-flex items-center px-2 py-1 text-[10px] font-medium rounded-full bg-[var(--success)]/20 text-[var(--success)]">
-                          Verified
-                        </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-[var(--text-primary)] truncate">
+                        {selectedConvo?.customer_name || selectedConvo?.customer_email}
+                      </p>
+                      {selectedConvo?.customer_name && (
+                        <p className="text-sm text-[var(--text-muted)] truncate">{selectedConvo.customer_email}</p>
                       )}
                     </div>
-                  )}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {selectedConvo && (
+                        <span className={`hidden sm:inline-flex px-2.5 py-1 text-xs font-semibold rounded-full ${
+                          selectedConvo.has_purchase
+                            ? 'bg-[var(--success)]/15 text-[var(--success)]'
+                            : 'bg-[var(--warning)]/15 text-[var(--warning)]'
+                        }`}>
+                          {selectedConvo.has_purchase ? 'Buyer' : 'Window shopper'}
+                        </span>
+                      )}
+                      {selectedConvo?.has_encryption && (
+                        <div className="flex items-center gap-1 sm:gap-2">
+                          <button
+                            onClick={() => handleVerifyCustomer(
+                              selectedCustomer,
+                              selectedConvo?.customer_name || selectedConvo?.customer_email || 'Customer'
+                            )}
+                            className="text-xs sm:text-sm text-[var(--success)] hover:underline flex items-center gap-1"
+                            title="Verify key"
+                          >
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                            </svg>
+                            <span className="hidden sm:inline">Verify key</span>
+                          </button>
+                          {selectedCustomerVerified && (
+                            <span className="inline-flex items-center px-1.5 sm:px-2 py-0.5 sm:py-1 text-[10px] font-medium rounded-full bg-[var(--success)]/20 text-[var(--success)]">
+                              Verified
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 {sendNotice && (
                   <p className="px-4 pb-2 text-xs text-[var(--text-muted)]">{sendNotice}</p>
                 )}
 
-                {/* Messages - iMessage style bubbles */}
-                <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-1 bg-[var(--bg-primary)]">
-                  {messages.map((msg, index) => {
-                    const isOwn = msg.sender_type === 'admin'
-                    const senderName = isOwn ? 'You' : (selectedConvo?.customer_name || 'Customer')
-                    
-                    return (
-                      <div key={msg.id} className="group relative">
-                        <MessageBubble
-                          content={msg.decryptedContent || msg.content}
-                          isOwn={isOwn}
-                          timestamp={msg.created_at}
-                          isEncrypted={msg.encrypted}
-                          senderName={senderName}
-                          showAvatar={index === 0 || messages[index - 1]?.sender_type !== msg.sender_type}
-                        />
-                        
-                        {/* Location link */}
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4">
+                  {messages.map(msg => (
+                    <div
+                      key={msg.id}
+                      className={`flex ${msg.sender_type === 'admin' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`group relative max-w-[85%] sm:max-w-[70%] px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl ${
+                          msg.sender_type === 'admin'
+                            ? 'bg-[var(--accent)] text-white rounded-br-md'
+                            : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-bl-md'
+                        }`}
+                      >
+                        <p className="text-sm">{msg.decryptedContent || msg.content}</p>
                         {msg.message_type === 'location' && msg.location && !msg.deleted_at && (
-                          <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-2`}>
-                            <a
-                              href={`https://www.google.com/maps?q=${msg.location.lat},${msg.location.lng}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-[var(--accent-blue)] hover:underline"
-                            >
-                              📍 View on map
-                            </a>
-                          </div>
+                          <a
+                            href={`https://www.google.com/maps?q=${msg.location.lat},${msg.location.lng}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`mt-2 block text-xs underline ${
+                              msg.sender_type === 'admin'
+                                ? 'text-white/80 hover:text-white'
+                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                            }`}
+                          >
+                            📍 View on map ({msg.location.lat.toFixed(5)}, {msg.location.lng.toFixed(5)})
+                            {msg.location.accuracy && ` ±${Math.round(msg.location.accuracy)}m`}
+                          </a>
                         )}
-                        
-                        {/* Attachment */}
                         {msg.attachment_path && !msg.deleted_at && (
-                          <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-2`}>
-                            <button
-                              onClick={() => handleDownloadAttachment(msg)}
-                              className="text-xs text-[var(--accent-blue)] hover:underline flex items-center gap-1"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                              </svg>
-                              {msg.attachment_name || 'Download attachment'}
-                            </button>
-                          </div>
+                          <button
+                            onClick={() => handleDownloadAttachment(msg)}
+                            className={`mt-2 text-xs underline ${
+                              msg.sender_type === 'admin'
+                                ? 'text-white/80 hover:text-white'
+                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                            }`}
+                          >
+                            📎 {msg.attachment_name || 'Attachment'}
+                          </button>
                         )}
-                        
-                        {/* Delete button (desktop only) */}
+                        <div className={`flex items-center gap-1 text-[10px] mt-1 ${
+                          msg.sender_type === 'admin' ? 'text-white/60' : 'text-[var(--text-muted)]'
+                        }`}>
+                          {msg.encrypted && (
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                          {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
                         {!msg.deleted_at && (
                           <button
                             onClick={() => handleDeleteMessage(msg.id)}
-                            className="hidden md:block absolute top-0 right-0 -mt-2 -mr-2 bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:text-[var(--error)] border border-[var(--border-primary)] rounded-full w-6 h-6 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute -top-2 -right-2 bg-[var(--bg-secondary)] text-[var(--text-muted)] border border-[var(--border-primary)] rounded-full w-6 h-6 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                             title="Delete message"
                           >
                             ✕
                           </button>
                         )}
                       </div>
-                    )
-                  })}
+                    </div>
+                  ))}
                   <div ref={messagesEndRef} />
                 </div>
 
                 {/* Input */}
-                {/* Hidden file input */}
-                <input
-                  ref={attachmentInputRef}
-                  type="file"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    setAttachmentFile(file || null)
-                    setAttachmentError(null)
-                  }}
-                />
-
-                {/* Attachment preview (if file selected) */}
-                {attachmentFile && (
-                  <div className="px-3 md:px-4 py-2 border-t border-[var(--border-primary)] bg-[var(--bg-secondary)]">
-                    <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-tertiary)] rounded-lg text-sm">
-                      <svg className="w-4 h-4 text-[var(--accent-blue)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                      </svg>
-                      <span className="flex-1 truncate text-[var(--text-primary)]">{attachmentFile.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAttachmentFile(null)
-                          setAttachmentError(null)
+                <form onSubmit={handleSend} className="p-3 sm:p-4 border-t border-[var(--border-primary)]">
+                  <input
+                    ref={attachmentInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      setAttachmentFile(file || null)
+                      setAttachmentError(null)
+                    }}
+                  />
+                  <div className="flex gap-2 sm:gap-3 items-end">
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <textarea
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        placeholder="Type a message..."
+                        className="flex-1 resize-none w-full text-sm sm:text-base"
+                        rows={2}
+                        disabled={sending}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault()
+                            ;(e.currentTarget.form as HTMLFormElement | null)?.requestSubmit()
+                          }
                         }}
-                        className="text-[var(--text-muted)] hover:text-[var(--error)] transition-colors"
-                      >
-                        ✕
-                      </button>
+                      />
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
+                        <button
+                          type="button"
+                          onClick={() => attachmentInputRef.current?.click()}
+                          className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                        >
+                          Attach file
+                        </button>
+                        {attachmentFile && (
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="truncate max-w-[120px] sm:max-w-none">{attachmentFile.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => setAttachmentFile(null)}
+                              className="text-[var(--text-muted)] hover:text-[var(--error)] flex-shrink-0"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      {attachmentError && (
+                        <p className="text-xs text-[var(--error)]">{attachmentError}</p>
+                      )}
                     </div>
-                    {attachmentError && (
-                      <p className="text-xs text-[var(--error)] mt-1 px-3">{attachmentError}</p>
-                    )}
+                    <button
+                      type="submit"
+                      disabled={!newMessage.trim() || sending}
+                      className="btn-primary px-4 sm:px-6 flex-shrink-0"
+                    >
+                      Send
+                    </button>
                   </div>
-                )}
-
-                {!conversationSecureReady && (
-                  <div className="px-3 md:px-4 py-2 border-t border-[var(--border-primary)] bg-[var(--bg-secondary)] text-xs text-[var(--text-muted)] flex flex-wrap items-center gap-2 justify-between">
-                    <span>
-                      {isLocked
-                        ? 'Unlock security to send encrypted messages.'
-                        : selectedCustomer && !recipientHasKey
-                          ? 'Recipient has not set up encryption. Messages will send standard.'
-                          : 'Encryption is still initializing. Messages will send standard.'}
-                    </span>
-                    {selectedCustomer && !recipientHasKey && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleSendSetupPrompt}
-                        disabled={sending || !!attachmentFile}
-                      >
-                        Send setup prompt
-                      </Button>
-                    )}
-                  </div>
-                )}
-
-                {/* iMessage-style input */}
-                <MessageInput
-                  value={newMessage}
-                  onChange={setNewMessage}
-                  onSend={() => handleSend({ preventDefault: () => {} } as any)}
-                  onAttach={attachmentFile ? undefined : () => attachmentInputRef.current?.click()}
-                  disabled={sending}
-                  sending={sending}
-                  placeholder="Message..."
-                />
+                </form>
               </>
             ) : (
               <div className="flex-1 flex items-center justify-center">

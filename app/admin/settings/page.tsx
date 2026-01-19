@@ -278,7 +278,7 @@ export default function AdminSettingsPage() {
       <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-8">Admin Settings</h1>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-x-visible scrollbar-hide">
         {(
           (isOwner
             ? (['users', 'activity', 'pricing', 'shipping', 'alerts', 'site'] as Array<typeof activeTab>)
@@ -287,17 +287,17 @@ export default function AdminSettingsPage() {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
               activeTab === tab
                 ? 'bg-[var(--accent)] text-white'
                 : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
             }`}
           >
             {tab === 'users' && 'Users & Roles'}
-            {tab === 'activity' && 'Activity Log'}
-            {tab === 'pricing' && 'Pricing Rules'}
-            {tab === 'shipping' && 'Shipping & Delivery'}
-            {tab === 'alerts' && 'Alerts & Cleanup'}
+            {tab === 'activity' && 'Activity'}
+            {tab === 'pricing' && 'Pricing'}
+            {tab === 'shipping' && 'Shipping'}
+            {tab === 'alerts' && 'Alerts'}
             {tab === 'site' && 'Site & Safety'}
           </button>
         ))}
@@ -581,6 +581,19 @@ function UsersTab({ users, isOwner, onUpdateRole, onAddUser, onDeleteUser }: {
   onDeleteUser: (user: User) => void
 }) {
   const [roleFilter, setRoleFilter] = useState<'all' | User['role']>('all')
+  const [expandedRoles, setExpandedRoles] = useState<Set<string>>(new Set())
+
+  const toggleRole = (role: string) => {
+    setExpandedRoles(prev => {
+      const next = new Set(prev)
+      if (next.has(role)) {
+        next.delete(role)
+      } else {
+        next.add(role)
+      }
+      return next
+    })
+  }
 
   const getRoleBadge = (role: string) => {
     const styles: Record<string, string> = {
@@ -592,7 +605,7 @@ function UsersTab({ users, isOwner, onUpdateRole, onAddUser, onDeleteUser }: {
     return styles[role] || styles.customer
   }
 
-  const rolePermissions = {
+  const rolePermissions: Record<string, string[]> = {
     owner: ['All permissions', 'Manage admins', 'Delete products', 'View financials', 'Export data'],
     admin: ['Manage products', 'Manage orders', 'Process refunds', 'View reports'],
     staff: ['View orders', 'Update inventory', 'Process shipments'],
@@ -606,21 +619,42 @@ function UsersTab({ users, isOwner, onUpdateRole, onAddUser, onDeleteUser }: {
   return (
     <div className="space-y-6">
       {/* Permissions Overview */}
-      <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6">
-        <h2 className="font-semibold text-[var(--text-primary)] mb-4">Role Permissions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-4 sm:p-6">
+        <h2 className="font-semibold text-[var(--text-primary)] mb-3 sm:mb-4">Role Permissions</h2>
+        <div className="space-y-2">
           {Object.entries(rolePermissions).map(([role, perms]) => (
-            <div key={role} className="p-4 bg-[var(--bg-tertiary)] rounded-lg">
-              <span className={`px-2 py-1 text-xs font-medium rounded ${getRoleBadge(role)}`}>
-                {role}
-              </span>
-              <ul className="mt-3 space-y-1">
-                {perms.map((perm, i) => (
-                  <li key={i} className="text-sm text-[var(--text-secondary)] flex items-center gap-2">
-                    <span className="text-[var(--success)]">✓</span> {perm}
-                  </li>
-                ))}
-              </ul>
+            <div key={role} className="bg-[var(--bg-tertiary)] rounded-lg overflow-hidden">
+              <button
+                type="button"
+                onClick={() => toggleRole(role)}
+                className="w-full px-4 py-3 flex items-center justify-between gap-3 hover:bg-[var(--bg-primary)]/50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${getRoleBadge(role)}`}>
+                    {role}
+                  </span>
+                  <span className="text-xs text-[var(--text-muted)]">
+                    {perms.length} permissions
+                  </span>
+                </div>
+                <svg
+                  className={`w-4 h-4 text-[var(--text-muted)] transition-transform ${expandedRoles.has(role) ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {expandedRoles.has(role) && (
+                <ul className="px-4 pb-3 space-y-1 border-t border-[var(--border-primary)]">
+                  {perms.map((perm, i) => (
+                    <li key={i} className="text-sm text-[var(--text-secondary)] flex items-center gap-2 pt-2 first:pt-3">
+                      <span className="text-[var(--success)]">✓</span> {perm}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           ))}
         </div>
@@ -628,105 +662,111 @@ function UsersTab({ users, isOwner, onUpdateRole, onAddUser, onDeleteUser }: {
 
       {/* Users List */}
       <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg overflow-hidden">
-        <div className="p-4 border-b border-[var(--border-primary)] flex justify-between items-center">
-          <div>
-            <h2 className="font-semibold text-[var(--text-primary)]">
-              Profiles ({filteredUsers.length})
-            </h2>
-            <p className="text-xs text-[var(--text-muted)]">
-              Filter to preview roles during demos.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <label className="text-xs text-[var(--text-muted)]">Role</label>
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value as 'all' | User['role'])}
-              className="text-sm bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded px-2 py-1"
-            >
-              <option value="all">All roles</option>
-              <option value="owner">Owner</option>
-              <option value="admin">Admin</option>
-              <option value="staff">Staff</option>
-              <option value="customer">Customer</option>
-            </select>
-            {isOwner ? (
-              <button onClick={onAddUser} className="btn-primary text-sm">
-                Invite User
-              </button>
-            ) : (
-              <span className="text-xs text-[var(--text-muted)]">Owner required</span>
-            )}
+        <div className="p-4 border-b border-[var(--border-primary)]">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+            <div>
+              <h2 className="font-semibold text-[var(--text-primary)]">
+                Profiles ({filteredUsers.length})
+              </h2>
+              <p className="text-xs text-[var(--text-muted)] hidden sm:block">
+                Filter to preview roles during demos.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex items-center gap-2 flex-1 sm:flex-initial">
+                <label className="text-xs text-[var(--text-muted)] sr-only sm:not-sr-only">Role</label>
+                <select
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value as 'all' | User['role'])}
+                  className="text-sm bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded px-2 py-1.5 flex-1 sm:flex-initial"
+                >
+                  <option value="all">All roles</option>
+                  <option value="owner">Owner</option>
+                  <option value="admin">Admin</option>
+                  <option value="staff">Staff</option>
+                  <option value="customer">Customer</option>
+                </select>
+              </div>
+              {isOwner ? (
+                <button onClick={onAddUser} className="btn-primary text-sm whitespace-nowrap">
+                  Invite
+                </button>
+              ) : (
+                <span className="text-xs text-[var(--text-muted)] hidden sm:inline">Owner required</span>
+              )}
+            </div>
           </div>
         </div>
         
-        <table className="w-full">
-          <thead className="bg-[var(--bg-tertiary)]">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">User</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Role</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Last Active</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--border-primary)]">
-            {filteredUsers.map((user) => (
-              <tr key={user.id} className="hover:bg-[var(--bg-tertiary)]">
-                <td className="px-4 py-4">
-                  <p className="text-sm font-medium text-[var(--text-primary)]">
-                    {user.full_name || user.email}
-                  </p>
-                  {user.full_name && (
-                    <p className="text-xs text-[var(--text-secondary)]">{user.email}</p>
-                  )}
-                  <p className="text-xs text-[var(--text-muted)]">Added {new Date(user.created_at).toLocaleDateString()}</p>
-                </td>
-                <td className="px-4 py-4">
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${getRoleBadge(user.role)}`}>
-                    {user.role}
-                  </span>
-                </td>
-                <td className="px-4 py-4 text-sm text-[var(--text-muted)]">
-                  {user.last_sign_in ? new Date(user.last_sign_in).toLocaleString() : 'Never'}
-                </td>
-                <td className="px-4 py-4">
-                  {isOwner && user.role !== 'owner' ? (
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={user.role}
-                        onChange={(e) => onUpdateRole(user.id, e.target.value)}
-                        className="text-sm bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded px-2 py-1"
-                      >
-                        <option value="customer">Customer</option>
-                        <option value="staff">Staff</option>
-                        <option value="admin">Admin</option>
-                        <option value="owner">Owner</option>
-                      </select>
-                      <button
-                        onClick={() => onDeleteUser(user)}
-                        className="p-1.5 text-[var(--text-muted)] hover:text-[var(--error)] hover:bg-[var(--error)]/10 rounded transition-colors"
-                        title="Delete user and all data"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="text-xs text-[var(--text-muted)]">—</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {filteredUsers.length === 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[500px]">
+            <thead className="bg-[var(--bg-tertiary)]">
               <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-[var(--text-muted)]">
-                  No profiles match this role.
-                </td>
+                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">User</th>
+                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Role</th>
+                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase hidden sm:table-cell">Last Active</th>
+                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase">Actions</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-[var(--border-primary)]">
+              {filteredUsers.map((user) => (
+                <tr key={user.id} className="hover:bg-[var(--bg-tertiary)]">
+                  <td className="px-3 sm:px-4 py-3 sm:py-4">
+                    <p className="text-sm font-medium text-[var(--text-primary)] truncate max-w-[150px] sm:max-w-none">
+                      {user.full_name || user.email}
+                    </p>
+                    {user.full_name && (
+                      <p className="text-xs text-[var(--text-secondary)] truncate max-w-[150px] sm:max-w-none">{user.email}</p>
+                    )}
+                    <p className="text-xs text-[var(--text-muted)]">Added {new Date(user.created_at).toLocaleDateString()}</p>
+                  </td>
+                  <td className="px-3 sm:px-4 py-3 sm:py-4">
+                    <span className={`px-2 py-1 text-xs font-medium rounded ${getRoleBadge(user.role)}`}>
+                      {user.role}
+                    </span>
+                  </td>
+                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-[var(--text-muted)] hidden sm:table-cell">
+                    {user.last_sign_in ? new Date(user.last_sign_in).toLocaleString() : 'Never'}
+                  </td>
+                  <td className="px-3 sm:px-4 py-3 sm:py-4">
+                    {isOwner && user.role !== 'owner' ? (
+                      <div className="flex items-center gap-1 sm:gap-2">
+                        <select
+                          value={user.role}
+                          onChange={(e) => onUpdateRole(user.id, e.target.value)}
+                          className="text-sm bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded px-1.5 sm:px-2 py-1"
+                        >
+                          <option value="customer">Customer</option>
+                          <option value="staff">Staff</option>
+                          <option value="admin">Admin</option>
+                          <option value="owner">Owner</option>
+                        </select>
+                        <button
+                          onClick={() => onDeleteUser(user)}
+                          className="p-1.5 text-[var(--text-muted)] hover:text-[var(--error)] hover:bg-[var(--error)]/10 rounded transition-colors flex-shrink-0"
+                          title="Delete user and all data"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-[var(--text-muted)]">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {filteredUsers.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-4 py-10 text-center text-[var(--text-muted)]">
+                    No profiles match this role.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )

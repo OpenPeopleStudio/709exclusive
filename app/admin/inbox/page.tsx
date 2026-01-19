@@ -528,31 +528,193 @@ export default function InboxPage() {
   }
 
   const handleAttach = async (file: File) => {
-    // TODO: Implement file attachment upload
-    // This will need to:
-    // 1. Generate a file encryption key
-    // 2. Encrypt the file
-    // 3. Upload to storage
-    // 4. Encrypt the file key with recipient's public key
-    // 5. Store attachment metadata
-    console.log('Attachment upload not yet implemented:', file.name)
-    alert('File attachments coming soon!')
+    if (!selectedId || !selectedType || !tenantId || !adminId) {
+      alert('Please select a conversation first')
+      return
+    }
+
+    // Validate file size (10MB limit)
+    const MAX_FILE_SIZE = 10 * 1024 * 1024
+    if (file.size > MAX_FILE_SIZE) {
+      alert('File is too large. Maximum size is 10MB.')
+      return
+    }
+
+    setSending(true)
+
+    try {
+      // Read file into ArrayBuffer
+      const fileBuffer = await file.arrayBuffer()
+      
+      // Generate a unique file key for encryption
+      const fileKey = await generateFileKey()
+      
+      // Encrypt the file
+      const { ciphertext: encryptedFile, iv: fileIv } = await encryptFileWithKey(fileBuffer, fileKey)
+      
+      // Generate unique storage path
+      const timestamp = Date.now()
+      const randomId = crypto.randomUUID()
+      const extension = file.name.split('.').pop() || 'bin'
+      const storagePath = `attachments/${tenantId}/${selectedId}/${timestamp}-${randomId}.enc`
+      
+      // Upload encrypted file to storage
+      const { error: uploadError } = await supabase.storage
+        .from('message-attachments')
+        .upload(storagePath, new Blob([encryptedFile]), {
+          contentType: 'application/octet-stream',
+          cacheControl: '3600'
+        })
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError)
+        alert('Failed to upload file. Please try again.')
+        setSending(false)
+        return
+      }
+
+      // Prepare message data
+      let messageData: {
+        tenant_id: string
+        customer_id: string
+        content: string
+        sender_type: 'admin'
+        read: boolean
+        attachment_path: string
+        attachment_name: string
+        attachment_type: string
+        attachment_size: number
+        encrypted?: boolean
+        iv?: string
+        sender_public_key?: string
+        message_index?: number
+        attachment_key?: string
+        attachment_key_iv?: string
+        attachment_key_sender_public_key?: string
+        attachment_key_message_index?: number
+      } = {
+        tenant_id: tenantId,
+        customer_id: selectedId,
+        content: `📎 ${file.name}`,
+        sender_type: 'admin',
+        read: false,
+        attachment_path: storagePath,
+        attachment_name: file.name,
+        attachment_type: file.type || 'application/octet-stream',
+        attachment_size: file.size
+      }
+
+      // If encryption is available, encrypt the file key for the recipient
+      if (isInitialized && selectedType === 'customer') {
+        const recipientKey = await getRecipientPublicKey(selectedId)
+        if (recipientKey) {
+          // Encrypt the file key using the same E2E encryption as messages
+          // This ensures only the recipient can decrypt the file
+          const encryptedFileKey = await encrypt(`${fileKey}:${fileIv}`, selectedId)
+          
+          if (encryptedFileKey) {
+            messageData = {
+              ...messageData,
+              encrypted: true,
+              attachment_key: encryptedFileKey.content,
+              attachment_key_iv: encryptedFileKey.iv,
+              attachment_key_sender_public_key: encryptedFileKey.senderPublicKey,
+              attachment_key_message_index: encryptedFileKey.messageIndex
+            }
+          }
+        }
+      }
+
+      // Insert message with attachment metadata
+      const { data, error } = await supabase
+        .from('messages')
+        .insert(messageData)
+        .select()
+        .single()
+
+      if (!error && data) {
+        setMessages(prev => [...prev, {
+          ...data,
+          content: `📎 ${file.name}`,
+          sender_id: adminId
+        }])
+      } else {
+        // Clean up uploaded file if message insert fails
+        await supabase.storage
+          .from('message-attachments')
+          .remove([storagePath])
+        throw new Error('Failed to save message')
+      }
+    } catch (error) {
+      console.error('Failed to upload attachment:', error)
+      alert('Failed to send attachment. Please try again.')
+    } finally {
+      setSending(false)
+    }
   }
 
   const handleDownloadAttachment = async (message: DecryptedMessage) => {
     if (!message.attachment_path) return
 
     try {
-      // TODO: Implement attachment download with decryption
-      // This will need to:
-      // 1. Download encrypted file from storage
-      // 2. Decrypt the file key with user's private key
-      // 3. Decrypt the file
-      // 4. Trigger download
-      console.log('Downloading attachment:', message.attachment_name)
-      alert('Attachment download coming soon!')
+      // Download encrypted file from storage
+      const { data: fileData, error: downloadError } = await supabase.storage
+        .from('message-attachments')
+        .download(message.attachment_path)
+
+      if (downloadError || !fileData) {
+        throw new Error('Failed to download file')
+      }
+
+      const encryptedBuffer = await fileData.arrayBuffer()
+      let decryptedBuffer: ArrayBuffer
+
+      // Check if the attachment is encrypted
+      if (message.attachment_key && message.attachment_key_iv && message.attachment_key_sender_public_key) {
+        // Decrypt the file key first
+        const decryptedKeyData = await decrypt(
+          {
+            id: message.id,
+            content: message.attachment_key,
+            encrypted: true,
+            iv: message.attachment_key_iv,
+            sender_public_key: message.attachment_key_sender_public_key,
+            message_index: message.attachment_key_message_index || 0,
+            sender_type: message.sender_type,
+            customer_id: message.customer_id
+          },
+          message.sender_type === 'admin' ? (message.sender_id || '') : message.customer_id
+        )
+
+        // Parse the decrypted key data (format: "fileKey:fileIv")
+        const [fileKey, fileIv] = decryptedKeyData.split(':')
+        
+        if (!fileKey || !fileIv) {
+          throw new Error('Invalid encrypted file key format')
+        }
+
+        // Decrypt the file
+        decryptedBuffer = await decryptFileWithKey(encryptedBuffer, fileKey, fileIv)
+      } else {
+        // File is not encrypted (legacy or unencrypted conversation)
+        decryptedBuffer = encryptedBuffer
+      }
+
+      // Create blob and trigger download
+      const blob = new Blob([decryptedBuffer], { 
+        type: message.attachment_type || 'application/octet-stream' 
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = message.attachment_name || 'attachment'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
     } catch (error) {
       console.error('Failed to download attachment:', error)
+      alert('Failed to download attachment. The file may be encrypted with a different key.')
     }
   }
 
@@ -751,6 +913,24 @@ export default function InboxPage() {
                             <div className="text-xs text-[var(--text-muted)]">Send via Resend</div>
                           </div>
                         </button>
+                        
+                        <div className="my-1 border-t border-[var(--border-primary)]" />
+                        
+                        {/* Group Messages - Coming Soon */}
+                        <div
+                          className="w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-md opacity-60 cursor-not-allowed"
+                        >
+                          <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                          <div className="flex-1 text-left">
+                            <div className="font-semibold text-[var(--text-secondary)]">Group Message</div>
+                            <div className="text-xs text-[var(--text-muted)]">Coming soon</div>
+                          </div>
+                          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-purple-500/20 text-purple-400">
+                            Soon
+                          </span>
+                        </div>
                       </div>
                       
                       <div className="px-3 py-2 bg-[var(--bg-tertiary)]/50 border-t border-[var(--border-primary)]">
@@ -825,9 +1005,9 @@ export default function InboxPage() {
         </div>
       ) : (
         /* Chat View */
-        <div className="h-full flex">
+        <div className="h-full flex overflow-hidden">
           {/* Main Thread */}
-          <div className={`flex-1 flex flex-col h-full transition-all duration-300 ${
+          <div className={`flex-1 flex flex-col h-full overflow-hidden transition-all duration-300 ${
             showCustomerProfile ? 'mr-0 lg:mr-96' : ''
           }`}>
             {inboxError && (

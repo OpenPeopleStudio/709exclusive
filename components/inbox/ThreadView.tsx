@@ -119,59 +119,57 @@ export default function ThreadView({
       <div className={`sticky top-0 z-10 px-4 md:px-6 py-4 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)] rounded-t-2xl md:rounded-t-3xl backdrop-blur-sm bg-[var(--bg-secondary)]/95 transition-transform duration-300 ${
         showHeader ? 'translate-y-0' : '-translate-y-full'
       }`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            {/* Mobile back button */}
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="lg:hidden p-2 -ml-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-            )}
+        <div className="flex items-center gap-3">
+          {/* Mobile back button */}
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="lg:hidden p-2 -ml-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors flex-shrink-0"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          )}
 
-            {/* Avatar */}
-            <div className="relative flex-shrink-0">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--accent)]/20 to-[var(--accent-blue)]/20 flex items-center justify-center text-sm font-semibold text-[var(--text-primary)] border border-[var(--border-primary)]">
-                {mainParticipant?.name?.[0]?.toUpperCase() || '?'}
-              </div>
-              <div className="absolute -bottom-0.5 -right-0.5">
-                <PresenceIndicator
-                  isOnline={mainParticipant?.isOnline || false}
-                  lastActiveAt={mainParticipant?.lastActiveAt || null}
-                  size="sm"
-                />
-              </div>
+          {/* Avatar */}
+          <div className="relative flex-shrink-0">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--accent)]/20 to-[var(--accent-blue)]/20 flex items-center justify-center text-sm font-semibold text-[var(--text-primary)] border border-[var(--border-primary)]">
+              {mainParticipant?.name?.[0]?.toUpperCase() || '?'}
             </div>
-
-            {/* Info */}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-[var(--text-primary)] truncate">
-                  {mainParticipant?.name || 'Unknown'}
-                </h3>
-                {isEncrypted && (
-                  <svg className="w-4 h-4 text-[var(--success)] flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                  </svg>
-                )}
-              </div>
-              {mainParticipant?.email && threadType === 'customer' && (
-                <p className="text-xs text-[var(--text-muted)] truncate">{mainParticipant.email}</p>
-              )}
-              {participants.length > 1 && (
-                <p className="text-xs text-[var(--text-muted)]">
-                  {participants.length} participants
-                </p>
-              )}
+            <div className="absolute -bottom-0.5 -right-0.5">
+              <PresenceIndicator
+                isOnline={mainParticipant?.isOnline || false}
+                lastActiveAt={mainParticipant?.lastActiveAt || null}
+                size="sm"
+              />
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-2">
+          {/* Info - constrained width */}
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-[var(--text-primary)] truncate max-w-[200px] sm:max-w-[300px]">
+                {mainParticipant?.name || 'Unknown'}
+              </h3>
+              {isEncrypted && (
+                <svg className="w-4 h-4 text-[var(--success)] flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                </svg>
+              )}
+            </div>
+            {mainParticipant?.email && threadType === 'customer' && (
+              <p className="text-xs text-[var(--text-muted)] truncate max-w-[200px] sm:max-w-[300px]">{mainParticipant.email}</p>
+            )}
+            {participants.length > 1 && (
+              <p className="text-xs text-[var(--text-muted)]">
+                {participants.length} participants
+              </p>
+            )}
+          </div>
+
+          {/* Actions - fixed position on right */}
+          <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
             {onOpenProfile && threadType === 'customer' && (
               <Button
                 variant="ghost"
@@ -190,7 +188,7 @@ export default function ThreadView({
       </div>
 
       {/* Messages Area */}
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3 bg-[var(--bg-primary)]">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 space-y-3 bg-[var(--bg-primary)]">
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center space-y-2">
@@ -236,15 +234,37 @@ export default function ThreadView({
 
                   {/* Attachment */}
                   {!msg.deleted_at && msg.attachment_path && onDownloadAttachment && (
-                    <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mt-1`}>
+                    <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mt-2`}>
                       <button
                         onClick={() => onDownloadAttachment(msg)}
-                        className="text-xs text-[var(--accent-blue)] hover:underline flex items-center gap-1"
+                        className={`group/attach flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all ${
+                          isOwn 
+                            ? 'bg-white/10 hover:bg-white/20' 
+                            : 'bg-[var(--bg-tertiary)] hover:bg-[var(--bg-primary)] border border-[var(--border-primary)]'
+                        }`}
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                          isOwn ? 'bg-white/20' : 'bg-[var(--accent)]/10'
+                        }`}>
+                          <svg className={`w-4 h-4 ${isOwn ? 'text-white' : 'text-[var(--accent)]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                        </div>
+                        <div className="text-left">
+                          <p className={`text-xs font-medium truncate max-w-[150px] ${
+                            isOwn ? 'text-white' : 'text-[var(--text-primary)]'
+                          }`}>
+                            {msg.attachment_name || 'Attachment'}
+                          </p>
+                          <p className={`text-[10px] ${isOwn ? 'text-white/60' : 'text-[var(--text-muted)]'}`}>
+                            Tap to download
+                          </p>
+                        </div>
+                        <svg className={`w-4 h-4 transition-transform group-hover/attach:translate-y-0.5 ${
+                          isOwn ? 'text-white/60' : 'text-[var(--text-muted)]'
+                        }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                         </svg>
-                        {msg.attachment_name || 'Download attachment'}
                       </button>
                     </div>
                   )}

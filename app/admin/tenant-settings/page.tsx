@@ -50,6 +50,37 @@ const featureOptions: Array<{ key: keyof TenantFeatureFlags; label: string; desc
 
 type CryptoProvider = TenantIntegrations['payments'] extends { crypto_provider?: infer T } ? T : never
 
+// Plan pricing and features
+const PLAN_DETAILS: Record<SubscriptionTier, {
+  name: string
+  price: number
+  description: string
+  features: string[]
+  color: string
+}> = {
+  starter: {
+    name: 'Starter',
+    price: 99,
+    description: 'Perfect for getting started',
+    features: ['Up to 100 products', 'Essential inventory tools', 'Customer messaging', 'Secure payments'],
+    color: 'var(--accent)',
+  },
+  professional: {
+    name: 'Professional',
+    price: 199,
+    description: 'Built for growth',
+    features: ['Unlimited products', 'Product drops & alerts', 'End-to-end encryption', 'Local delivery & pickup', 'Advanced analytics'],
+    color: 'var(--accent)',
+  },
+  enterprise: {
+    name: 'Enterprise',
+    price: 499,
+    description: 'Maximum performance',
+    features: ['All Professional features', 'Cryptocurrency payments', 'Consignment management', 'Priority support', 'Custom integrations'],
+    color: '#a855f7',
+  },
+}
+
 export default function TenantSettingsPage() {
   const [activeTab, setActiveTab] = useState<'general' | 'customization' | 'features' | 'integrations' | 'subscription'>('general')
   const [tenant, setTenant] = useState<TenantRecord | null>(null)
@@ -74,6 +105,15 @@ export default function TenantSettingsPage() {
   const [addingDomain, setAddingDomain] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  
+  // Subscription modal state
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState<SubscriptionTier | null>(null)
+  const [checkoutStep, setCheckoutStep] = useState<'select' | 'payment' | 'processing' | 'success'>('select')
+  const [mockCardNumber, setMockCardNumber] = useState('')
+  const [mockCardExpiry, setMockCardExpiry] = useState('')
+  const [mockCardCvc, setMockCardCvc] = useState('')
+  const [processingPayment, setProcessingPayment] = useState(false)
 
   const primaryDomain = useMemo(() => {
     return domains.find((d) => d.is_primary)?.domain || tenant?.primary_domain || ''
@@ -106,7 +146,7 @@ export default function TenantSettingsPage() {
           
           // Mock billing data (replace with actual API call)
           setBilling({
-            tier: 'professional',
+            tier: 'enterprise',
             status: 'active',
             current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           })
@@ -128,6 +168,72 @@ export default function TenantSettingsPage() {
     }
     load()
   }, [])
+
+  // Mock subscription change handlers
+  const handleSelectPlan = (tier: SubscriptionTier) => {
+    if (tier === billing?.tier) return
+    setSelectedPlan(tier)
+    setCheckoutStep('payment')
+    setShowCheckoutModal(true)
+    // Reset form
+    setMockCardNumber('')
+    setMockCardExpiry('')
+    setMockCardCvc('')
+  }
+
+  const handleMockPayment = async () => {
+    if (!selectedPlan) return
+    
+    setProcessingPayment(true)
+    setCheckoutStep('processing')
+    
+    // Simulate payment processing
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    
+    // Simulate success
+    setCheckoutStep('success')
+    
+    // Update billing after a short delay
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    
+    setBilling({
+      tier: selectedPlan,
+      status: 'active',
+      current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    })
+    
+    setProcessingPayment(false)
+    
+    // Close modal after showing success
+    setTimeout(() => {
+      setShowCheckoutModal(false)
+      setSelectedPlan(null)
+      setCheckoutStep('select')
+    }, 1000)
+  }
+
+  const formatCardNumber = (value: string) => {
+    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '')
+    const matches = v.match(/\d{4,16}/g)
+    const match = (matches && matches[0]) || ''
+    const parts = []
+    for (let i = 0, len = match.length; i < len; i += 4) {
+      parts.push(match.substring(i, i + 4))
+    }
+    return parts.length ? parts.join(' ') : value
+  }
+
+  const formatExpiry = (value: string) => {
+    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '')
+    if (v.length >= 2) {
+      return v.substring(0, 2) + '/' + v.substring(2, 4)
+    }
+    return v
+  }
+
+  const isPaymentFormValid = mockCardNumber.replace(/\s/g, '').length >= 15 && 
+    mockCardExpiry.length >= 5 && 
+    mockCardCvc.length >= 3
 
   const toggleFeature = (key: keyof TenantFeatureFlags) => {
     setFeatures((prev) => ({ ...prev, [key]: !prev?.[key] }))
@@ -312,9 +418,9 @@ export default function TenantSettingsPage() {
   return (
     <div className="space-y-6 max-w-7xl">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-3xl font-bold text-[var(--text-primary)]">Tenant Settings</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-[var(--text-primary)]">Tenant Settings</h1>
           <p className="text-sm text-[var(--text-muted)]">
             Manage your store configuration, branding, features, and subscription
           </p>
@@ -322,19 +428,19 @@ export default function TenantSettingsPage() {
         <button
           onClick={saveSettings}
           disabled={saving}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-semibold text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          className="group flex items-center justify-center gap-2.5 px-6 py-3 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-semibold text-sm transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed shadow-lg shadow-[var(--accent)]/25 hover:shadow-xl hover:shadow-[var(--accent)]/30 hover:-translate-y-0.5 active:translate-y-0 w-full sm:w-auto"
         >
           {saving ? (
             <>
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              Saving...
+              <span>Saving...</span>
             </>
           ) : (
             <>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <svg className="w-4 h-4 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
-              Save Changes
+              <span>Save Changes</span>
             </>
           )}
         </button>
@@ -533,30 +639,32 @@ export default function TenantSettingsPage() {
                 </div>
               )}
               
-              <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <input
                   type="text"
-                  className="w-full rounded-lg border border-[var(--border-primary)] bg-[var(--bg-elevated)] px-3 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent"
+                  className="flex-1 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-elevated)] px-3 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent"
                   value={domainInput}
                   onChange={(e) => setDomainInput(e.target.value)}
                   placeholder="store.yourdomain.com"
                 />
-                <label className="flex items-center gap-2 px-3 py-2.5 text-sm text-[var(--text-secondary)] whitespace-nowrap">
-                  <input
-                    type="checkbox"
-                    checked={makePrimary}
-                    onChange={() => setMakePrimary((prev) => !prev)}
-                    className="rounded border-[var(--border-primary)]"
-                  />
-                  Make primary
-                </label>
-                <button
-                  onClick={addDomain}
-                  disabled={addingDomain || !domainInput.trim()}
-                  className="px-5 py-2.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-semibold text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
-                >
-                  {addingDomain ? 'Adding...' : 'Add Domain'}
-                </button>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-[var(--text-secondary)] whitespace-nowrap rounded-lg border border-[var(--border-primary)] bg-[var(--bg-elevated)] cursor-pointer hover:border-[var(--accent)]/50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={makePrimary}
+                      onChange={() => setMakePrimary((prev) => !prev)}
+                      className="w-4 h-4 rounded border-[var(--border-primary)] text-[var(--accent)] focus:ring-[var(--accent)] focus:ring-offset-0 cursor-pointer"
+                    />
+                    <span>Primary</span>
+                  </label>
+                  <button
+                    onClick={addDomain}
+                    disabled={addingDomain || !domainInput.trim()}
+                    className="px-5 py-2.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-semibold text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    {addingDomain ? 'Adding...' : 'Add Domain'}
+                  </button>
+                </div>
               </div>
             </section>
           </div>
@@ -949,19 +1057,52 @@ export default function TenantSettingsPage() {
 
         {activeTab === 'subscription' && (
           <div className="space-y-6">
+            {/* Platform Info */}
+            <section className="rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-transparent p-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold text-[var(--text-primary)]">open_people Platform</h2>
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-purple-500/20 text-purple-400 uppercase tracking-wide">
+                      Powered by
+                    </span>
+                  </div>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">
+                    Your store is built on the open_people platform — a unified commerce infrastructure for modern businesses.
+                  </p>
+                </div>
+              </div>
+            </section>
+
             {/* Current Plan */}
             <section className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-6 space-y-5">
               <div>
                 <h2 className="text-lg font-semibold text-[var(--text-primary)]">Current Subscription</h2>
-                <p className="text-sm text-[var(--text-muted)] mt-1">Manage your billing and subscription</p>
+                <p className="text-sm text-[var(--text-muted)] mt-1">Manage your open_people platform billing</p>
               </div>
               
               {billing && (
-                <div className="p-5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-primary)]">
-                  <div className="flex items-start justify-between gap-4">
+                <div className={`p-5 rounded-xl border-2 ${
+                  billing.tier === 'enterprise' 
+                    ? 'border-purple-500/30 bg-gradient-to-br from-purple-500/10 via-[var(--bg-elevated)] to-[var(--bg-elevated)]'
+                    : 'border-[var(--border-primary)] bg-[var(--bg-elevated)]'
+                }`}>
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-3">
-                        <h3 className="text-xl font-bold text-[var(--text-primary)] capitalize">{billing.tier} Plan</h3>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          {billing.tier === 'enterprise' && (
+                            <svg className="w-6 h-6 text-purple-400" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1zM12 2a1 1 0 01.967.744L14.146 7.2 17.5 9.134a1 1 0 010 1.732l-3.354 1.935-1.18 4.455a1 1 0 01-1.933 0L9.854 12.8 6.5 10.866a1 1 0 010-1.732l3.354-1.935 1.18-4.455A1 1 0 0112 2z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                          <h3 className="text-xl font-bold text-[var(--text-primary)] capitalize">{billing.tier} Plan</h3>
+                        </div>
                         <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
                           billing.status === 'active' ? 'bg-green-500/20 text-green-500' :
                           billing.status === 'trialing' ? 'bg-blue-500/20 text-blue-500' :
@@ -974,19 +1115,48 @@ export default function TenantSettingsPage() {
                            'Canceled'}
                         </span>
                       </div>
+                      <div className="mt-3 flex items-baseline gap-2">
+                        <span className="text-3xl font-bold text-[var(--text-primary)]">$499</span>
+                        <span className="text-[var(--text-muted)]">/month</span>
+                      </div>
                       {billing.current_period_end && (
                         <p className="text-sm text-[var(--text-muted)] mt-2">
-                          Next billing date: {new Date(billing.current_period_end).toLocaleDateString()}
+                          Next billing: {new Date(billing.current_period_end).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                         </p>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      className="px-4 py-2 rounded-lg border border-[var(--border-primary)] text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
-                    >
-                      Manage Billing
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="px-4 py-2 rounded-lg border border-[var(--border-primary)] text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                      >
+                        View Invoice
+                      </button>
+                      <button
+                        type="button"
+                        className="px-4 py-2 rounded-lg bg-[var(--accent)] text-white text-sm font-medium hover:bg-[var(--accent-hover)] transition-colors"
+                      >
+                        Manage
+                      </button>
+                    </div>
                   </div>
+                  
+                  {/* Enterprise Features */}
+                  {billing.tier === 'enterprise' && (
+                    <div className="mt-5 pt-5 border-t border-[var(--border-primary)]">
+                      <p className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide mb-3">Included Features</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {['Unlimited Products', 'E2E Encryption', 'Product Drops', 'Crypto Payments', 'Consignments', 'Priority Support'].map((feature) => (
+                          <div key={feature} className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                            <svg className="w-4 h-4 text-purple-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            <span>{feature}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </section>
@@ -1045,10 +1215,11 @@ export default function TenantSettingsPage() {
                   <div className="p-8 pt-0">
                     <button
                       type="button"
+                      onClick={() => handleSelectPlan('starter')}
                       disabled={billing?.tier === 'starter'}
                       className="w-full py-3 rounded-xl font-semibold text-sm transition-all duration-200 border border-[var(--border-primary)] text-[var(--text-primary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-[var(--border-primary)] disabled:hover:text-[var(--text-primary)]"
                     >
-                      {billing?.tier === 'starter' ? 'Active Plan' : 'Select Plan'}
+                      {billing?.tier === 'starter' ? '✓ Current Plan' : 'Select Plan'}
                     </button>
                   </div>
                 </div>
@@ -1112,72 +1283,95 @@ export default function TenantSettingsPage() {
                     <div className="p-8 pt-0">
                       <button
                         type="button"
+                        onClick={() => handleSelectPlan('professional')}
                         disabled={billing?.tier === 'professional'}
                         className="w-full py-3 rounded-xl font-bold text-sm transition-all duration-200 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white shadow-lg shadow-[var(--accent)]/30 hover:shadow-xl hover:shadow-[var(--accent)]/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                       >
-                        {billing?.tier === 'professional' ? 'Active Plan' : 'Get Started'}
+                        {billing?.tier === 'professional' ? '✓ Current Plan' : 'Get Started'}
                       </button>
                     </div>
                   </div>
                 </div>
 
                 {/* Enterprise */}
-                <div className="group relative rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] hover:border-[var(--border-secondary)] transition-all duration-300 overflow-hidden">
-                  <div className="p-8 space-y-6">
-                    <div className="space-y-2">
-                      <h4 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">Enterprise</h4>
-                      <p className="text-sm text-[var(--text-muted)]">Maximum performance</p>
+                <div className={`group relative rounded-2xl overflow-visible ${
+                  billing?.tier === 'enterprise'
+                    ? 'bg-gradient-to-b from-purple-500 to-purple-600 p-[2px] transform md:scale-105 shadow-xl shadow-purple-500/20 mt-6'
+                    : 'border border-[var(--border-primary)] bg-[var(--bg-secondary)] hover:border-[var(--border-secondary)] transition-all duration-300'
+                }`}>
+                  {billing?.tier === 'enterprise' && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
+                      <div className="px-4 py-1.5 rounded-full bg-purple-500 text-white text-xs font-bold tracking-wide shadow-lg flex items-center gap-1.5">
+                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1zM12 2a1 1 0 01.967.744L14.146 7.2 17.5 9.134a1 1 0 010 1.732l-3.354 1.935-1.18 4.455a1 1 0 01-1.933 0L9.854 12.8 6.5 10.866a1 1 0 010-1.732l3.354-1.935 1.18-4.455A1 1 0 0112 2z" clipRule="evenodd" />
+                        </svg>
+                        YOUR PLAN
+                      </div>
                     </div>
-                    
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-5xl font-bold text-[var(--text-primary)] tracking-tight">$499</span>
-                      <span className="text-[var(--text-muted)] font-medium">/mo</span>
-                    </div>
-                    
-                    <div className="h-px bg-[var(--border-primary)]"></div>
-                    
-                    <ul className="space-y-3">
-                      <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
-                        <svg className="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span>All Professional features</span>
-                      </li>
-                      <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
-                        <svg className="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span>Cryptocurrency payments</span>
-                      </li>
-                      <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
-                        <svg className="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span>Consignment management</span>
-                      </li>
-                      <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
-                        <svg className="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span>Priority support</span>
-                      </li>
-                      <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
-                        <svg className="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span>Custom integrations</span>
-                      </li>
-                    </ul>
-                  </div>
+                  )}
                   
-                  <div className="p-8 pt-0">
-                    <button
-                      type="button"
-                      disabled={billing?.tier === 'enterprise'}
-                      className="w-full py-3 rounded-xl font-semibold text-sm transition-all duration-200 border border-[var(--border-primary)] text-[var(--text-primary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-[var(--border-primary)] disabled:hover:text-[var(--text-primary)]"
-                    >
-                      {billing?.tier === 'enterprise' ? 'Active Plan' : 'Contact Sales'}
-                    </button>
+                  <div className={`${billing?.tier === 'enterprise' ? 'rounded-2xl bg-[var(--bg-secondary)] h-full' : ''}`}>
+                    <div className={`p-8 space-y-6 ${billing?.tier === 'enterprise' ? 'pt-12' : ''}`}>
+                      <div className="space-y-2">
+                        <h4 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">Enterprise</h4>
+                        <p className="text-sm text-[var(--text-muted)]">Maximum performance</p>
+                      </div>
+                      
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-5xl font-bold text-[var(--text-primary)] tracking-tight">$499</span>
+                        <span className="text-[var(--text-muted)] font-medium">/mo</span>
+                      </div>
+                      
+                      <div className={`h-px ${billing?.tier === 'enterprise' ? 'bg-gradient-to-r from-transparent via-purple-500/30 to-transparent' : 'bg-[var(--border-primary)]'}`}></div>
+                      
+                      <ul className="space-y-3">
+                        <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
+                          <svg className={`w-5 h-5 flex-shrink-0 mt-0.5 ${billing?.tier === 'enterprise' ? 'text-purple-400' : 'text-[var(--accent)]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className={billing?.tier === 'enterprise' ? 'font-medium' : ''}>All Professional features</span>
+                        </li>
+                        <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
+                          <svg className={`w-5 h-5 flex-shrink-0 mt-0.5 ${billing?.tier === 'enterprise' ? 'text-purple-400' : 'text-[var(--accent)]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className={billing?.tier === 'enterprise' ? 'font-medium' : ''}>Cryptocurrency payments</span>
+                        </li>
+                        <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
+                          <svg className={`w-5 h-5 flex-shrink-0 mt-0.5 ${billing?.tier === 'enterprise' ? 'text-purple-400' : 'text-[var(--accent)]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className={billing?.tier === 'enterprise' ? 'font-medium' : ''}>Consignment management</span>
+                        </li>
+                        <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
+                          <svg className={`w-5 h-5 flex-shrink-0 mt-0.5 ${billing?.tier === 'enterprise' ? 'text-purple-400' : 'text-[var(--accent)]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className={billing?.tier === 'enterprise' ? 'font-medium' : ''}>Priority support</span>
+                        </li>
+                        <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
+                          <svg className={`w-5 h-5 flex-shrink-0 mt-0.5 ${billing?.tier === 'enterprise' ? 'text-purple-400' : 'text-[var(--accent)]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className={billing?.tier === 'enterprise' ? 'font-medium' : ''}>Custom integrations</span>
+                        </li>
+                      </ul>
+                    </div>
+                    
+                    <div className="p-8 pt-0">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectPlan('enterprise')}
+                        disabled={billing?.tier === 'enterprise'}
+                        className={`w-full py-3 rounded-xl font-bold text-sm transition-all duration-200 ${
+                          billing?.tier === 'enterprise'
+                            ? 'bg-purple-500/20 text-purple-400 cursor-default'
+                            : 'border border-[var(--border-primary)] text-[var(--text-primary)] hover:border-purple-500 hover:text-purple-400'
+                        }`}
+                      >
+                        {billing?.tier === 'enterprise' ? '✓ Current Plan' : 'Upgrade Now'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1205,6 +1399,196 @@ export default function TenantSettingsPage() {
           </div>
         )}
       </div>
+
+      {/* Mock Checkout Modal */}
+      {showCheckoutModal && selectedPlan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-[var(--border-primary)] bg-gradient-to-r from-[var(--bg-tertiary)] to-transparent">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-[var(--text-primary)]">
+                    {checkoutStep === 'success' ? 'Welcome to ' + PLAN_DETAILS[selectedPlan].name + '!' : 
+                     checkoutStep === 'processing' ? 'Processing Payment...' :
+                     'Upgrade to ' + PLAN_DETAILS[selectedPlan].name}
+                  </h2>
+                  {checkoutStep === 'payment' && (
+                    <p className="text-sm text-[var(--text-muted)] mt-1">
+                      {billing?.tier ? `Changing from ${PLAN_DETAILS[billing.tier].name} plan` : 'Complete your subscription'}
+                    </p>
+                  )}
+                </div>
+                {checkoutStep !== 'processing' && (
+                  <button
+                    onClick={() => {
+                      setShowCheckoutModal(false)
+                      setSelectedPlan(null)
+                      setCheckoutStep('select')
+                    }}
+                    className="p-2 -mr-2 -mt-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6">
+              {checkoutStep === 'payment' && (
+                <div className="space-y-6">
+                  {/* Plan Summary */}
+                  <div className="p-4 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-primary)]">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-[var(--text-primary)]">{PLAN_DETAILS[selectedPlan].name} Plan</p>
+                        <p className="text-sm text-[var(--text-muted)]">{PLAN_DETAILS[selectedPlan].description}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-[var(--text-primary)]">${PLAN_DETAILS[selectedPlan].price}</p>
+                        <p className="text-xs text-[var(--text-muted)]">per month</p>
+                      </div>
+                    </div>
+                    
+                    {/* Price difference */}
+                    {billing?.tier && PLAN_DETAILS[selectedPlan].price !== PLAN_DETAILS[billing.tier].price && (
+                      <div className="mt-3 pt-3 border-t border-[var(--border-primary)]">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-[var(--text-muted)]">
+                            {PLAN_DETAILS[selectedPlan].price > PLAN_DETAILS[billing.tier].price ? 'Additional cost' : 'You save'}
+                          </span>
+                          <span className={PLAN_DETAILS[selectedPlan].price > PLAN_DETAILS[billing.tier].price ? 'text-[var(--warning)]' : 'text-[var(--success)]'}>
+                            ${Math.abs(PLAN_DETAILS[selectedPlan].price - PLAN_DETAILS[billing.tier].price)}/mo
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Mock Credit Card Form */}
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Card Number</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={mockCardNumber}
+                          onChange={(e) => setMockCardNumber(formatCardNumber(e.target.value))}
+                          placeholder="4242 4242 4242 4242"
+                          maxLength={19}
+                          className="w-full px-4 py-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 font-mono"
+                        />
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1">
+                          <svg className="w-8 h-5 text-[var(--text-muted)]" viewBox="0 0 32 20" fill="currentColor">
+                            <rect x="0" y="0" width="32" height="20" rx="3" fill="currentColor" opacity="0.1"/>
+                            <circle cx="12" cy="10" r="5" fill="#EB001B" opacity="0.8"/>
+                            <circle cx="20" cy="10" r="5" fill="#F79E1B" opacity="0.8"/>
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Expiry</label>
+                        <input
+                          type="text"
+                          value={mockCardExpiry}
+                          onChange={(e) => setMockCardExpiry(formatExpiry(e.target.value))}
+                          placeholder="MM/YY"
+                          maxLength={5}
+                          className="w-full px-4 py-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">CVC</label>
+                        <input
+                          type="text"
+                          value={mockCardCvc}
+                          onChange={(e) => setMockCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                          placeholder="123"
+                          maxLength={4}
+                          className="w-full px-4 py-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Test Mode Notice */}
+                  <div className="p-3 rounded-lg bg-[var(--warning)]/10 border border-[var(--warning)]/20">
+                    <div className="flex items-start gap-2">
+                      <svg className="w-5 h-5 text-[var(--warning)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-medium text-[var(--warning)]">Test Mode</p>
+                        <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                          This is a mock payment. Use any card number (e.g., 4242 4242 4242 4242).
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Submit Button */}
+                  <button
+                    onClick={handleMockPayment}
+                    disabled={!isPaymentFormValid}
+                    className="w-full py-4 rounded-xl font-bold text-sm transition-all duration-200 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white shadow-lg shadow-[var(--accent)]/30 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                  >
+                    Pay ${PLAN_DETAILS[selectedPlan].price}/month
+                  </button>
+                  
+                  <p className="text-center text-xs text-[var(--text-muted)]">
+                    By confirming, you agree to the terms of service. Cancel anytime.
+                  </p>
+                </div>
+              )}
+
+              {checkoutStep === 'processing' && (
+                <div className="py-12 text-center">
+                  <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-[var(--accent)]/10 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-[var(--accent)] animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  </div>
+                  <p className="text-lg font-semibold text-[var(--text-primary)]">Processing your payment...</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-2">Please wait while we confirm your subscription.</p>
+                </div>
+              )}
+
+              {checkoutStep === 'success' && (
+                <div className="py-12 text-center">
+                  <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-[var(--success)]/10 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-[var(--success)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <p className="text-lg font-semibold text-[var(--text-primary)]">Payment Successful!</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-2">
+                    You&apos;re now on the {PLAN_DETAILS[selectedPlan].name} plan.
+                  </p>
+                  <div className="mt-6 p-4 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-primary)]">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-[var(--text-muted)]">Amount charged</span>
+                      <span className="font-semibold text-[var(--text-primary)]">${PLAN_DETAILS[selectedPlan].price}.00</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm mt-2">
+                      <span className="text-[var(--text-muted)]">Next billing date</span>
+                      <span className="font-semibold text-[var(--text-primary)]">
+                        {new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

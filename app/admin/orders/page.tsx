@@ -153,14 +153,27 @@ export default function AdminOrdersPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">Orders</h1>
-        <div className="flex gap-3">
-          <Link href="/admin/orders/returns" className="btn-secondary">
-            Returns & Exchanges
+        <div className="flex gap-2">
+          <Link 
+            href="/admin/orders/returns" 
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]/50 hover:bg-[var(--bg-tertiary)] transition-all text-sm font-medium"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z" />
+            </svg>
+            <span className="hidden sm:inline">Returns</span>
+            <span className="sm:hidden">Returns</span>
           </Link>
-          <Link href="/admin/orders/consignments" className="btn-secondary">
-            Consignments
+          <Link 
+            href="/admin/orders/consignments" 
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]/50 hover:bg-[var(--bg-tertiary)] transition-all text-sm font-medium"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+            <span>Consign</span>
           </Link>
         </div>
       </div>
